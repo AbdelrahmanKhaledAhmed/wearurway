@@ -11,7 +11,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
+- **Database**: PostgreSQL + Drizzle ORM (not used by wearurway — JSON file store used instead)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
@@ -25,3 +25,52 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## wearurway Project
+
+### Overview
+
+A premium streetwear customization website with a multi-step product configurator and a protected admin panel.
+
+### Frontend (artifacts/wearurway)
+
+- React + Vite + Tailwind CSS
+- Dark streetwear aesthetic (near-black background, off-white text)
+- `framer-motion` for transitions
+- Wouter for routing
+- Customization flow: Landing → Products → Fits → Colors → Sizes
+- Admin flow: /admin (login) → /admin/dashboard
+
+### Backend (artifacts/api-server)
+
+- Express 5 API, data stored in `artifacts/api-server/src/data/db.json`
+- No database — JSON file store for simplicity
+- Admin password: set via `ADMIN_PASSWORD` env var (default: `admin123`)
+
+### Routes
+
+- `GET /api/products` — list products
+- `PATCH /api/products/:id` — update product availability
+- `GET /api/fits` — list fits
+- `PATCH /api/fits/:id` — update fit availability
+- `GET /api/fits/:fitId/colors` — list colors for a fit
+- `POST /api/fits/:fitId/colors` — add a color (admin)
+- `DELETE /api/fits/:fitId/colors/:colorId` — remove a color (admin)
+- `GET /api/fits/:fitId/sizes` — list sizes for a fit
+- `POST /api/fits/:fitId/sizes` — add a size (admin)
+- `PATCH /api/fits/:fitId/sizes/:sizeId` — update a size (admin)
+- `DELETE /api/fits/:fitId/sizes/:sizeId` — delete a size (admin)
+- `POST /api/admin/login` — admin login (returns token)
+- `POST /api/admin/logout` — admin logout
+- `GET /api/admin/me` — check admin session
+
+### Assets
+
+- Logo: `artifacts/wearurway/public/logo.png` (1024x1024) — if absent, a styled text wordmark is shown
+- Size images: `artifacts/wearurway/public/size-images/` — naming format: `Boxy-Fit-Small.png`, `Regular-Fit-Medium.png`, etc.
+
+### Admin Panel
+
+- URL: `/admin`
+- Default password: `admin123`
+- Features: toggle product/fit availability, manage colors (add/delete with hex picker), manage sizes (add/edit/delete)

@@ -1,0 +1,59 @@
+import { Router, type IRouter } from "express";
+import {
+  AdminLoginBody,
+  AdminLoginResponse,
+  GetAdminMeResponse,
+} from "@workspace/api-zod";
+
+const router: IRouter = Router();
+
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "admin123";
+
+const sessions = new Set<string>();
+
+function generateSessionToken(): string {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+export function isAdminAuthenticated(req: { headers: Record<string, string | string[] | undefined> }): boolean {
+  const auth = req.headers["authorization"];
+  if (!auth || typeof auth !== "string") return false;
+  const token = auth.replace("Bearer ", "").trim();
+  return sessions.has(token);
+}
+
+router.post("/admin/login", (req, res) => {
+  const body = AdminLoginBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Invalid body" });
+    return;
+  }
+
+  if (body.data.password !== ADMIN_PASSWORD) {
+    res.status(401).json({ error: "Invalid password" });
+    return;
+  }
+
+  const token = generateSessionToken();
+  sessions.add(token);
+
+  const data = AdminLoginResponse.parse({ success: true, message: "Logged in" });
+  res.json({ ...data, token });
+});
+
+router.post("/admin/logout", (req, res) => {
+  const auth = req.headers["authorization"];
+  if (auth && typeof auth === "string") {
+    const token = auth.replace("Bearer ", "").trim();
+    sessions.delete(token);
+  }
+  res.json({ success: true });
+});
+
+router.get("/admin/me", (req, res) => {
+  const authenticated = isAdminAuthenticated(req as Parameters<typeof isAdminAuthenticated>[0]);
+  const data = GetAdminMeResponse.parse({ authenticated });
+  res.json(data);
+});
+
+export default router;

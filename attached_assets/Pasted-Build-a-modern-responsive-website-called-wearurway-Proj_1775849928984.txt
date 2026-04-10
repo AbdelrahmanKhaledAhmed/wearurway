@@ -1,0 +1,130 @@
+Build a modern responsive website called "wearurway".
+
+Project structure must be clean and scalable using React (Vite) for frontend and Node.js + Express for backend.
+
+First:
+Tell me exactly where to place the logo file.
+The logo will be named "logo.png" with size 1024x1024.
+Use it in the navbar (top left).
+
+-----------------------------------
+
+USER FLOW:
+
+1) Landing Page:
+- Full screen clean design
+- Center button: "Start Customize"
+
+-----------------------------------
+
+2) Product Selection Page:
+Ask: "Which do you need?"
+
+Options:
+- T-Shirt (Available)
+- Sweatshirt (Coming Soon - disabled button)
+- Sweatpants (Coming Soon - disabled button)
+
+-----------------------------------
+
+3) Fit Selection Page (after clicking T-Shirt):
+Ask: "Which fit do you prefer?"
+
+Options:
+- Boxy Fit (Available)
+- Regular Fit (Available)
+- Oversize (Coming Soon - disabled)
+
+-----------------------------------
+
+4) Color Selection Page:
+- Show available colors dynamically (based on selected fit)
+- Colors should be manageable from admin panel
+
+-----------------------------------
+
+5) Size Selection Page:
+- Each size has:
+  - realWidth
+  - realHeight
+  - image preview above it
+
+Image naming format:
+- Boxy-Fit-Small.png
+- Boxy-Fit-Medium.png
+- Regular-Fit-Large.png
+
+Display image above each size option
+
+IMPORTANT:
+Sizes differ per fit (Boxy ≠ Regular)
+
+-----------------------------------
+
+ADMIN PANEL:
+
+Create a protected admin dashboard (/admin)
+
+Admin features:
+
+1) Toggle availability:
+- Enable/Disable:
+  - Products (T-Shirt, Sweatshirt, Sweatpants)
+  - Fits (Boxy, Regular, Oversize)
+
+2) Manage Colors:
+- Add / Remove colors per fit
+
+3) Manage Sizes:
+- Add / Edit / Delete sizes per fit
+Each size includes:
+  - Name (Small, Medium, etc.)
+  - realWidth
+  - realHeight
+  - Image
+
+4) Change "Coming Soon" to Available and vice versa dynamically
+
+-----------------------------------
+
+TECH REQUIREMENTS:
+
+- Use React (Vite)
+- Use Tailwind CSS for styling
+- Use Zustand or Context API for state management
+- Backend: Node.js + Express
+- Store data in JSON file or simple database (like MongoDB optional)
+
+-----------------------------------
+
+UI/UX:
+
+- Clean modern streetwear style
+- Smooth transitions between steps
+- Mobile friendly
+- Buttons clearly disabled for "Coming Soon"
+
+-----------------------------------
+
+EXTRA:
+
+- Add loading states between steps
+- Keep code modular (components for each step)
+- Use reusable components
+
+-----------------------------------
+
+IMPORTANT:
+
+At the end, explain project structure like:
+
+/src
+  /components
+  /pages
+  /assets
+  /admin
+
+And clearly tell me:
+Where exactly I should put:
+- logo.png
+- size images

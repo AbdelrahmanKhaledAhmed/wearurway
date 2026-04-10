@@ -3,20 +3,29 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: wearurway API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: products
+    description: Product operations
+  - name: fits
+    description: Fit operations
+  - name: colors
+    description: Color operations
+  - name: sizes
+    description: Size operations
+  - name: admin
+    description: Admin operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +33,292 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /products:
+    get:
+      operationId: getProducts
+      tags: [products]
+      summary: Get all products
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /products/{id}:
+    patch:
+      operationId: updateProduct
+      tags: [products, admin]
+      summary: Update a product (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductBody"
+      responses:
+        "200":
+          description: Updated product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  /fits:
+    get:
+      operationId: getFits
+      tags: [fits]
+      summary: Get all fits
+      responses:
+        "200":
+          description: List of fits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Fit"
+
+  /fits/{id}:
+    patch:
+      operationId: updateFit
+      tags: [fits, admin]
+      summary: Update a fit (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFitBody"
+      responses:
+        "200":
+          description: Updated fit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fit"
+
+  /fits/{fitId}/colors:
+    get:
+      operationId: getColors
+      tags: [colors]
+      summary: Get colors for a fit
+      parameters:
+        - in: path
+          name: fitId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of colors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Color"
+    post:
+      operationId: addColor
+      tags: [colors, admin]
+      summary: Add a color to a fit (admin)
+      parameters:
+        - in: path
+          name: fitId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddColorBody"
+      responses:
+        "201":
+          description: Created color
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Color"
+
+  /fits/{fitId}/colors/{colorId}:
+    delete:
+      operationId: deleteColor
+      tags: [colors, admin]
+      summary: Remove a color from a fit (admin)
+      parameters:
+        - in: path
+          name: fitId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: colorId
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /fits/{fitId}/sizes:
+    get:
+      operationId: getSizes
+      tags: [sizes]
+      summary: Get sizes for a fit
+      parameters:
+        - in: path
+          name: fitId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of sizes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Size"
+    post:
+      operationId: addSize
+      tags: [sizes, admin]
+      summary: Add a size to a fit (admin)
+      parameters:
+        - in: path
+          name: fitId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddSizeBody"
+      responses:
+        "201":
+          description: Created size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Size"
+
+  /fits/{fitId}/sizes/{sizeId}:
+    patch:
+      operationId: updateSize
+      tags: [sizes, admin]
+      summary: Update a size (admin)
+      parameters:
+        - in: path
+          name: fitId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: sizeId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSizeBody"
+      responses:
+        "200":
+          description: Updated size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Size"
+    delete:
+      operationId: deleteSize
+      tags: [sizes, admin]
+      summary: Delete a size (admin)
+      parameters:
+        - in: path
+          name: fitId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: sizeId
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /admin/login:
+    post:
+      operationId: adminLogin
+      tags: [admin]
+      summary: Admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginBody"
+      responses:
+        "200":
+          description: Login success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLoginResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/logout:
+    post:
+      operationId: adminLogout
+      tags: [admin]
+      summary: Admin logout
+      responses:
+        "200":
+          description: Logged out
+
+  /admin/me:
+    get:
+      operationId: getAdminMe
+      tags: [admin]
+      summary: Check admin session
+      responses:
+        "200":
+          description: Admin session info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMeResponse"
+        "401":
+          description: Not authenticated
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +329,168 @@ components:
       required:
         - status
 
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        available:
+          type: boolean
+        comingSoon:
+          type: boolean
+      required:
+        - id
+        - name
+        - available
+        - comingSoon
+
+    UpdateProductBody:
+      type: object
+      properties:
+        available:
+          type: boolean
+        comingSoon:
+          type: boolean
+
+    Fit:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        available:
+          type: boolean
+        comingSoon:
+          type: boolean
+        productId:
+          type: string
+      required:
+        - id
+        - name
+        - available
+        - comingSoon
+        - productId
+
+    UpdateFitBody:
+      type: object
+      properties:
+        available:
+          type: boolean
+        comingSoon:
+          type: boolean
+
+    Color:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        hex:
+          type: string
+        fitId:
+          type: string
+      required:
+        - id
+        - name
+        - hex
+        - fitId
+
+    AddColorBody:
+      type: object
+      properties:
+        name:
+          type: string
+        hex:
+          type: string
+      required:
+        - name
+        - hex
+
+    Size:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        realWidth:
+          type: number
+        realHeight:
+          type: number
+        image:
+          type: string
+        fitId:
+          type: string
+      required:
+        - id
+        - name
+        - realWidth
+        - realHeight
+        - fitId
+
+    AddSizeBody:
+      type: object
+      properties:
+        name:
+          type: string
+        realWidth:
+          type: number
+        realHeight:
+          type: number
+        image:
+          type: string
+      required:
+        - name
+        - realWidth
+        - realHeight
+
+    UpdateSizeBody:
+      type: object
+      properties:
+        name:
+          type: string
+        realWidth:
+          type: number
+        realHeight:
+          type: number
+        image:
+          type: string
+
+    AdminLoginBody:
+      type: object
+      properties:
+        password:
+          type: string
+      required:
+        - password
+
+    AdminLoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+        - message
+
+    AdminMeResponse:
+      type: object
+      properties:
+        authenticated:
+          type: boolean
+      required:
+        - authenticated
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
