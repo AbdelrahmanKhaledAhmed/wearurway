@@ -13,7 +13,6 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Trash2, Plus, Edit, LogOut, Upload, X } from "lucide-react";
@@ -23,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { motion } from "framer-motion";
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -49,49 +49,42 @@ export default function AdminDashboard() {
   if (isAuthLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-sm uppercase tracking-widest text-muted-foreground animate-pulse">Verifying...</div>
+        <p className="text-sm uppercase tracking-widest text-muted-foreground animate-pulse">Verifying...</p>
       </div>
     );
   }
 
-  if (!adminMe?.authenticated) {
-    return null;
-  }
+  if (!adminMe?.authenticated) return null;
 
   return (
-    <div className="min-h-screen pt-20 px-4 md:px-8 max-w-6xl mx-auto pb-24">
-      <div className="flex justify-between items-center mb-10 pt-6 border-b border-border pb-6">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-black tracking-tighter uppercase">Admin Dashboard</h1>
-          <p className="text-muted-foreground text-xs uppercase tracking-widest mt-1">Full Control Panel</p>
+    <div className="min-h-screen pt-24 px-6 md:px-12 lg:px-24 max-w-7xl mx-auto pb-24">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+        <div className="flex items-end justify-between mb-2">
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tighter uppercase">Admin Panel</h1>
+          <Button variant="ghost" onClick={handleLogout} className="uppercase tracking-widest text-xs mb-2 rounded-none">
+            <LogOut className="w-4 h-4 mr-2" /> Logout
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          className="rounded-none uppercase tracking-widest text-xs"
-          onClick={handleLogout}
-          data-testid="button-logout"
-        >
-          <LogOut className="w-4 h-4 mr-2" /> Logout
-        </Button>
-      </div>
+        <p className="text-muted-foreground text-lg mb-12">Manage everything without touching code.</p>
 
-      <Tabs defaultValue="products" className="w-full">
-        <TabsList className="mb-8 rounded-none border-b border-border bg-transparent h-auto p-0 flex space-x-8 overflow-x-auto justify-start w-full">
-          {["products", "fits", "colors", "sizes"].map(tab => (
-            <TabsTrigger
-              key={tab}
-              value={tab}
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-3 uppercase tracking-widest text-xs px-0"
-            >
-              {tab}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        <TabsContent value="products"><ProductsManager /></TabsContent>
-        <TabsContent value="fits"><FitsManager /></TabsContent>
-        <TabsContent value="colors"><ColorsManager /></TabsContent>
-        <TabsContent value="sizes"><SizesManager /></TabsContent>
-      </Tabs>
+        <Tabs defaultValue="products" className="w-full">
+          <TabsList className="mb-12 rounded-none border-b border-border bg-transparent h-auto p-0 flex space-x-8 overflow-x-auto justify-start w-full">
+            {["products", "fits", "colors", "sizes"].map(tab => (
+              <TabsTrigger
+                key={tab}
+                value={tab}
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-3 uppercase tracking-widest text-xs px-0 font-medium"
+              >
+                {tab}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <TabsContent value="products"><ProductsManager /></TabsContent>
+          <TabsContent value="fits"><FitsManager /></TabsContent>
+          <TabsContent value="colors"><ColorsManager /></TabsContent>
+          <TabsContent value="sizes"><SizesManager /></TabsContent>
+        </Tabs>
+      </motion.div>
     </div>
   );
 }
@@ -99,9 +92,7 @@ export default function AdminDashboard() {
 // ─── Image Upload Helper ────────────────────────────────────────────────────
 
 function ImageUploader({ value, onChange, label = "Image" }: {
-  value: string;
-  onChange: (url: string) => void;
-  label?: string;
+  value: string; onChange: (url: string) => void; label?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -120,50 +111,31 @@ function ImageUploader({ value, onChange, label = "Image" }: {
       if (!res.ok) throw new Error("Upload failed");
       const data = await res.json() as { url: string };
       onChange(data.url);
-    } catch {
-      // silent fail
-    } finally {
-      setUploading(false);
-    }
+    } catch { /* silent */ }
+    finally { setUploading(false); }
   };
 
   return (
     <div className="space-y-2">
       <Label className="uppercase tracking-widest text-xs">{label}</Label>
-      <div className="flex gap-2 items-start">
-        <Input
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder="/api/uploads/image.png"
-          className="rounded-none h-10 flex-1"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          className="rounded-none h-10 whitespace-nowrap"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-        >
-          <Upload className="w-4 h-4 mr-2" />
-          {uploading ? "Uploading..." : "Upload"}
+      <div className="flex gap-2 items-center">
+        <Input value={value} onChange={e => onChange(e.target.value)} placeholder="/api/uploads/image.png" className="rounded-none h-10 flex-1" />
+        <Button type="button" variant="outline" className="rounded-none h-10 whitespace-nowrap" onClick={() => inputRef.current?.click()} disabled={uploading}>
+          <Upload className="w-4 h-4 mr-2" />{uploading ? "Uploading..." : "Upload"}
         </Button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={e => {
-            const file = e.target.files?.[0];
-            if (file) handleFile(file);
-            e.target.value = "";
-          }}
-        />
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
       </div>
-      {value && (
-        <div className="w-20 h-20 border border-border overflow-hidden bg-muted/10">
-          <img src={value} alt="preview" className="w-full h-full object-contain" onError={() => {}} />
-        </div>
-      )}
+      {value && <div className="w-16 h-16 border border-border overflow-hidden bg-muted/10"><img src={value} alt="preview" className="w-full h-full object-contain" /></div>}
+    </div>
+  );
+}
+
+// ─── Shared admin card action sidebar ──────────────────────────────────────
+
+function AdminActions({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2 justify-start pt-1 min-w-[120px]">
+      {children}
     </div>
   );
 }
@@ -199,19 +171,11 @@ function ProductsManager() {
     if (!form.name.trim()) return;
     if (editId) {
       updateProduct.mutate({ id: editId, data: form }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() });
-          toast({ title: "Product updated" });
-          setIsOpen(false);
-        }
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() }); toast({ title: "Product updated" }); setIsOpen(false); }
       });
     } else {
       createProduct.mutate({ data: form }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() });
-          toast({ title: "Product created" });
-          setIsOpen(false);
-        }
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() }); toast({ title: "Product created" }); setIsOpen(false); }
       });
     }
   };
@@ -219,11 +183,7 @@ function ProductsManager() {
   const handleDelete = (id: string, name: string) => {
     if (!confirm(`Delete "${name}"? This removes all its fits, colors, and sizes.`)) return;
     deleteProduct.mutate({ id }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetFitsQueryKey() });
-        toast({ title: "Product deleted" });
-      }
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() }); queryClient.invalidateQueries({ queryKey: getGetFitsQueryKey() }); toast({ title: "Deleted" }); }
     });
   };
 
@@ -235,60 +195,73 @@ function ProductsManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <p className="text-xs text-muted-foreground uppercase tracking-widest">{products?.length ?? 0} products</p>
-        <Button onClick={openAdd} className="rounded-none uppercase tracking-widest text-xs">
-          <Plus className="w-4 h-4 mr-2" /> Add Product
-        </Button>
-      </div>
+      {/* Add card */}
+      <motion.div
+        onClick={openAdd}
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        className="group relative h-[180px] border border-dashed border-border flex flex-col justify-center items-center cursor-pointer hover:border-foreground transition-colors bg-transparent"
+      >
+        <Plus className="w-8 h-8 text-muted-foreground group-hover:text-foreground transition-colors mb-2" />
+        <span className="text-xs uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Add Product</span>
+      </motion.div>
 
-      <div className="grid gap-4">
-        {products?.map(product => (
-          <Card key={product.id} className="rounded-none border-border">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-4">
-                {product.image && (
-                  <div className="w-16 h-16 border border-border overflow-hidden shrink-0 bg-muted/10">
-                    <img src={product.image} alt={product.name} className="w-full h-full object-contain" />
-                  </div>
+      {/* Product cards */}
+      {products?.map((product, i) => (
+        <motion.div
+          key={product.id}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.05 }}
+          className="flex gap-4 items-start"
+        >
+          {/* Card matching the products page style */}
+          <div className={`relative flex-1 h-[240px] border border-border p-6 flex flex-col justify-end overflow-hidden ${product.available ? "bg-card" : "opacity-60 bg-muted/20"}`}>
+            {product.image && <img src={product.image} alt={product.name} className="absolute inset-0 w-full h-full object-cover opacity-30" />}
+            <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent z-10" />
+            <div className="relative z-20">
+              <h3 className="text-2xl font-bold uppercase tracking-tight mb-1">{product.name}</h3>
+              <div className="flex gap-2 flex-wrap">
+                {!product.available && (
+                  <span className="inline-block px-3 py-1 bg-muted text-muted-foreground text-xs font-medium tracking-widest uppercase">
+                    Coming Soon
+                  </span>
                 )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="font-bold uppercase tracking-tight">{product.name}</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5 font-mono">ID: {product.id}</p>
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(product)} className="h-8 w-8">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(product.id, product.name)} className="h-8 w-8 text-destructive">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex gap-6 mt-3">
-                    <div className="flex items-center gap-2">
-                      <Switch id={`avail-${product.id}`} checked={product.available} onCheckedChange={v => handleToggle(product.id, "available", v)} />
-                      <Label htmlFor={`avail-${product.id}`} className="text-xs uppercase tracking-widest cursor-pointer">Available</Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch id={`soon-${product.id}`} checked={product.comingSoon} onCheckedChange={v => handleToggle(product.id, "comingSoon", v)} />
-                      <Label htmlFor={`soon-${product.id}`} className="text-xs uppercase tracking-widest cursor-pointer">Coming Soon</Label>
-                    </div>
-                  </div>
-                </div>
+                {product.available && (
+                  <span className="inline-block px-3 py-1 bg-foreground text-background text-xs font-medium tracking-widest uppercase">
+                    Available
+                  </span>
+                )}
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            </div>
+          </div>
 
+          {/* Action buttons beside the card */}
+          <AdminActions>
+            <Button variant="outline" className="rounded-none uppercase tracking-widest text-xs w-full justify-start" onClick={() => openEdit(product)}>
+              <Edit className="w-3.5 h-3.5 mr-2" /> Edit
+            </Button>
+            <Button variant="outline" className="rounded-none uppercase tracking-widest text-xs w-full justify-start text-destructive border-destructive/40 hover:bg-destructive/10" onClick={() => handleDelete(product.id, product.name)}>
+              <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+            </Button>
+            <div className="border border-border p-2 space-y-2 mt-1">
+              <div className="flex items-center gap-2">
+                <Switch id={`avail-${product.id}`} checked={product.available} onCheckedChange={v => handleToggle(product.id, "available", v)} />
+                <Label htmlFor={`avail-${product.id}`} className="text-xs uppercase tracking-widest cursor-pointer whitespace-nowrap">Available</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch id={`soon-${product.id}`} checked={product.comingSoon} onCheckedChange={v => handleToggle(product.id, "comingSoon", v)} />
+                <Label htmlFor={`soon-${product.id}`} className="text-xs uppercase tracking-widest cursor-pointer whitespace-nowrap">Soon</Label>
+              </div>
+            </div>
+          </AdminActions>
+        </motion.div>
+      ))}
+
+      {/* Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="rounded-none border-border max-w-md">
-          <DialogHeader>
-            <DialogTitle className="uppercase tracking-tighter font-black">{editId ? "Edit Product" : "Add Product"}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="uppercase tracking-tighter font-black">{editId ? "Edit Product" : "Add Product"}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             <div className="space-y-2">
               <Label className="uppercase tracking-widest text-xs">Name</Label>
@@ -296,14 +269,8 @@ function ProductsManager() {
             </div>
             <ImageUploader label="Product Image" value={form.image} onChange={url => setForm({ ...form, image: url })} />
             <div className="flex gap-6">
-              <div className="flex items-center gap-2">
-                <Switch id="p-avail" checked={form.available} onCheckedChange={v => setForm({ ...form, available: v })} />
-                <Label htmlFor="p-avail" className="text-xs uppercase tracking-widest cursor-pointer">Available</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch id="p-soon" checked={form.comingSoon} onCheckedChange={v => setForm({ ...form, comingSoon: v })} />
-                <Label htmlFor="p-soon" className="text-xs uppercase tracking-widest cursor-pointer">Coming Soon</Label>
-              </div>
+              <div className="flex items-center gap-2"><Switch id="p-avail" checked={form.available} onCheckedChange={v => setForm({ ...form, available: v })} /><Label htmlFor="p-avail" className="text-xs uppercase tracking-widest cursor-pointer">Available</Label></div>
+              <div className="flex items-center gap-2"><Switch id="p-soon" checked={form.comingSoon} onCheckedChange={v => setForm({ ...form, comingSoon: v })} /><Label htmlFor="p-soon" className="text-xs uppercase tracking-widest cursor-pointer">Coming Soon</Label></div>
             </div>
             <Button type="submit" className="w-full rounded-none uppercase tracking-widest font-bold h-11" disabled={createProduct.isPending || updateProduct.isPending}>
               {editId ? "Save Changes" : "Create Product"}
@@ -347,20 +314,12 @@ function FitsManager() {
     if (!form.name.trim()) return;
     if (editId) {
       updateFit.mutate({ id: editId, data: { name: form.name, available: form.available, comingSoon: form.comingSoon } }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetFitsQueryKey() });
-          toast({ title: "Fit updated" });
-          setIsOpen(false);
-        }
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetFitsQueryKey() }); toast({ title: "Fit updated" }); setIsOpen(false); }
       });
     } else {
       if (!form.productId) return;
       createFit.mutate({ data: form }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetFitsQueryKey() });
-          toast({ title: "Fit created" });
-          setIsOpen(false);
-        }
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetFitsQueryKey() }); toast({ title: "Fit created" }); setIsOpen(false); }
       });
     }
   };
@@ -368,10 +327,7 @@ function FitsManager() {
   const handleDelete = (id: string, name: string) => {
     if (!confirm(`Delete fit "${name}"? This removes all its colors and sizes.`)) return;
     deleteFit.mutate({ id }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetFitsQueryKey() });
-        toast({ title: "Fit deleted" });
-      }
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetFitsQueryKey() }); toast({ title: "Fit deleted" }); }
     });
   };
 
@@ -387,48 +343,64 @@ function FitsManager() {
   })) ?? [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <p className="text-xs text-muted-foreground uppercase tracking-widest">{fits?.length ?? 0} fits total</p>
-        <Button onClick={openAdd} className="rounded-none uppercase tracking-widest text-xs" disabled={!products?.length}>
-          <Plus className="w-4 h-4 mr-2" /> Add Fit
-        </Button>
-      </div>
+    <div className="space-y-10">
+      {/* Add card */}
+      <motion.div
+        onClick={openAdd}
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        className="group relative h-[100px] border border-dashed border-border flex flex-col justify-center items-center cursor-pointer hover:border-foreground transition-colors"
+      >
+        <Plus className="w-6 h-6 text-muted-foreground group-hover:text-foreground transition-colors mb-1" />
+        <span className="text-xs uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Add Fit</span>
+      </motion.div>
 
       {groupedFits.map(({ product, fits: productFits }) => (
-        <div key={product.id} className="space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-2">{product.name}</h3>
-          <div className="grid gap-3">
-            {productFits.map(fit => (
-              <Card key={fit.id} className="rounded-none border-border">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between flex-wrap gap-4">
-                    <div>
-                      <h4 className="font-bold uppercase tracking-tight">{fit.name}</h4>
-                      <p className="text-xs text-muted-foreground font-mono">ID: {fit.id}</p>
+        <div key={product.id} className="space-y-4">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-3">{product.name}</h3>
+          <div className="space-y-4">
+            {productFits.map((fit, i) => (
+              <motion.div
+                key={fit.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="flex gap-4 items-start"
+              >
+                {/* Fit card matching fits.tsx style */}
+                <div className={`flex-1 p-6 border border-border flex flex-col justify-center items-center text-center min-h-[140px] ${fit.available ? "bg-card" : "opacity-60 bg-muted/20"}`}>
+                  <h3 className="text-2xl font-bold uppercase tracking-tight mb-3">{fit.name}</h3>
+                  {!fit.available && (
+                    <span className="inline-block px-3 py-1 bg-muted text-muted-foreground text-xs font-medium tracking-widest uppercase">Coming Soon</span>
+                  )}
+                  {fit.available && (
+                    <span className="inline-block px-3 py-1 bg-foreground text-background text-xs font-medium tracking-widest uppercase">Available</span>
+                  )}
+                </div>
+
+                {/* Action buttons beside the card */}
+                <AdminActions>
+                  <Button variant="outline" className="rounded-none uppercase tracking-widest text-xs w-full justify-start" onClick={() => openEdit(fit)}>
+                    <Edit className="w-3.5 h-3.5 mr-2" /> Edit
+                  </Button>
+                  <Button variant="outline" className="rounded-none uppercase tracking-widest text-xs w-full justify-start text-destructive border-destructive/40 hover:bg-destructive/10" onClick={() => handleDelete(fit.id, fit.name)}>
+                    <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+                  </Button>
+                  <div className="border border-border p-2 space-y-2 mt-1">
+                    <div className="flex items-center gap-2">
+                      <Switch id={`f-avail-${fit.id}`} checked={fit.available} onCheckedChange={v => handleToggle(fit.id, "available", v)} />
+                      <Label htmlFor={`f-avail-${fit.id}`} className="text-xs uppercase tracking-widest cursor-pointer whitespace-nowrap">Available</Label>
                     </div>
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <Switch id={`f-avail-${fit.id}`} checked={fit.available} onCheckedChange={v => handleToggle(fit.id, "available", v)} />
-                        <Label htmlFor={`f-avail-${fit.id}`} className="text-xs uppercase tracking-widest cursor-pointer">Available</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch id={`f-soon-${fit.id}`} checked={fit.comingSoon} onCheckedChange={v => handleToggle(fit.id, "comingSoon", v)} />
-                        <Label htmlFor={`f-soon-${fit.id}`} className="text-xs uppercase tracking-widest cursor-pointer">Coming Soon</Label>
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(fit)} className="h-8 w-8">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(fit.id, fit.name)} className="h-8 w-8 text-destructive">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                    <div className="flex items-center gap-2">
+                      <Switch id={`f-soon-${fit.id}`} checked={fit.comingSoon} onCheckedChange={v => handleToggle(fit.id, "comingSoon", v)} />
+                      <Label htmlFor={`f-soon-${fit.id}`} className="text-xs uppercase tracking-widest cursor-pointer whitespace-nowrap">Soon</Label>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </AdminActions>
+              </motion.div>
             ))}
             {productFits.length === 0 && (
-              <p className="text-xs text-muted-foreground uppercase tracking-widest">No fits — add one above</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-widest">No fits yet — add one above</p>
             )}
           </div>
         </div>
@@ -436,9 +408,7 @@ function FitsManager() {
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="rounded-none border-border max-w-md">
-          <DialogHeader>
-            <DialogTitle className="uppercase tracking-tighter font-black">{editId ? "Edit Fit" : "Add Fit"}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="uppercase tracking-tighter font-black">{editId ? "Edit Fit" : "Add Fit"}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             <div className="space-y-2">
               <Label className="uppercase tracking-widest text-xs">Name</Label>
@@ -447,24 +417,14 @@ function FitsManager() {
             {!editId && (
               <div className="space-y-2">
                 <Label className="uppercase tracking-widest text-xs">Product</Label>
-                <select
-                  value={form.productId}
-                  onChange={e => setForm({ ...form, productId: e.target.value })}
-                  className="w-full h-10 rounded-none border border-input bg-background px-3 text-sm focus:outline-none focus:border-foreground"
-                >
+                <select value={form.productId} onChange={e => setForm({ ...form, productId: e.target.value })} className="w-full h-10 rounded-none border border-input bg-background px-3 text-sm focus:outline-none focus:border-foreground">
                   {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
             )}
             <div className="flex gap-6">
-              <div className="flex items-center gap-2">
-                <Switch id="f-form-avail" checked={form.available} onCheckedChange={v => setForm({ ...form, available: v })} />
-                <Label htmlFor="f-form-avail" className="text-xs uppercase tracking-widest cursor-pointer">Available</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch id="f-form-soon" checked={form.comingSoon} onCheckedChange={v => setForm({ ...form, comingSoon: v })} />
-                <Label htmlFor="f-form-soon" className="text-xs uppercase tracking-widest cursor-pointer">Coming Soon</Label>
-              </div>
+              <div className="flex items-center gap-2"><Switch id="f-form-avail" checked={form.available} onCheckedChange={v => setForm({ ...form, available: v })} /><Label htmlFor="f-form-avail" className="text-xs uppercase tracking-widest cursor-pointer">Available</Label></div>
+              <div className="flex items-center gap-2"><Switch id="f-form-soon" checked={form.comingSoon} onCheckedChange={v => setForm({ ...form, comingSoon: v })} /><Label htmlFor="f-form-soon" className="text-xs uppercase tracking-widest cursor-pointer">Coming Soon</Label></div>
             </div>
             <Button type="submit" className="w-full rounded-none uppercase tracking-widest font-bold h-11" disabled={createFit.isPending || updateFit.isPending}>
               {editId ? "Save Changes" : "Create Fit"}
@@ -484,9 +444,7 @@ function ColorsManager() {
   const [selectedFitId, setSelectedFitId] = useState<string>("");
 
   useEffect(() => {
-    if (fits && fits.length > 0 && !selectedFitId) {
-      setSelectedFitId(fits[0].id);
-    }
+    if (fits && fits.length > 0 && !selectedFitId) setSelectedFitId(fits[0].id);
   }, [fits, selectedFitId]);
 
   const { data: colors } = useGetColors(selectedFitId, {
@@ -505,11 +463,7 @@ function ColorsManager() {
     e.preventDefault();
     if (!newColorName.trim() || !selectedFitId) return;
     addColor.mutate({ fitId: selectedFitId, data: { name: newColorName, hex: newColorHex } }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetColorsQueryKey(selectedFitId) });
-        setNewColorName("");
-        toast({ title: "Color added" });
-      }
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetColorsQueryKey(selectedFitId) }); setNewColorName(""); toast({ title: "Color added" }); }
     });
   };
 
@@ -520,7 +474,8 @@ function ColorsManager() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
+      {/* Fit selector */}
       <div className="flex flex-wrap gap-2">
         {fits?.map(fit => (
           <Button key={fit.id} variant={selectedFitId === fit.id ? "default" : "outline"} className="rounded-none uppercase tracking-widest text-xs h-8" onClick={() => setSelectedFitId(fit.id)}>
@@ -529,46 +484,52 @@ function ColorsManager() {
         ))}
       </div>
 
+      {/* Add color form */}
       {selectedFitId && (
-        <Card className="rounded-none border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm uppercase tracking-widest font-bold">Add Color to {getFitLabel(selectedFitId)}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAdd} className="flex gap-3 items-end flex-wrap">
-              <div className="space-y-1 flex-1 min-w-40">
-                <Label className="text-xs uppercase tracking-widest">Name</Label>
-                <Input value={newColorName} onChange={e => setNewColorName(e.target.value)} placeholder="e.g. Vintage Black" className="rounded-none h-10" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs uppercase tracking-widest">Color</Label>
-                <div className="flex gap-2 items-center">
-                  <input type="color" value={newColorHex} onChange={e => setNewColorHex(e.target.value)} className="w-10 h-10 border border-input cursor-pointer bg-transparent" />
-                  <Input value={newColorHex} onChange={e => setNewColorHex(e.target.value)} className="w-24 rounded-none h-10 font-mono uppercase text-xs" placeholder="#000000" />
-                </div>
-              </div>
-              <Button type="submit" className="rounded-none h-10 uppercase tracking-widest text-xs" disabled={addColor.isPending}>
-                <Plus className="w-4 h-4 mr-1" /> Add
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {colors?.map(color => (
-          <div key={color.id} className="border border-border group">
-            <div className="aspect-square" style={{ backgroundColor: color.hex }} />
-            <div className="p-2 flex justify-between items-center">
-              <div>
-                <p className="text-xs font-bold uppercase truncate">{color.name}</p>
-                <p className="text-xs text-muted-foreground font-mono">{color.hex}</p>
-              </div>
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-60 hover:opacity-100" onClick={() => deleteColor.mutate({ fitId: selectedFitId, colorId: color.id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetColorsQueryKey(selectedFitId) }) })}>
-                <X className="w-3 h-3" />
-              </Button>
+        <form onSubmit={handleAdd} className="border border-dashed border-border p-6 flex gap-4 items-end flex-wrap">
+          <div className="space-y-2 flex-1 min-w-40">
+            <Label className="uppercase tracking-widest text-xs">Color Name</Label>
+            <Input value={newColorName} onChange={e => setNewColorName(e.target.value)} placeholder="e.g. Vintage Black" className="rounded-none h-10" />
+          </div>
+          <div className="space-y-2">
+            <Label className="uppercase tracking-widest text-xs">Hex</Label>
+            <div className="flex gap-2 items-center">
+              <input type="color" value={newColorHex} onChange={e => setNewColorHex(e.target.value)} className="w-10 h-10 border border-input cursor-pointer bg-transparent" />
+              <Input value={newColorHex} onChange={e => setNewColorHex(e.target.value)} className="w-24 rounded-none h-10 font-mono uppercase text-xs" />
             </div>
           </div>
+          <Button type="submit" className="rounded-none h-10 uppercase tracking-widest text-xs" disabled={addColor.isPending}>
+            <Plus className="w-4 h-4 mr-1" /> Add Color
+          </Button>
+        </form>
+      )}
+
+      {/* Color swatches — matching colors.tsx style */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+        {colors?.map((color, i) => (
+          <motion.div
+            key={color.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.04 }}
+            className="flex gap-3 items-start"
+          >
+            {/* Color card matching colors.tsx */}
+            <div className="flex-1 flex flex-col">
+              <div className="aspect-square w-full border border-border mb-3" style={{ backgroundColor: color.hex }} />
+              <p className="text-sm font-medium uppercase tracking-widest text-center">{color.name}</p>
+              <p className="text-xs text-muted-foreground text-center font-mono">{color.hex}</p>
+            </div>
+            {/* Delete button beside */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-destructive hover:bg-destructive/10 mt-1 shrink-0"
+              onClick={() => deleteColor.mutate({ fitId: selectedFitId, colorId: color.id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetColorsQueryKey(selectedFitId) }) })}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </motion.div>
         ))}
         {selectedFitId && !colors?.length && (
           <p className="text-xs text-muted-foreground uppercase tracking-widest col-span-full">No colors yet</p>
@@ -586,9 +547,7 @@ function SizesManager() {
   const [selectedFitId, setSelectedFitId] = useState<string>("");
 
   useEffect(() => {
-    if (fits && fits.length > 0 && !selectedFitId) {
-      setSelectedFitId(fits[0].id);
-    }
+    if (fits && fits.length > 0 && !selectedFitId) setSelectedFitId(fits[0].id);
   }, [fits, selectedFitId]);
 
   const { data: sizes } = useGetSizes(selectedFitId, {
@@ -605,12 +564,7 @@ function SizesManager() {
   const [editingSizeId, setEditingSizeId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", realWidth: 0, realHeight: 0, image: "" });
 
-  const openAdd = () => {
-    setEditingSizeId(null);
-    setForm({ name: "", realWidth: 0, realHeight: 0, image: "" });
-    setIsOpen(true);
-  };
-
+  const openAdd = () => { setEditingSizeId(null); setForm({ name: "", realWidth: 0, realHeight: 0, image: "" }); setIsOpen(true); };
   const openEdit = (size: NonNullable<typeof sizes>[0]) => {
     setEditingSizeId(size.id);
     setForm({ name: size.name, realWidth: size.realWidth, realHeight: size.realHeight, image: size.image ?? "" });
@@ -622,19 +576,11 @@ function SizesManager() {
     if (!form.name.trim()) return;
     if (editingSizeId) {
       updateSize.mutate({ fitId: selectedFitId, sizeId: editingSizeId, data: form }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetSizesQueryKey(selectedFitId) });
-          toast({ title: "Size updated" });
-          setIsOpen(false);
-        }
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetSizesQueryKey(selectedFitId) }); toast({ title: "Size updated" }); setIsOpen(false); }
       });
     } else {
       addSize.mutate({ fitId: selectedFitId, data: form }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetSizesQueryKey(selectedFitId) });
-          toast({ title: "Size added" });
-          setIsOpen(false);
-        }
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetSizesQueryKey(selectedFitId) }); toast({ title: "Size added" }); setIsOpen(false); }
       });
     }
   };
@@ -646,7 +592,8 @@ function SizesManager() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
+      {/* Fit selector */}
       <div className="flex flex-wrap gap-2">
         {fits?.map(fit => (
           <Button key={fit.id} variant={selectedFitId === fit.id ? "default" : "outline"} className="rounded-none uppercase tracking-widest text-xs h-8" onClick={() => setSelectedFitId(fit.id)}>
@@ -655,39 +602,54 @@ function SizesManager() {
         ))}
       </div>
 
+      {/* Add size card */}
       {selectedFitId && (
-        <div className="flex justify-end">
-          <Button onClick={openAdd} className="rounded-none uppercase tracking-widest text-xs">
-            <Plus className="w-4 h-4 mr-2" /> Add Size
-          </Button>
-        </div>
+        <motion.div
+          onClick={openAdd}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          className="group h-[120px] border border-dashed border-border flex flex-col justify-center items-center cursor-pointer hover:border-foreground transition-colors"
+        >
+          <Plus className="w-6 h-6 text-muted-foreground group-hover:text-foreground transition-colors mb-1" />
+          <span className="text-xs uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Add Size</span>
+        </motion.div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {sizes?.map(size => (
-          <Card key={size.id} className="rounded-none border-border">
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start mb-3">
-                <h3 className="font-black text-2xl uppercase">{size.name}</h3>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(size)}>
-                    <Edit className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteSize.mutate({ fitId: selectedFitId, sizeId: size.id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetSizesQueryKey(selectedFitId) }) })}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
+      {/* Size cards — similar to sizes.tsx but with buttons beside */}
+      <div className="space-y-4">
+        {sizes?.map((size, i) => (
+          <motion.div
+            key={size.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+            className="flex gap-4 items-start"
+          >
+            {/* Size card */}
+            <div className="flex-1 border border-border p-6 flex gap-6 items-center bg-card">
+              <div className="w-24 h-24 border border-border bg-muted/10 flex items-center justify-center overflow-hidden shrink-0">
+                {size.image
+                  ? <img src={size.image} alt={size.name} className="w-full h-full object-contain" />
+                  : <span className="text-xs text-muted-foreground uppercase tracking-widest text-center px-1">No Image</span>
+                }
               </div>
-              <p className="text-xs font-mono text-muted-foreground mb-3">{size.realWidth}W × {size.realHeight}H cm</p>
-              <div className="w-full h-32 bg-muted/10 border border-border flex items-center justify-center overflow-hidden">
-                {size.image ? (
-                  <img src={size.image} alt={size.name} className="object-contain h-full w-full" />
-                ) : (
-                  <span className="text-xs text-muted-foreground uppercase tracking-widest">No Image</span>
-                )}
+              <div>
+                <h3 className="text-3xl font-bold uppercase tracking-tight">{size.name}</h3>
+                <p className="text-sm font-mono text-muted-foreground mt-1">{size.realWidth}W × {size.realHeight}H cm</p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+
+            {/* Action buttons beside */}
+            <AdminActions>
+              <Button variant="outline" className="rounded-none uppercase tracking-widest text-xs w-full justify-start" onClick={() => openEdit(size)}>
+                <Edit className="w-3.5 h-3.5 mr-2" /> Edit
+              </Button>
+              <Button variant="outline" className="rounded-none uppercase tracking-widest text-xs w-full justify-start text-destructive border-destructive/40 hover:bg-destructive/10"
+                onClick={() => deleteSize.mutate({ fitId: selectedFitId, sizeId: size.id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetSizesQueryKey(selectedFitId) }) })}>
+                <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+              </Button>
+            </AdminActions>
+          </motion.div>
         ))}
         {selectedFitId && !sizes?.length && (
           <p className="text-xs text-muted-foreground uppercase tracking-widest">No sizes yet</p>
@@ -696,9 +658,7 @@ function SizesManager() {
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="rounded-none border-border max-w-md">
-          <DialogHeader>
-            <DialogTitle className="uppercase tracking-tighter font-black">{editingSizeId ? "Edit Size" : "Add Size"}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="uppercase tracking-tighter font-black">{editingSizeId ? "Edit Size" : "Add Size"}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             <div className="space-y-2">
               <Label className="uppercase tracking-widest text-xs">Name</Label>
