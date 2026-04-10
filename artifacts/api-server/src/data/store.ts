@@ -10,6 +10,7 @@ export interface Product {
   name: string;
   available: boolean;
   comingSoon: boolean;
+  image?: string;
 }
 
 export interface Fit {
@@ -65,14 +66,14 @@ const DEFAULT_STORE: Store = {
     { id: "reg-olive", name: "Olive", hex: "#5B5B3A", fitId: "regular" },
   ],
   sizes: [
-    { id: "boxy-s", name: "Small", realWidth: 48, realHeight: 66, image: "Boxy-Fit-Small.png", fitId: "boxy" },
-    { id: "boxy-m", name: "Medium", realWidth: 52, realHeight: 68, image: "Boxy-Fit-Medium.png", fitId: "boxy" },
-    { id: "boxy-l", name: "Large", realWidth: 56, realHeight: 70, image: "Boxy-Fit-Large.png", fitId: "boxy" },
-    { id: "boxy-xl", name: "XL", realWidth: 60, realHeight: 72, image: "Boxy-Fit-XL.png", fitId: "boxy" },
-    { id: "reg-s", name: "Small", realWidth: 44, realHeight: 68, image: "Regular-Fit-Small.png", fitId: "regular" },
-    { id: "reg-m", name: "Medium", realWidth: 48, realHeight: 70, image: "Regular-Fit-Medium.png", fitId: "regular" },
-    { id: "reg-l", name: "Large", realWidth: 52, realHeight: 72, image: "Regular-Fit-Large.png", fitId: "regular" },
-    { id: "reg-xl", name: "XL", realWidth: 56, realHeight: 74, image: "Regular-Fit-XL.png", fitId: "regular" },
+    { id: "boxy-s", name: "Small", realWidth: 48, realHeight: 66, fitId: "boxy" },
+    { id: "boxy-m", name: "Medium", realWidth: 52, realHeight: 68, fitId: "boxy" },
+    { id: "boxy-l", name: "Large", realWidth: 56, realHeight: 70, fitId: "boxy" },
+    { id: "boxy-xl", name: "XL", realWidth: 60, realHeight: 72, fitId: "boxy" },
+    { id: "reg-s", name: "Small", realWidth: 44, realHeight: 68, fitId: "regular" },
+    { id: "reg-m", name: "Medium", realWidth: 48, realHeight: 70, fitId: "regular" },
+    { id: "reg-l", name: "Large", realWidth: 52, realHeight: 72, fitId: "regular" },
+    { id: "reg-xl", name: "XL", realWidth: 56, realHeight: 74, fitId: "regular" },
   ],
 };
 

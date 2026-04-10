@@ -11,4 +11,5 @@ export interface Product {
   name: string;
   available: boolean;
   comingSoon: boolean;
+  image?: string;
 }

@@ -14,11 +14,25 @@ export interface Product {
   name: string;
   available: boolean;
   comingSoon: boolean;
+  image?: string;
+}
+
+export interface CreateProductBody {
+  name: string;
+  available?: boolean;
+  comingSoon?: boolean;
+  image?: string;
 }
 
 export interface UpdateProductBody {
+  name?: string;
   available?: boolean;
   comingSoon?: boolean;
+  image?: string;
+}
+
+export interface DeleteProductParams {
+  id: string;
 }
 
 export interface Fit {
@@ -29,7 +43,15 @@ export interface Fit {
   productId: string;
 }
 
+export interface CreateFitBody {
+  name: string;
+  productId: string;
+  available?: boolean;
+  comingSoon?: boolean;
+}
+
 export interface UpdateFitBody {
+  name?: string;
   available?: boolean;
   comingSoon?: boolean;
 }
@@ -69,6 +91,11 @@ export interface UpdateSizeBody {
   image?: string;
 }
 
+export interface UploadResponse {
+  url: string;
+  filename: string;
+}
+
 export interface AdminLoginBody {
   password: string;
 }
@@ -76,6 +103,7 @@ export interface AdminLoginBody {
 export interface AdminLoginResponse {
   success: boolean;
   message: string;
+  token?: string;
 }
 
 export interface AdminMeResponse {
@@ -85,3 +113,7 @@ export interface AdminMeResponse {
 export interface ErrorResponse {
   error: string;
 }
+
+export type UploadImageBody = {
+  file: Blob;
+};

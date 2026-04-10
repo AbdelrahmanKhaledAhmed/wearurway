@@ -9,17 +9,11 @@ servers:
     description: Base API path
 tags:
   - name: health
-    description: Health operations
   - name: products
-    description: Product operations
   - name: fits
-    description: Fit operations
   - name: colors
-    description: Color operations
   - name: sizes
-    description: Size operations
   - name: admin
-    description: Admin operations
 paths:
   /healthz:
     get:
@@ -48,6 +42,23 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Product"
+    post:
+      operationId: createProduct
+      tags: [products, admin]
+      summary: Create a new product (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductBody"
+      responses:
+        "201":
+          description: Created product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
 
   /products/{id}:
     patch:
@@ -73,6 +84,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Product"
+    delete:
+      operationId: deleteProduct
+      tags: [products, admin]
+      summary: Delete a product (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
 
   /fits:
     get:
@@ -88,6 +112,23 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Fit"
+    post:
+      operationId: createFit
+      tags: [fits, admin]
+      summary: Create a new fit (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFitBody"
+      responses:
+        "201":
+          description: Created fit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fit"
 
   /fits/{id}:
     patch:
@@ -113,12 +154,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Fit"
+    delete:
+      operationId: deleteFit
+      tags: [fits, admin]
+      summary: Delete a fit (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
 
   /fits/{fitId}/colors:
     get:
       operationId: getColors
       tags: [colors]
-      summary: Get colors for a fit
       parameters:
         - in: path
           name: fitId
@@ -137,7 +190,6 @@ paths:
     post:
       operationId: addColor
       tags: [colors, admin]
-      summary: Add a color to a fit (admin)
       parameters:
         - in: path
           name: fitId
@@ -162,7 +214,6 @@ paths:
     delete:
       operationId: deleteColor
       tags: [colors, admin]
-      summary: Remove a color from a fit (admin)
       parameters:
         - in: path
           name: fitId
@@ -182,7 +233,6 @@ paths:
     get:
       operationId: getSizes
       tags: [sizes]
-      summary: Get sizes for a fit
       parameters:
         - in: path
           name: fitId
@@ -201,7 +251,6 @@ paths:
     post:
       operationId: addSize
       tags: [sizes, admin]
-      summary: Add a size to a fit (admin)
       parameters:
         - in: path
           name: fitId
@@ -226,7 +275,6 @@ paths:
     patch:
       operationId: updateSize
       tags: [sizes, admin]
-      summary: Update a size (admin)
       parameters:
         - in: path
           name: fitId
@@ -254,7 +302,6 @@ paths:
     delete:
       operationId: deleteSize
       tags: [sizes, admin]
-      summary: Delete a size (admin)
       parameters:
         - in: path
           name: fitId
@@ -270,11 +317,35 @@ paths:
         "204":
           description: Deleted
 
+  /uploads:
+    post:
+      operationId: uploadImage
+      tags: [admin]
+      summary: Upload an image file (admin)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+                - file
+      responses:
+        "201":
+          description: Upload result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
+
   /admin/login:
     post:
       operationId: adminLogin
       tags: [admin]
-      summary: Admin login
       requestBody:
         required: true
         content:
@@ -299,7 +370,6 @@ paths:
     post:
       operationId: adminLogout
       tags: [admin]
-      summary: Admin logout
       responses:
         "200":
           description: Logged out
@@ -308,7 +378,6 @@ paths:
     get:
       operationId: getAdminMe
       tags: [admin]
-      summary: Check admin session
       responses:
         "200":
           description: Admin session info
@@ -326,8 +395,7 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
     Product:
       type: object
@@ -340,19 +408,41 @@ components:
           type: boolean
         comingSoon:
           type: boolean
-      required:
-        - id
-        - name
-        - available
-        - comingSoon
+        image:
+          type: string
+      required: [id, name, available, comingSoon]
 
-    UpdateProductBody:
+    CreateProductBody:
       type: object
       properties:
+        name:
+          type: string
         available:
           type: boolean
         comingSoon:
           type: boolean
+        image:
+          type: string
+      required: [name]
+
+    UpdateProductBody:
+      type: object
+      properties:
+        name:
+          type: string
+        available:
+          type: boolean
+        comingSoon:
+          type: boolean
+        image:
+          type: string
+
+    DeleteProductParams:
+      type: object
+      properties:
+        id:
+          type: string
+      required: [id]
 
     Fit:
       type: object
@@ -367,16 +457,26 @@ components:
           type: boolean
         productId:
           type: string
-      required:
-        - id
-        - name
-        - available
-        - comingSoon
-        - productId
+      required: [id, name, available, comingSoon, productId]
+
+    CreateFitBody:
+      type: object
+      properties:
+        name:
+          type: string
+        productId:
+          type: string
+        available:
+          type: boolean
+        comingSoon:
+          type: boolean
+      required: [name, productId]
 
     UpdateFitBody:
       type: object
       properties:
+        name:
+          type: string
         available:
           type: boolean
         comingSoon:
@@ -393,11 +493,7 @@ components:
           type: string
         fitId:
           type: string
-      required:
-        - id
-        - name
-        - hex
-        - fitId
+      required: [id, name, hex, fitId]
 
     AddColorBody:
       type: object
@@ -406,9 +502,7 @@ components:
           type: string
         hex:
           type: string
-      required:
-        - name
-        - hex
+      required: [name, hex]
 
     Size:
       type: object
@@ -425,12 +519,7 @@ components:
           type: string
         fitId:
           type: string
-      required:
-        - id
-        - name
-        - realWidth
-        - realHeight
-        - fitId
+      required: [id, name, realWidth, realHeight, fitId]
 
     AddSizeBody:
       type: object
@@ -443,10 +532,7 @@ components:
           type: number
         image:
           type: string
-      required:
-        - name
-        - realWidth
-        - realHeight
+      required: [name, realWidth, realHeight]
 
     UpdateSizeBody:
       type: object
@@ -460,13 +546,21 @@ components:
         image:
           type: string
 
+    UploadResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        filename:
+          type: string
+      required: [url, filename]
+
     AdminLoginBody:
       type: object
       properties:
         password:
           type: string
-      required:
-        - password
+      required: [password]
 
     AdminLoginResponse:
       type: object
@@ -475,22 +569,20 @@ components:
           type: boolean
         message:
           type: string
-      required:
-        - success
-        - message
+        token:
+          type: string
+      required: [success, message]
 
     AdminMeResponse:
       type: object
       properties:
         authenticated:
           type: boolean
-      required:
-        - authenticated
+      required: [authenticated]
 
     ErrorResponse:
       type: object
       properties:
         error:
           type: string
-      required:
-        - error
+      required: [error]

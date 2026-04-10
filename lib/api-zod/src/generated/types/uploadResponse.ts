@@ -6,8 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface AdminLoginResponse {
-  success: boolean;
-  message: string;
-  token?: string;
+export interface UploadResponse {
+  url: string;
+  filename: string;
 }

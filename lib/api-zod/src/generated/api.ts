@@ -22,8 +22,19 @@ export const GetProductsResponseItem = zod.object({
   name: zod.string(),
   available: zod.boolean(),
   comingSoon: zod.boolean(),
+  image: zod.string().optional(),
 });
 export const GetProductsResponse = zod.array(GetProductsResponseItem);
+
+/**
+ * @summary Create a new product (admin)
+ */
+export const CreateProductBody = zod.object({
+  name: zod.string(),
+  available: zod.boolean().optional(),
+  comingSoon: zod.boolean().optional(),
+  image: zod.string().optional(),
+});
 
 /**
  * @summary Update a product (admin)
@@ -33,8 +44,10 @@ export const UpdateProductParams = zod.object({
 });
 
 export const UpdateProductBody = zod.object({
+  name: zod.string().optional(),
   available: zod.boolean().optional(),
   comingSoon: zod.boolean().optional(),
+  image: zod.string().optional(),
 });
 
 export const UpdateProductResponse = zod.object({
@@ -42,6 +55,14 @@ export const UpdateProductResponse = zod.object({
   name: zod.string(),
   available: zod.boolean(),
   comingSoon: zod.boolean(),
+  image: zod.string().optional(),
+});
+
+/**
+ * @summary Delete a product (admin)
+ */
+export const DeleteProductParams = zod.object({
+  id: zod.coerce.string(),
 });
 
 /**
@@ -57,6 +78,16 @@ export const GetFitsResponseItem = zod.object({
 export const GetFitsResponse = zod.array(GetFitsResponseItem);
 
 /**
+ * @summary Create a new fit (admin)
+ */
+export const CreateFitBody = zod.object({
+  name: zod.string(),
+  productId: zod.string(),
+  available: zod.boolean().optional(),
+  comingSoon: zod.boolean().optional(),
+});
+
+/**
  * @summary Update a fit (admin)
  */
 export const UpdateFitParams = zod.object({
@@ -64,6 +95,7 @@ export const UpdateFitParams = zod.object({
 });
 
 export const UpdateFitBody = zod.object({
+  name: zod.string().optional(),
   available: zod.boolean().optional(),
   comingSoon: zod.boolean().optional(),
 });
@@ -77,8 +109,12 @@ export const UpdateFitResponse = zod.object({
 });
 
 /**
- * @summary Get colors for a fit
+ * @summary Delete a fit (admin)
  */
+export const DeleteFitParams = zod.object({
+  id: zod.coerce.string(),
+});
+
 export const GetColorsParams = zod.object({
   fitId: zod.coerce.string(),
 });
@@ -91,9 +127,6 @@ export const GetColorsResponseItem = zod.object({
 });
 export const GetColorsResponse = zod.array(GetColorsResponseItem);
 
-/**
- * @summary Add a color to a fit (admin)
- */
 export const AddColorParams = zod.object({
   fitId: zod.coerce.string(),
 });
@@ -103,17 +136,11 @@ export const AddColorBody = zod.object({
   hex: zod.string(),
 });
 
-/**
- * @summary Remove a color from a fit (admin)
- */
 export const DeleteColorParams = zod.object({
   fitId: zod.coerce.string(),
   colorId: zod.coerce.string(),
 });
 
-/**
- * @summary Get sizes for a fit
- */
 export const GetSizesParams = zod.object({
   fitId: zod.coerce.string(),
 });
@@ -128,9 +155,6 @@ export const GetSizesResponseItem = zod.object({
 });
 export const GetSizesResponse = zod.array(GetSizesResponseItem);
 
-/**
- * @summary Add a size to a fit (admin)
- */
 export const AddSizeParams = zod.object({
   fitId: zod.coerce.string(),
 });
@@ -142,9 +166,6 @@ export const AddSizeBody = zod.object({
   image: zod.string().optional(),
 });
 
-/**
- * @summary Update a size (admin)
- */
 export const UpdateSizeParams = zod.object({
   fitId: zod.coerce.string(),
   sizeId: zod.coerce.string(),
@@ -166,17 +187,18 @@ export const UpdateSizeResponse = zod.object({
   fitId: zod.string(),
 });
 
-/**
- * @summary Delete a size (admin)
- */
 export const DeleteSizeParams = zod.object({
   fitId: zod.coerce.string(),
   sizeId: zod.coerce.string(),
 });
 
 /**
- * @summary Admin login
+ * @summary Upload an image file (admin)
  */
+export const UploadImageBody = zod.object({
+  file: zod.instanceof(File),
+});
+
 export const AdminLoginBody = zod.object({
   password: zod.string(),
 });
@@ -184,11 +206,9 @@ export const AdminLoginBody = zod.object({
 export const AdminLoginResponse = zod.object({
   success: zod.boolean(),
   message: zod.string(),
+  token: zod.string().optional(),
 });
 
-/**
- * @summary Check admin session
- */
 export const GetAdminMeResponse = zod.object({
   authenticated: zod.boolean(),
 });

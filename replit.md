@@ -50,9 +50,13 @@ A premium streetwear customization website with a multi-step product configurato
 ### Routes
 
 - `GET /api/products` — list products
-- `PATCH /api/products/:id` — update product availability
+- `POST /api/products` — create product (admin)
+- `PATCH /api/products/:id` — update product (admin)
+- `DELETE /api/products/:id` — delete product + cascade (admin)
 - `GET /api/fits` — list fits
-- `PATCH /api/fits/:id` — update fit availability
+- `POST /api/fits` — create fit (admin)
+- `PATCH /api/fits/:id` — update fit (admin)
+- `DELETE /api/fits/:id` — delete fit + cascade (admin)
 - `GET /api/fits/:fitId/colors` — list colors for a fit
 - `POST /api/fits/:fitId/colors` — add a color (admin)
 - `DELETE /api/fits/:fitId/colors/:colorId` — remove a color (admin)
@@ -60,7 +64,9 @@ A premium streetwear customization website with a multi-step product configurato
 - `POST /api/fits/:fitId/sizes` — add a size (admin)
 - `PATCH /api/fits/:fitId/sizes/:sizeId` — update a size (admin)
 - `DELETE /api/fits/:fitId/sizes/:sizeId` — delete a size (admin)
-- `POST /api/admin/login` — admin login (returns token)
+- `POST /api/uploads` — upload image file (multipart/form-data, field: "file") → returns { url, filename }
+- `GET /api/uploads/:filename` — serve uploaded image
+- `POST /api/admin/login` — admin login (returns Bearer token)
 - `POST /api/admin/logout` — admin logout
 - `GET /api/admin/me` — check admin session
 
@@ -73,4 +79,10 @@ A premium streetwear customization website with a multi-step product configurato
 
 - URL: `/admin`
 - Default password: `admin123`
-- Features: toggle product/fit availability, manage colors (add/delete with hex picker), manage sizes (add/edit/delete)
+- Auth: Bearer token stored in `localStorage` as `wearurway_admin_token`
+- Features:
+  - **Products tab**: Add/edit/delete products, toggle available/coming-soon, upload product image
+  - **Fits tab**: Add/edit/delete fits (linked to a product), toggle available/coming-soon, grouped by product
+  - **Colors tab**: Add/delete colors per fit with hex color picker; fit filter tabs
+  - **Sizes tab**: Add/edit/delete sizes per fit with width/height/image; fit filter tabs
+  - **Image uploads**: Click "Upload" button in any image field → `POST /api/uploads` → image stored on disk and URL auto-filled

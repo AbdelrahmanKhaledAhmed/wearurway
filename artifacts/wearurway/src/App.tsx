@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
 
 import Landing from "@/pages/landing";
 import Products from "@/pages/products";
@@ -17,6 +19,8 @@ import { CustomizerProvider } from "@/hooks/use-customizer";
 
 const queryClient = new QueryClient();
 
+setAuthTokenGetter(() => localStorage.getItem("wearurway_admin_token"));
+
 function Router() {
   return (
     <div className="flex flex-col min-h-screen">
@@ -30,7 +34,6 @@ function Router() {
           <Route path="/sizes" component={Sizes} />
           <Route path="/admin" component={AdminLogin} />
           <Route path="/admin/dashboard" component={AdminDashboard} />
-          
           <Route component={NotFound} />
         </Switch>
       </main>

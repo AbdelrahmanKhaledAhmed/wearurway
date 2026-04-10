@@ -23,6 +23,8 @@ import type {
   AdminLoginResponse,
   AdminMeResponse,
   Color,
+  CreateFitBody,
+  CreateProductBody,
   ErrorResponse,
   Fit,
   HealthStatus,
@@ -31,6 +33,8 @@ import type {
   UpdateFitBody,
   UpdateProductBody,
   UpdateSizeBody,
+  UploadImageBody,
+  UploadResponse,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -193,6 +197,92 @@ export function useGetProducts<
 }
 
 /**
+ * @summary Create a new product (admin)
+ */
+export const getCreateProductUrl = () => {
+  return `/api/products`;
+};
+
+export const createProduct = async (
+  createProductBody: CreateProductBody,
+  options?: RequestInit,
+): Promise<Product> => {
+  return customFetch<Product>(getCreateProductUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createProductBody),
+  });
+};
+
+export const getCreateProductMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createProduct>>,
+    TError,
+    { data: BodyType<CreateProductBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createProduct>>,
+  TError,
+  { data: BodyType<CreateProductBody> },
+  TContext
+> => {
+  const mutationKey = ["createProduct"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createProduct>>,
+    { data: BodyType<CreateProductBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createProduct(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateProductMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createProduct>>
+>;
+export type CreateProductMutationBody = BodyType<CreateProductBody>;
+export type CreateProductMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a new product (admin)
+ */
+export const useCreateProduct = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createProduct>>,
+    TError,
+    { data: BodyType<CreateProductBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createProduct>>,
+  TError,
+  { data: BodyType<CreateProductBody> },
+  TContext
+> => {
+  return useMutation(getCreateProductMutationOptions(options));
+};
+
+/**
  * @summary Update a product (admin)
  */
 export const getUpdateProductUrl = (id: string) => {
@@ -280,6 +370,90 @@ export const useUpdateProduct = <
 };
 
 /**
+ * @summary Delete a product (admin)
+ */
+export const getDeleteProductUrl = (id: string) => {
+  return `/api/products/${id}`;
+};
+
+export const deleteProduct = async (
+  id: string,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteProductUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteProductMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteProduct>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteProduct>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["deleteProduct"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteProduct>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteProduct(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteProductMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteProduct>>
+>;
+
+export type DeleteProductMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a product (admin)
+ */
+export const useDeleteProduct = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteProduct>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteProduct>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getDeleteProductMutationOptions(options));
+};
+
+/**
  * @summary Get all fits
  */
 export const getGetFitsUrl = () => {
@@ -343,6 +517,92 @@ export function useGetFits<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Create a new fit (admin)
+ */
+export const getCreateFitUrl = () => {
+  return `/api/fits`;
+};
+
+export const createFit = async (
+  createFitBody: CreateFitBody,
+  options?: RequestInit,
+): Promise<Fit> => {
+  return customFetch<Fit>(getCreateFitUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createFitBody),
+  });
+};
+
+export const getCreateFitMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createFit>>,
+    TError,
+    { data: BodyType<CreateFitBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createFit>>,
+  TError,
+  { data: BodyType<CreateFitBody> },
+  TContext
+> => {
+  const mutationKey = ["createFit"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createFit>>,
+    { data: BodyType<CreateFitBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createFit(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateFitMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createFit>>
+>;
+export type CreateFitMutationBody = BodyType<CreateFitBody>;
+export type CreateFitMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a new fit (admin)
+ */
+export const useCreateFit = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createFit>>,
+    TError,
+    { data: BodyType<CreateFitBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createFit>>,
+  TError,
+  { data: BodyType<CreateFitBody> },
+  TContext
+> => {
+  return useMutation(getCreateFitMutationOptions(options));
+};
 
 /**
  * @summary Update a fit (admin)
@@ -432,8 +692,89 @@ export const useUpdateFit = <
 };
 
 /**
- * @summary Get colors for a fit
+ * @summary Delete a fit (admin)
  */
+export const getDeleteFitUrl = (id: string) => {
+  return `/api/fits/${id}`;
+};
+
+export const deleteFit = async (
+  id: string,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteFitUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteFitMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteFit>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteFit>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["deleteFit"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteFit>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteFit(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteFitMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteFit>>
+>;
+
+export type DeleteFitMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a fit (admin)
+ */
+export const useDeleteFit = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteFit>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteFit>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getDeleteFitMutationOptions(options));
+};
+
 export const getGetColorsUrl = (fitId: string) => {
   return `/api/fits/${fitId}/colors`;
 };
@@ -489,10 +830,6 @@ export type GetColorsQueryResult = NonNullable<
 >;
 export type GetColorsQueryError = ErrorType<unknown>;
 
-/**
- * @summary Get colors for a fit
- */
-
 export function useGetColors<
   TData = Awaited<ReturnType<typeof getColors>>,
   TError = ErrorType<unknown>,
@@ -516,9 +853,6 @@ export function useGetColors<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
-/**
- * @summary Add a color to a fit (admin)
- */
 export const getAddColorUrl = (fitId: string) => {
   return `/api/fits/${fitId}/colors`;
 };
@@ -580,9 +914,6 @@ export type AddColorMutationResult = NonNullable<
 export type AddColorMutationBody = BodyType<AddColorBody>;
 export type AddColorMutationError = ErrorType<unknown>;
 
-/**
- * @summary Add a color to a fit (admin)
- */
 export const useAddColor = <
   TError = ErrorType<unknown>,
   TContext = unknown,
@@ -603,9 +934,6 @@ export const useAddColor = <
   return useMutation(getAddColorMutationOptions(options));
 };
 
-/**
- * @summary Remove a color from a fit (admin)
- */
 export const getDeleteColorUrl = (fitId: string, colorId: string) => {
   return `/api/fits/${fitId}/colors/${colorId}`;
 };
@@ -665,9 +993,6 @@ export type DeleteColorMutationResult = NonNullable<
 
 export type DeleteColorMutationError = ErrorType<unknown>;
 
-/**
- * @summary Remove a color from a fit (admin)
- */
 export const useDeleteColor = <
   TError = ErrorType<unknown>,
   TContext = unknown,
@@ -688,9 +1013,6 @@ export const useDeleteColor = <
   return useMutation(getDeleteColorMutationOptions(options));
 };
 
-/**
- * @summary Get sizes for a fit
- */
 export const getGetSizesUrl = (fitId: string) => {
   return `/api/fits/${fitId}/sizes`;
 };
@@ -746,10 +1068,6 @@ export type GetSizesQueryResult = NonNullable<
 >;
 export type GetSizesQueryError = ErrorType<unknown>;
 
-/**
- * @summary Get sizes for a fit
- */
-
 export function useGetSizes<
   TData = Awaited<ReturnType<typeof getSizes>>,
   TError = ErrorType<unknown>,
@@ -773,9 +1091,6 @@ export function useGetSizes<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
-/**
- * @summary Add a size to a fit (admin)
- */
 export const getAddSizeUrl = (fitId: string) => {
   return `/api/fits/${fitId}/sizes`;
 };
@@ -837,9 +1152,6 @@ export type AddSizeMutationResult = NonNullable<
 export type AddSizeMutationBody = BodyType<AddSizeBody>;
 export type AddSizeMutationError = ErrorType<unknown>;
 
-/**
- * @summary Add a size to a fit (admin)
- */
 export const useAddSize = <
   TError = ErrorType<unknown>,
   TContext = unknown,
@@ -860,9 +1172,6 @@ export const useAddSize = <
   return useMutation(getAddSizeMutationOptions(options));
 };
 
-/**
- * @summary Update a size (admin)
- */
 export const getUpdateSizeUrl = (fitId: string, sizeId: string) => {
   return `/api/fits/${fitId}/sizes/${sizeId}`;
 };
@@ -925,9 +1234,6 @@ export type UpdateSizeMutationResult = NonNullable<
 export type UpdateSizeMutationBody = BodyType<UpdateSizeBody>;
 export type UpdateSizeMutationError = ErrorType<unknown>;
 
-/**
- * @summary Update a size (admin)
- */
 export const useUpdateSize = <
   TError = ErrorType<unknown>,
   TContext = unknown,
@@ -948,9 +1254,6 @@ export const useUpdateSize = <
   return useMutation(getUpdateSizeMutationOptions(options));
 };
 
-/**
- * @summary Delete a size (admin)
- */
 export const getDeleteSizeUrl = (fitId: string, sizeId: string) => {
   return `/api/fits/${fitId}/sizes/${sizeId}`;
 };
@@ -1010,9 +1313,6 @@ export type DeleteSizeMutationResult = NonNullable<
 
 export type DeleteSizeMutationError = ErrorType<unknown>;
 
-/**
- * @summary Delete a size (admin)
- */
 export const useDeleteSize = <
   TError = ErrorType<unknown>,
   TContext = unknown,
@@ -1034,8 +1334,93 @@ export const useDeleteSize = <
 };
 
 /**
- * @summary Admin login
+ * @summary Upload an image file (admin)
  */
+export const getUploadImageUrl = () => {
+  return `/api/uploads`;
+};
+
+export const uploadImage = async (
+  uploadImageBody: UploadImageBody,
+  options?: RequestInit,
+): Promise<UploadResponse> => {
+  const formData = new FormData();
+  formData.append(`file`, uploadImageBody.file);
+
+  return customFetch<UploadResponse>(getUploadImageUrl(), {
+    ...options,
+    method: "POST",
+    body: formData,
+  });
+};
+
+export const getUploadImageMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadImage>>,
+    TError,
+    { data: BodyType<UploadImageBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uploadImage>>,
+  TError,
+  { data: BodyType<UploadImageBody> },
+  TContext
+> => {
+  const mutationKey = ["uploadImage"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uploadImage>>,
+    { data: BodyType<UploadImageBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return uploadImage(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UploadImageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof uploadImage>>
+>;
+export type UploadImageMutationBody = BodyType<UploadImageBody>;
+export type UploadImageMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Upload an image file (admin)
+ */
+export const useUploadImage = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadImage>>,
+    TError,
+    { data: BodyType<UploadImageBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof uploadImage>>,
+  TError,
+  { data: BodyType<UploadImageBody> },
+  TContext
+> => {
+  return useMutation(getUploadImageMutationOptions(options));
+};
+
 export const getAdminLoginUrl = () => {
   return `/api/admin/login`;
 };
@@ -1096,9 +1481,6 @@ export type AdminLoginMutationResult = NonNullable<
 export type AdminLoginMutationBody = BodyType<AdminLoginBody>;
 export type AdminLoginMutationError = ErrorType<ErrorResponse>;
 
-/**
- * @summary Admin login
- */
 export const useAdminLogin = <
   TError = ErrorType<ErrorResponse>,
   TContext = unknown,
@@ -1119,9 +1501,6 @@ export const useAdminLogin = <
   return useMutation(getAdminLoginMutationOptions(options));
 };
 
-/**
- * @summary Admin logout
- */
 export const getAdminLogoutUrl = () => {
   return `/api/admin/logout`;
 };
@@ -1175,9 +1554,6 @@ export type AdminLogoutMutationResult = NonNullable<
 
 export type AdminLogoutMutationError = ErrorType<unknown>;
 
-/**
- * @summary Admin logout
- */
 export const useAdminLogout = <
   TError = ErrorType<unknown>,
   TContext = unknown,
@@ -1198,9 +1574,6 @@ export const useAdminLogout = <
   return useMutation(getAdminLogoutMutationOptions(options));
 };
 
-/**
- * @summary Check admin session
- */
 export const getGetAdminMeUrl = () => {
   return `/api/admin/me`;
 };
@@ -1248,10 +1621,6 @@ export type GetAdminMeQueryResult = NonNullable<
   Awaited<ReturnType<typeof getAdminMe>>
 >;
 export type GetAdminMeQueryError = ErrorType<void>;
-
-/**
- * @summary Check admin session
- */
 
 export function useGetAdminMe<
   TData = Awaited<ReturnType<typeof getAdminMe>>,

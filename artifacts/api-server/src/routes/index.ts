@@ -5,6 +5,7 @@ import fitsRouter from "./fits.js";
 import colorsRouter from "./colors.js";
 import sizesRouter from "./sizes.js";
 import adminRouter from "./admin.js";
+import uploadsRouter from "./uploads.js";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(fitsRouter);
 router.use(colorsRouter);
 router.use(sizesRouter);
 router.use(adminRouter);
+router.use(uploadsRouter);
 
 export default router;

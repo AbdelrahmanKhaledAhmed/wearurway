@@ -7,6 +7,7 @@
  */
 
 export interface UpdateFitBody {
+  name?: string;
   available?: boolean;
   comingSoon?: boolean;
 }

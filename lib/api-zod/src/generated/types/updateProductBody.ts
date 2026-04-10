@@ -7,6 +7,8 @@
  */
 
 export interface UpdateProductBody {
+  name?: string;
   available?: boolean;
   comingSoon?: boolean;
+  image?: string;
 }
