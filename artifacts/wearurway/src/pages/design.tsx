@@ -112,45 +112,46 @@ export default function Design() {
               </motion.div>
             </AnimatePresence>
 
-            {/* Invisible bounding box constraint layer — defines the design area */}
+            {/* Design area bounding box — position is fixed per mockup, numbers reflect selected size */}
             {bbox && (
               <div
-                aria-hidden
-                style={{
-                  position: "absolute",
-                  left: `${bbox.x}%`,
-                  top: `${bbox.y}%`,
-                  width: `${bbox.width}%`,
-                  height: `${bbox.height}%`,
-                  pointerEvents: "none",
-                  // Invisible to user — this is just the constraint layer
-                  // opacity: 0 by design
-                }}
                 data-design-area="true"
                 data-real-width-cm={realWidth}
                 data-real-height-cm={realHeight}
-              />
-            )}
-
-            {/* Design placeholder inside bounding box */}
-            {bbox && (
-              <div
                 style={{
                   position: "absolute",
                   left: `${bbox.x}%`,
                   top: `${bbox.y}%`,
                   width: `${bbox.width}%`,
                   height: `${bbox.height}%`,
-                  border: "1px dashed rgba(255,255,255,0.15)",
+                  border: "1px dashed rgba(255,255,255,0.25)",
+                  pointerEvents: "none",
                   display: "flex",
+                  flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  pointerEvents: "none",
+                  gap: "2px",
                 }}
               >
-                <p className="text-xs uppercase tracking-widest text-white/30 text-center px-2">
-                  Design Area
-                </p>
+                {/* Real-world cm numbers — update on size change, box never moves */}
+                {realWidth > 0 && realHeight > 0 ? (
+                  <>
+                    <p
+                      style={{ fontSize: "clamp(10px, 2vw, 18px)", fontWeight: 900, fontFamily: "monospace", color: "rgba(255,255,255,0.55)", letterSpacing: "0.05em", lineHeight: 1 }}
+                    >
+                      {realWidth} × {realHeight}
+                    </p>
+                    <p
+                      style={{ fontSize: "clamp(8px, 1.2vw, 11px)", color: "rgba(255,255,255,0.3)", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace" }}
+                    >
+                      cm
+                    </p>
+                  </>
+                ) : (
+                  <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                    Design Area
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -189,19 +190,16 @@ export default function Design() {
             </div>
           </div>
 
-          {/* Real-world dimensions (data only — for print calculation) */}
+          {/* Design area dimensions — numbers from selected size */}
           <div className="border border-border p-4">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Real-World Dimensions</p>
-            <p className="text-2xl font-black font-mono">{realWidth} × {realHeight}</p>
-            <p className="text-xs text-muted-foreground uppercase tracking-widest mt-1">Width × Height (cm)</p>
-            {bbox && (
-              <div className="mt-4 pt-4 border-t border-border space-y-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-widest">Design Area</p>
-                <p className="text-xs font-mono text-muted-foreground">
-                  {((bbox.width / 100) * realWidth).toFixed(1)} × {((bbox.height / 100) * realHeight).toFixed(1)} cm (print size)
-                </p>
-              </div>
-            )}
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Design Area</p>
+            <p className="text-3xl font-black font-mono leading-none">
+              {realWidth > 0 ? `${realWidth} × ${realHeight}` : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground uppercase tracking-widest mt-2">cm (width × height)</p>
+            <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
+              Updates per size. Box position on mockup never changes.
+            </p>
           </div>
 
           <div className="mt-auto">
