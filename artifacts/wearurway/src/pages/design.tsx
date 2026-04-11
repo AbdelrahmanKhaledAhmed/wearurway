@@ -15,6 +15,8 @@ interface DesignLayer {
   width: number;
   height: number;
   visible: boolean;
+  naturalWidth: number;
+  naturalHeight: number;
 }
 
 interface DragState {
@@ -38,6 +40,8 @@ export default function Design() {
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [clipSize, setClipSize] = useState({ w: 0, h: 0 });
+  const [dpiWarning, setDpiWarning] = useState(false);
 
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -99,6 +103,38 @@ export default function Design() {
       window.removeEventListener("mouseup", onMouseUp);
     };
   }, [onMouseMove, onMouseUp]);
+
+  // ── Track clip area pixel size (needed for DPI calculation) ────────────────
+  useEffect(() => {
+    const el = clipAreaRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (entry) {
+        setClipSize({ w: entry.contentRect.width, h: entry.contentRect.height });
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // ── DPI warning: recalculate whenever layers / selection / clip size change ─
+  useEffect(() => {
+    if (!selectedLayerId || !bbox || !realWidth || !realHeight || clipSize.w === 0) {
+      setDpiWarning(false);
+      return;
+    }
+    const layer = layers.find(l => l.id === selectedLayerId);
+    if (!layer || !layer.visible || layer.naturalWidth === 0) {
+      setDpiWarning(false);
+      return;
+    }
+    const printW_cm = (bbox.width / 100) * realWidth;
+    const exportW = (printW_cm / 2.54) * 300;
+    const scaleX = exportW / clipSize.w;
+    const effectiveDPI = (layer.naturalWidth / layer.width) / scaleX * 300;
+    setDpiWarning(effectiveDPI < 300);
+  }, [layers, selectedLayerId, clipSize, bbox, realWidth, realHeight]);
 
   const startDrag = (e: React.MouseEvent, layer: DesignLayer) => {
     e.preventDefault();
@@ -209,6 +245,8 @@ export default function Design() {
           width: defaultW,
           height: defaultH,
           visible: true,
+          naturalWidth: natural.w,
+          naturalHeight: natural.h,
         };
         setLayers(prev => [...prev, newLayer]);
         setSelectedLayerId(newLayer.id);
@@ -312,10 +350,8 @@ export default function Design() {
         });
       }
 
-      // Filename: print area in cm + pixel dimensions for DTF
-      const wCm = printW_cm.toFixed(1).replace(".", "_");
-      const hCm = printH_cm.toFixed(1).replace(".", "_");
-      const filename = `design-${side}-${wCm}x${hCm}cm-${exportW}x${exportH}px.png`;
+      // Filename includes pixel dimensions derived from the bounding box at 300 DPI
+      const filename = `design-${side}-${exportW}x${exportH}.png`;
 
       canvas.toBlob(blob => {
         if (!blob) return;
@@ -506,6 +542,24 @@ export default function Design() {
               No bounding box set — configure it in the Admin Panel
             </p>
           )}
+
+          {/* ── DPI warning banner ── */}
+          <AnimatePresence>
+            {dpiWarning && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2 }}
+                className="mt-4 flex items-start gap-2 border border-amber-500/60 bg-amber-500/10 px-4 py-3 max-w-sm"
+              >
+                <span className="text-amber-400 text-base leading-none mt-0.5">⚠</span>
+                <p className="text-xs text-amber-400 uppercase tracking-widest leading-relaxed">
+                  If you increase the size more, the quality will not be good enough for print at 300 DPI.
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* ── Right sidebar ── */}
@@ -566,22 +620,37 @@ export default function Design() {
 
             {/* Zoom controls — only when a layer is selected */}
             {selectedLayer && (
-              <div className="flex items-center gap-2">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground flex-1">Zoom</p>
-                <button
-                  onClick={() => zoomSelected("out")}
-                  className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors"
-                  title="Zoom Out"
-                >
-                  −
-                </button>
-                <button
-                  onClick={() => zoomSelected("in")}
-                  className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors"
-                  title="Zoom In"
-                >
-                  +
-                </button>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground flex-1">Zoom</p>
+                  <button
+                    onClick={() => zoomSelected("out")}
+                    className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors"
+                    title="Zoom Out"
+                  >
+                    −
+                  </button>
+                  <button
+                    onClick={() => zoomSelected("in")}
+                    className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors"
+                    title="Zoom In"
+                  >
+                    +
+                  </button>
+                </div>
+                <AnimatePresence>
+                  {dpiWarning && (
+                    <motion.p
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="text-xs text-amber-400 uppercase tracking-widest leading-relaxed overflow-hidden"
+                    >
+                      ⚠ Quality below 300 DPI — image too small for this print size.
+                    </motion.p>
+                  )}
+                </AnimatePresence>
               </div>
             )}
           </div>
