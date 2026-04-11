@@ -68,9 +68,9 @@ export default function Sizes() {
           <Button 
             size="lg" 
             className="rounded-none px-12 h-14 uppercase tracking-widest"
-            onClick={() => setLocation("/")}
+            onClick={() => setLocation("/design")}
           >
-            Start Over
+            Start Design
           </Button>
         </motion.div>
       </div>

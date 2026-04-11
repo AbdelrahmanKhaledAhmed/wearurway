@@ -110,9 +110,47 @@ export interface AdminMeResponse {
   authenticated: boolean;
 }
 
+export interface BoundingBox {
+  /** Left position as percentage (0-100) of image width */
+  x: number;
+  /** Top position as percentage (0-100) of image height */
+  y: number;
+  /** Width as percentage (0-100) of image width */
+  width: number;
+  /** Height as percentage (0-100) of image height */
+  height: number;
+}
+
+export interface MockupSide {
+  image?: string;
+  boundingBox?: BoundingBox;
+}
+
+export interface Mockup {
+  productId: string;
+  fitId: string;
+  colorId: string;
+  front?: MockupSide;
+  back?: MockupSide;
+}
+
+export interface SaveMockupBody {
+  productId: string;
+  fitId: string;
+  colorId: string;
+  front?: MockupSide;
+  back?: MockupSide;
+}
+
 export interface ErrorResponse {
   error: string;
 }
+
+export type GetMockupParams = {
+  productId: string;
+  fitId: string;
+  colorId: string;
+};
 
 export type UploadImageBody = {
   file: Blob;

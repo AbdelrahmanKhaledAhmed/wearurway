@@ -37,14 +37,36 @@ export interface Size {
   fitId: string;
 }
 
+export interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface MockupSide {
+  image?: string;
+  boundingBox?: BoundingBox;
+}
+
+export interface Mockup {
+  productId: string;
+  fitId: string;
+  colorId: string;
+  front?: MockupSide;
+  back?: MockupSide;
+}
+
 export interface Store {
   products: Product[];
   fits: Fit[];
   colors: Color[];
   sizes: Size[];
+  mockups: Record<string, Mockup>;
 }
 
 const DEFAULT_STORE: Store = {
+  mockups: {},
   products: [
     { id: "tshirt", name: "T-Shirt", available: true, comingSoon: false },
     { id: "sweatshirt", name: "Sweatshirt", available: false, comingSoon: true },
@@ -81,7 +103,12 @@ function loadStore(): Store {
   try {
     if (fs.existsSync(DATA_FILE)) {
       const raw = fs.readFileSync(DATA_FILE, "utf-8");
-      return JSON.parse(raw) as Store;
+      const parsed = JSON.parse(raw) as Partial<Store>;
+      return {
+        ...JSON.parse(JSON.stringify(DEFAULT_STORE)),
+        ...parsed,
+        mockups: parsed.mockups ?? {},
+      };
     }
   } catch {
     // fall through to default

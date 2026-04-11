@@ -27,8 +27,11 @@ import type {
   CreateProductBody,
   ErrorResponse,
   Fit,
+  GetMockupParams,
   HealthStatus,
+  Mockup,
   Product,
+  SaveMockupBody,
   Size,
   UpdateFitBody,
   UpdateProductBody,
@@ -1331,6 +1334,186 @@ export const useDeleteSize = <
   TContext
 > => {
   return useMutation(getDeleteSizeMutationOptions(options));
+};
+
+/**
+ * @summary Get mockup config for a product+fit+color combo
+ */
+export const getGetMockupUrl = (params: GetMockupParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/mockups?${stringifiedParams}`
+    : `/api/mockups`;
+};
+
+export const getMockup = async (
+  params: GetMockupParams,
+  options?: RequestInit,
+): Promise<Mockup> => {
+  return customFetch<Mockup>(getGetMockupUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMockupQueryKey = (params?: GetMockupParams) => {
+  return [`/api/mockups`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetMockupQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMockup>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetMockupParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMockup>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMockupQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMockup>>> = ({
+    signal,
+  }) => getMockup(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMockup>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMockupQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMockup>>
+>;
+export type GetMockupQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get mockup config for a product+fit+color combo
+ */
+
+export function useGetMockup<
+  TData = Awaited<ReturnType<typeof getMockup>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetMockupParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMockup>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMockupQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create or update mockup for a combo (admin)
+ */
+export const getSaveMockupUrl = () => {
+  return `/api/mockups`;
+};
+
+export const saveMockup = async (
+  saveMockupBody: SaveMockupBody,
+  options?: RequestInit,
+): Promise<Mockup> => {
+  return customFetch<Mockup>(getSaveMockupUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(saveMockupBody),
+  });
+};
+
+export const getSaveMockupMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveMockup>>,
+    TError,
+    { data: BodyType<SaveMockupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveMockup>>,
+  TError,
+  { data: BodyType<SaveMockupBody> },
+  TContext
+> => {
+  const mutationKey = ["saveMockup"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveMockup>>,
+    { data: BodyType<SaveMockupBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return saveMockup(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SaveMockupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveMockup>>
+>;
+export type SaveMockupMutationBody = BodyType<SaveMockupBody>;
+export type SaveMockupMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create or update mockup for a combo (admin)
+ */
+export const useSaveMockup = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveMockup>>,
+    TError,
+    { data: BodyType<SaveMockupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof saveMockup>>,
+  TError,
+  { data: BodyType<SaveMockupBody> },
+  TContext
+> => {
+  return useMutation(getSaveMockupMutationOptions(options));
 };
 
 /**

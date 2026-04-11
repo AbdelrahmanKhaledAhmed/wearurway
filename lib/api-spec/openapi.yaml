@@ -13,6 +13,7 @@ tags:
   - name: fits
   - name: colors
   - name: sizes
+  - name: mockups
   - name: admin
 paths:
   /healthz:
@@ -317,6 +318,52 @@ paths:
         "204":
           description: Deleted
 
+  /mockups:
+    get:
+      operationId: getMockup
+      tags: [mockups]
+      summary: Get mockup config for a product+fit+color combo
+      parameters:
+        - name: productId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: fitId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: colorId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Mockup config (may have empty front/back)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mockup"
+    put:
+      operationId: saveMockup
+      tags: [mockups, admin]
+      summary: Create or update mockup for a combo (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveMockupBody"
+      responses:
+        "200":
+          description: Saved mockup
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mockup"
+
   /uploads:
     post:
       operationId: uploadImage
@@ -579,6 +626,61 @@ components:
         authenticated:
           type: boolean
       required: [authenticated]
+
+    BoundingBox:
+      type: object
+      properties:
+        x:
+          type: number
+          description: Left position as percentage (0-100) of image width
+        y:
+          type: number
+          description: Top position as percentage (0-100) of image height
+        width:
+          type: number
+          description: Width as percentage (0-100) of image width
+        height:
+          type: number
+          description: Height as percentage (0-100) of image height
+      required: [x, y, width, height]
+
+    MockupSide:
+      type: object
+      properties:
+        image:
+          type: string
+        boundingBox:
+          $ref: "#/components/schemas/BoundingBox"
+
+    Mockup:
+      type: object
+      properties:
+        productId:
+          type: string
+        fitId:
+          type: string
+        colorId:
+          type: string
+        front:
+          $ref: "#/components/schemas/MockupSide"
+        back:
+          $ref: "#/components/schemas/MockupSide"
+      required: [productId, fitId, colorId]
+
+    SaveMockupBody:
+      type: object
+      properties:
+        productId:
+          type: string
+        fitId:
+          type: string
+        colorId:
+          type: string
+        front:
+          $ref: "#/components/schemas/MockupSide"
+        back:
+          $ref: "#/components/schemas/MockupSide"
+      required: [productId, fitId, colorId]
 
     ErrorResponse:
       type: object

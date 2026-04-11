@@ -1,0 +1,166 @@
+CORE FLOW CHANGE
+
+When the user reaches the step:
+
+"You've configured your tee"
+
+👉 Replace the button:
+
+From: Start Over
+To: Start Design
+
+This should NOT restart the flow.
+
+Instead:
+
+👉 It should redirect the user into Edit Mode
+
+MAIN FEATURE: 2D MOCKUP SYSTEM
+
+Each product configuration must support 2D Mockups.
+
+Product Structure:
+
+Every combination of:
+
+Product (e.g. T-Shirt)
+Fit (e.g. Boxy, Regular, Oversize)
+Color (e.g. White, Black)
+
+must have:
+
+👉 Assigned 2D Mockups (Front + Back images)
+
+ADMIN PANEL REQUIREMENTS
+1. Mockup Upload System
+
+For every combination of:
+
+Product
+Fit
+Color
+
+I must be able to upload:
+
+Front 2D mockup image
+Back 2D mockup image
+
+Example:
+
+Product: T-Shirt
+Fit: Boxy
+Color: White
+→ Front Mockup
+→ Back Mockup
+
+2. DESIGN BOUNDING BOX (IMPORTANT UPDATE)
+
+On top of each 2D mockup, there is a design bounding box (editable area).
+
+KEY RULE:
+
+❌ Do NOT auto-generate or calculate the bounding box
+❌ Do NOT visually scale or move it automatically
+✅ I will manually draw it from the Admin Panel (Front / Back)
+
+ADMIN CONTROL FEATURES:
+
+In Admin Panel, I must be able to manually:
+
+Draw the design area rectangle on the mockup (Front / Back)
+
+This must be configurable for:
+
+Product
+Fit
+Color
+Front / Back separately
+IMPORTANT BEHAVIOR:
+The system must NOT guess bounding box values
+The system must ONLY use what is defined in Admin Panel
+Each variant has its own independent bounding box
+Bounding box is stored and loaded dynamically
+FRONTEND DESIGN SYSTEM
+1. Render Mockups
+
+Based on user selection:
+
+Product
+Fit
+Color
+
+Load:
+
+Front mockup
+Back mockup
+2. DESIGN OVERLAY SYSTEM
+
+On top of the mockup:
+
+Render the bounding box as an invisible constraint layer
+User cannot see it
+3. EDIT MODE
+
+After clicking:
+
+👉 Start Design
+
+User enters Edit Mode where:
+
+Design tools are activated (will be defined later)
+Mockup is shown
+Bounding box constraint is active
+SIZE-BASED SYSTEM (IMPORTANT UPDATE)
+CORE IDEA:
+
+The bounding box is used to represent a real-world measurement system for the T-shirt.
+
+REAL WORLD MAPPING:
+
+I already have a real T-shirt sizing system, for example:
+
+👉 Small T-shirt = 50cm × 70cm (real physical size)
+
+SYSTEM BEHAVIOR:
+
+When the user selects a size (Small / Medium / Large):
+
+The bounding box must represent that real-world size in DATA ONLY
+IMPORTANT:
+
+❌ Do NOT visually resize the box
+❌ Do NOT move the box
+❌ Do NOT apply any scaling in UI
+
+WHAT ACTUALLY HAPPENS:
+
+Example:
+
+If user selects:
+
+Size: Small
+
+Then internally:
+
+Bounding box = 50 × 70 (real-world cm equivalent)
+
+If user selects Large:
+
+Bounding box values change accordingly (real-world size)
+
+BUT:
+
+👉 The box stays visually identical on screen
+👉 Only numeric values change behind the scenes
+
+PURPOSE OF THIS SYSTEM:
+
+This bounding box is used so that:
+
+👉 When I place an image inside the box
+👉 I can calculate its real print size relative to the actual T-shirt
+
+So I can know:
+
+How big the design is on a real Small / Medium / Large T-shirt
+Exact physical scaling for printing

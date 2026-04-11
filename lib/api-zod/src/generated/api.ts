@@ -193,6 +193,162 @@ export const DeleteSizeParams = zod.object({
 });
 
 /**
+ * @summary Get mockup config for a product+fit+color combo
+ */
+export const GetMockupQueryParams = zod.object({
+  productId: zod.coerce.string(),
+  fitId: zod.coerce.string(),
+  colorId: zod.coerce.string(),
+});
+
+export const GetMockupResponse = zod.object({
+  productId: zod.string(),
+  fitId: zod.string(),
+  colorId: zod.string(),
+  front: zod
+    .object({
+      image: zod.string().optional(),
+      boundingBox: zod
+        .object({
+          x: zod
+            .number()
+            .describe("Left position as percentage (0-100) of image width"),
+          y: zod
+            .number()
+            .describe("Top position as percentage (0-100) of image height"),
+          width: zod
+            .number()
+            .describe("Width as percentage (0-100) of image width"),
+          height: zod
+            .number()
+            .describe("Height as percentage (0-100) of image height"),
+        })
+        .optional(),
+    })
+    .optional(),
+  back: zod
+    .object({
+      image: zod.string().optional(),
+      boundingBox: zod
+        .object({
+          x: zod
+            .number()
+            .describe("Left position as percentage (0-100) of image width"),
+          y: zod
+            .number()
+            .describe("Top position as percentage (0-100) of image height"),
+          width: zod
+            .number()
+            .describe("Width as percentage (0-100) of image width"),
+          height: zod
+            .number()
+            .describe("Height as percentage (0-100) of image height"),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+/**
+ * @summary Create or update mockup for a combo (admin)
+ */
+export const SaveMockupBody = zod.object({
+  productId: zod.string(),
+  fitId: zod.string(),
+  colorId: zod.string(),
+  front: zod
+    .object({
+      image: zod.string().optional(),
+      boundingBox: zod
+        .object({
+          x: zod
+            .number()
+            .describe("Left position as percentage (0-100) of image width"),
+          y: zod
+            .number()
+            .describe("Top position as percentage (0-100) of image height"),
+          width: zod
+            .number()
+            .describe("Width as percentage (0-100) of image width"),
+          height: zod
+            .number()
+            .describe("Height as percentage (0-100) of image height"),
+        })
+        .optional(),
+    })
+    .optional(),
+  back: zod
+    .object({
+      image: zod.string().optional(),
+      boundingBox: zod
+        .object({
+          x: zod
+            .number()
+            .describe("Left position as percentage (0-100) of image width"),
+          y: zod
+            .number()
+            .describe("Top position as percentage (0-100) of image height"),
+          width: zod
+            .number()
+            .describe("Width as percentage (0-100) of image width"),
+          height: zod
+            .number()
+            .describe("Height as percentage (0-100) of image height"),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+export const SaveMockupResponse = zod.object({
+  productId: zod.string(),
+  fitId: zod.string(),
+  colorId: zod.string(),
+  front: zod
+    .object({
+      image: zod.string().optional(),
+      boundingBox: zod
+        .object({
+          x: zod
+            .number()
+            .describe("Left position as percentage (0-100) of image width"),
+          y: zod
+            .number()
+            .describe("Top position as percentage (0-100) of image height"),
+          width: zod
+            .number()
+            .describe("Width as percentage (0-100) of image width"),
+          height: zod
+            .number()
+            .describe("Height as percentage (0-100) of image height"),
+        })
+        .optional(),
+    })
+    .optional(),
+  back: zod
+    .object({
+      image: zod.string().optional(),
+      boundingBox: zod
+        .object({
+          x: zod
+            .number()
+            .describe("Left position as percentage (0-100) of image width"),
+          y: zod
+            .number()
+            .describe("Top position as percentage (0-100) of image height"),
+          width: zod
+            .number()
+            .describe("Width as percentage (0-100) of image width"),
+          height: zod
+            .number()
+            .describe("Height as percentage (0-100) of image height"),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+/**
  * @summary Upload an image file (admin)
  */
 export const UploadImageBody = zod.object({

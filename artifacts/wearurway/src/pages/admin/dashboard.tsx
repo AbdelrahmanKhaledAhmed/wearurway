@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
   useGetAdminMe,
@@ -6,6 +6,7 @@ import {
   useGetFits, useCreateFit, useUpdateFit, useDeleteFit, getGetFitsQueryKey,
   useGetColors, useAddColor, useDeleteColor, getGetColorsQueryKey,
   useGetSizes, useAddSize, useUpdateSize, useDeleteSize, getGetSizesQueryKey,
+  useGetMockup, useSaveMockup, getGetMockupQueryKey,
   useAdminLogout,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -69,7 +70,7 @@ export default function AdminDashboard() {
 
         <Tabs defaultValue="products" className="w-full">
           <TabsList className="mb-12 rounded-none border-b border-border bg-transparent h-auto p-0 flex space-x-8 overflow-x-auto justify-start w-full">
-            {["products", "fits", "colors", "sizes"].map(tab => (
+            {["products", "fits", "colors", "sizes", "mockups"].map(tab => (
               <TabsTrigger
                 key={tab}
                 value={tab}
@@ -83,6 +84,7 @@ export default function AdminDashboard() {
           <TabsContent value="fits"><FitsManager /></TabsContent>
           <TabsContent value="colors"><ColorsManager /></TabsContent>
           <TabsContent value="sizes"><SizesManager /></TabsContent>
+          <TabsContent value="mockups"><MockupsManager /></TabsContent>
         </Tabs>
       </motion.div>
     </div>
@@ -535,6 +537,386 @@ function ColorsManager() {
           <p className="text-xs text-muted-foreground uppercase tracking-widest col-span-full">No colors yet</p>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Mockups Manager ─────────────────────────────────────────────────────────
+
+interface BBox { x: number; y: number; width: number; height: number }
+
+function BoundingBoxEditor({
+  image,
+  bbox,
+  onChange,
+}: {
+  image: string;
+  bbox: BBox | null;
+  onChange: (b: BBox) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [startPt, setStartPt] = useState({ x: 0, y: 0 });
+  const [liveBbox, setLiveBbox] = useState<BBox | null>(bbox);
+
+  const getPct = (e: React.MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return {
+      x: Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)),
+      y: Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)),
+    };
+  };
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const pt = getPct(e);
+    setStartPt(pt);
+    setDrawing(true);
+    setLiveBbox({ x: pt.x, y: pt.y, width: 0, height: 0 });
+  };
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!drawing) return;
+    const pt = getPct(e);
+    setLiveBbox({
+      x: Math.min(startPt.x, pt.x),
+      y: Math.min(startPt.y, pt.y),
+      width: Math.abs(pt.x - startPt.x),
+      height: Math.abs(pt.y - startPt.y),
+    });
+  };
+
+  const onMouseUp = (e: React.MouseEvent) => {
+    if (!drawing) return;
+    setDrawing(false);
+    if (liveBbox && liveBbox.width > 1 && liveBbox.height > 1) {
+      onChange(liveBbox);
+    }
+  };
+
+  const displayBbox = liveBbox;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs uppercase tracking-widest text-muted-foreground">
+        Click and drag on the image to draw the design bounding box
+      </p>
+      <div
+        ref={containerRef}
+        className="relative w-full select-none overflow-hidden border border-border bg-muted/10"
+        style={{ cursor: "crosshair", aspectRatio: "3/4" }}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onMouseLeave={() => { if (drawing) { setDrawing(false); } }}
+      >
+        <img src={image} alt="mockup" className="w-full h-full object-contain pointer-events-none" draggable={false} />
+        {displayBbox && displayBbox.width > 0 && displayBbox.height > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              left: `${displayBbox.x}%`,
+              top: `${displayBbox.y}%`,
+              width: `${displayBbox.width}%`,
+              height: `${displayBbox.height}%`,
+              border: "2px solid rgba(255,255,255,0.8)",
+              background: "rgba(255,255,255,0.08)",
+              pointerEvents: "none",
+            }}
+          >
+            <div className="absolute top-0 left-0 right-0 bottom-0 flex items-center justify-center">
+              <span className="text-white/60 text-xs uppercase tracking-widest font-mono pointer-events-none">
+                {displayBbox.width.toFixed(1)}% × {displayBbox.height.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+      {displayBbox && (
+        <div className="grid grid-cols-4 gap-2 text-xs font-mono text-muted-foreground">
+          <div>X: {displayBbox.x.toFixed(1)}%</div>
+          <div>Y: {displayBbox.y.toFixed(1)}%</div>
+          <div>W: {displayBbox.width.toFixed(1)}%</div>
+          <div>H: {displayBbox.height.toFixed(1)}%</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MockupsManager() {
+  const { data: products } = useGetProducts();
+  const { data: fits } = useGetFits();
+  const { data: colors } = useGetColors("", { query: { enabled: false } });
+
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [selectedFitId, setSelectedFitId] = useState<string>("");
+  const [selectedColorId, setSelectedColorId] = useState<string>("");
+  const [activeSide, setActiveSide] = useState<"front" | "back">("front");
+
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  // Filtered fits/colors based on selection
+  const filteredFits = fits?.filter(f => f.productId === selectedProductId) ?? [];
+
+  const { data: filteredColors } = useGetColors(selectedFitId, {
+    query: { enabled: !!selectedFitId, queryKey: getGetColorsQueryKey(selectedFitId) }
+  });
+
+  useEffect(() => {
+    if (products && products.length > 0 && !selectedProductId) {
+      setSelectedProductId(products[0].id);
+    }
+  }, [products, selectedProductId]);
+
+  useEffect(() => {
+    if (filteredFits.length > 0 && (!selectedFitId || !filteredFits.find(f => f.id === selectedFitId))) {
+      setSelectedFitId(filteredFits[0].id);
+    }
+  }, [filteredFits, selectedFitId]);
+
+  useEffect(() => {
+    if (filteredColors && filteredColors.length > 0 && (!selectedColorId || !filteredColors.find(c => c.id === selectedColorId))) {
+      setSelectedColorId(filteredColors[0].id);
+    }
+  }, [filteredColors, selectedColorId]);
+
+  const mockupParams = selectedProductId && selectedFitId && selectedColorId
+    ? { productId: selectedProductId, fitId: selectedFitId, colorId: selectedColorId }
+    : null;
+
+  const { data: mockup, isLoading: mockupLoading } = useGetMockup(
+    mockupParams ?? { productId: "", fitId: "", colorId: "" },
+    { query: { enabled: !!mockupParams, queryKey: getGetMockupQueryKey(mockupParams ?? undefined) } }
+  );
+
+  const saveMockup = useSaveMockup();
+
+  // Local state for the mockup being edited
+  const [frontImage, setFrontImage] = useState("");
+  const [frontBbox, setFrontBbox] = useState<BBox | null>(null);
+  const [backImage, setBackImage] = useState("");
+  const [backBbox, setBackBbox] = useState<BBox | null>(null);
+
+  // Sync from fetched mockup when selection changes
+  useEffect(() => {
+    setFrontImage(mockup?.front?.image ?? "");
+    setFrontBbox(mockup?.front?.boundingBox ?? null);
+    setBackImage(mockup?.back?.image ?? "");
+    setBackBbox(mockup?.back?.boundingBox ?? null);
+  }, [mockup]);
+
+  const handleSave = () => {
+    if (!mockupParams) return;
+    saveMockup.mutate({
+      data: {
+        ...mockupParams,
+        front: {
+          image: frontImage || undefined,
+          boundingBox: frontBbox ?? undefined,
+        },
+        back: {
+          image: backImage || undefined,
+          boundingBox: backBbox ?? undefined,
+        },
+      }
+    }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetMockupQueryKey(mockupParams) });
+        toast({ title: "Mockup saved" });
+      }
+    });
+  };
+
+  const currentImage = activeSide === "front" ? frontImage : backImage;
+  const currentBbox = activeSide === "front" ? frontBbox : backBbox;
+  const setCurrentImage = activeSide === "front" ? setFrontImage : setBackImage;
+  const setCurrentBbox = activeSide === "front" ? setFrontBbox : setBackBbox;
+
+  const productName = products?.find(p => p.id === selectedProductId)?.name ?? "";
+  const fitName = fits?.find(f => f.id === selectedFitId)?.name ?? "";
+  const colorName = filteredColors?.find(c => c.id === selectedColorId)?.name ?? "";
+  const colorHex = filteredColors?.find(c => c.id === selectedColorId)?.hex ?? "";
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6">Select Combination</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Product */}
+          <div className="space-y-2">
+            <Label className="text-xs uppercase tracking-widest">Product</Label>
+            <select
+              value={selectedProductId}
+              onChange={e => { setSelectedProductId(e.target.value); setSelectedFitId(""); setSelectedColorId(""); }}
+              className="w-full h-10 rounded-none border border-input bg-background px-3 text-sm focus:outline-none focus:border-foreground"
+            >
+              {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          {/* Fit */}
+          <div className="space-y-2">
+            <Label className="text-xs uppercase tracking-widest">Fit</Label>
+            <select
+              value={selectedFitId}
+              onChange={e => { setSelectedFitId(e.target.value); setSelectedColorId(""); }}
+              className="w-full h-10 rounded-none border border-input bg-background px-3 text-sm focus:outline-none focus:border-foreground"
+              disabled={!filteredFits.length}
+            >
+              {filteredFits.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          </div>
+          {/* Color */}
+          <div className="space-y-2">
+            <Label className="text-xs uppercase tracking-widest">Color</Label>
+            <div className="flex gap-2">
+              {colorHex && <div className="w-10 h-10 border border-border shrink-0" style={{ backgroundColor: colorHex }} />}
+              <select
+                value={selectedColorId}
+                onChange={e => setSelectedColorId(e.target.value)}
+                className="flex-1 h-10 rounded-none border border-input bg-background px-3 text-sm focus:outline-none focus:border-foreground"
+                disabled={!filteredColors?.length}
+              >
+                {filteredColors?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {selectedProductId && selectedFitId && selectedColorId && (
+          <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-widest">
+            <span>Editing mockup for:</span>
+            <span className="font-bold text-foreground">{productName} / {fitName} / {colorName}</span>
+          </div>
+        )}
+      </div>
+
+      {mockupParams && (
+        <>
+          {/* Front / Back tabs */}
+          <div className="flex gap-0 border border-border w-fit">
+            {(["front", "back"] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setActiveSide(s)}
+                className={`px-8 py-2 text-xs uppercase tracking-widest font-medium transition-colors ${activeSide === s ? "bg-foreground text-background" : "bg-transparent text-foreground hover:bg-muted/20"}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Left: mockup image + bbox editor */}
+            <div className="space-y-4">
+              <ImageUploader
+                label={`${activeSide === "front" ? "Front" : "Back"} Mockup Image`}
+                value={currentImage}
+                onChange={setCurrentImage}
+              />
+
+              {currentImage ? (
+                <BoundingBoxEditor
+                  image={currentImage}
+                  bbox={currentBbox}
+                  onChange={setCurrentBbox}
+                />
+              ) : (
+                <div className="border border-dashed border-border aspect-[3/4] flex flex-col items-center justify-center text-muted-foreground gap-3">
+                  <span className="text-xs uppercase tracking-widest">Upload an image first</span>
+                  <span className="text-xs text-muted-foreground/60">Then draw the design bounding box on it</span>
+                </div>
+              )}
+            </div>
+
+            {/* Right: info + current bounding box values */}
+            <div className="space-y-6">
+              <div className="border border-border p-6 space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-widest">Bounding Box Values</h3>
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground uppercase tracking-widest">
+                    Stored as % of image dimensions (0–100). Draw on the image to set.
+                  </p>
+                  {currentBbox ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      {(["x", "y", "width", "height"] as const).map(field => (
+                        <div key={field} className="space-y-1">
+                          <Label className="text-xs uppercase tracking-widest">{field === "x" ? "Left (X)" : field === "y" ? "Top (Y)" : field === "width" ? "Width" : "Height"}</Label>
+                          <div className="flex gap-1 items-center">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.1}
+                              value={currentBbox[field].toFixed(1)}
+                              onChange={e => {
+                                const v = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
+                                const next = { ...currentBbox, [field]: v };
+                                setCurrentBbox(next);
+                              }}
+                              className="rounded-none h-9 font-mono text-xs"
+                            />
+                            <span className="text-xs text-muted-foreground">%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">No bounding box drawn yet</p>
+                  )}
+                </div>
+                {currentBbox && (
+                  <Button
+                    variant="ghost"
+                    className="rounded-none text-xs uppercase tracking-widest text-destructive"
+                    onClick={() => setCurrentBbox(null)}
+                  >
+                    Clear Bounding Box
+                  </Button>
+                )}
+              </div>
+
+              <div className="border border-border p-6 space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-widest">Summary</h3>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground uppercase tracking-widest">Front image</span>
+                    <span className={frontImage ? "text-foreground" : "text-muted-foreground"}>{frontImage ? "Uploaded" : "Missing"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground uppercase tracking-widest">Front bbox</span>
+                    <span className={frontBbox ? "text-foreground" : "text-muted-foreground"}>{frontBbox ? "Defined" : "Missing"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground uppercase tracking-widest">Back image</span>
+                    <span className={backImage ? "text-foreground" : "text-muted-foreground"}>{backImage ? "Uploaded" : "Missing"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground uppercase tracking-widest">Back bbox</span>
+                    <span className={backBbox ? "text-foreground" : "text-muted-foreground"}>{backBbox ? "Defined" : "Missing"}</span>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                className="w-full rounded-none uppercase tracking-widest font-bold h-12"
+                onClick={handleSave}
+                disabled={saveMockup.isPending || !mockupParams}
+              >
+                {saveMockup.isPending ? "Saving..." : "Save Mockup"}
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {!mockupParams && (
+        <div className="border border-dashed border-border p-12 text-center">
+          <p className="text-xs text-muted-foreground uppercase tracking-widest">Select a product, fit, and color above to manage its mockup</p>
+        </div>
+      )}
     </div>
   );
 }
