@@ -217,10 +217,17 @@ export default function Design() {
             ))}
           </div>
 
-          {/* Mockup viewer — transparent background, overflow hidden for clipping */}
+          {/* Mockup viewer — checkerboard shows transparent areas of the PNG */}
           <div
             className="relative w-full max-w-sm"
-            style={{ aspectRatio: "3/4" }}
+            style={{
+              aspectRatio: "3/4",
+              backgroundImage:
+                "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
+              backgroundSize: "16px 16px",
+              backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0px",
+              backgroundColor: "#1a1a1a",
+            }}
           >
             <AnimatePresence mode="wait">
               <motion.div
@@ -232,13 +239,12 @@ export default function Design() {
                 className="absolute inset-0"
               >
                 {currentSide?.image ? (
-                  /* Mockup image — rendered last so it sits ABOVE layers visually,
-                     design layers show through where the garment allows */
+                  /* Mockup image — sits BELOW design layers so art appears on the shirt */
                   <img
                     src={currentSide.image}
                     alt={`${side} mockup`}
                     className="w-full h-full object-contain pointer-events-none"
-                    style={{ position: "relative", zIndex: 10 }}
+                    style={{ position: "relative", zIndex: 1 }}
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center gap-3 border border-dashed border-border">
