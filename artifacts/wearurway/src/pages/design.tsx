@@ -435,7 +435,7 @@ export default function Design() {
                   top: `${bbox.y}%`,
                   width: `${bbox.width}%`,
                   height: `${bbox.height}%`,
-                  overflow: "hidden",
+                  overflow: "visible",
                   zIndex: 5,
                 }}
               >
