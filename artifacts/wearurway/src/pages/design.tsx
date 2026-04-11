@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGetMockup, getGetMockupQueryKey } from "@workspace/api-client-react";
 import { useCustomizer } from "@/hooks/use-customizer";
+import ImageEditor from "@/components/ImageEditor";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,7 @@ export default function Design() {
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [clipSize, setClipSize] = useState<{ w: number; h: number } | null>(null);
+  const [editorFile, setEditorFile] = useState<File | null>(null);
 
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -281,66 +283,72 @@ export default function Design() {
     holdActionRef.current = null;
   }, []);
 
-  // ── Add Image ──────────────────────────────────────────────────────────────
+  // ── Add Image — open editor first ─────────────────────────────────────────
 
-  const handleAddImage = useCallback(async () => {
+  const handleAddImage = useCallback(() => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
     input.click();
-    input.onchange = async () => {
+    input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
-      setUploading(true);
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch("/api/uploads", { method: "POST", body: formData });
-        const data = await res.json();
-        const clipRect = clipAreaRef.current?.getBoundingClientRect();
-        const clipW = clipRect?.width ?? 200;
-        const clipH = clipRect?.height ?? 200;
-
-        const natural = await new Promise<{ w: number; h: number }>((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-          img.onerror = () => resolve({ w: 1, h: 1 });
-          img.src = data.url;
-        });
-
-        const maxW = clipW * 0.6;
-        const maxH = clipH * 0.6;
-        const ratio = natural.w / natural.h;
-        let defaultW: number, defaultH: number;
-        if (ratio > maxW / maxH) {
-          defaultW = maxW;
-          defaultH = maxW / ratio;
-        } else {
-          defaultH = maxH;
-          defaultW = maxH * ratio;
-        }
-        defaultW = Math.round(defaultW);
-        defaultH = Math.round(defaultH);
-
-        const newLayer: DesignLayer = {
-          id: crypto.randomUUID(),
-          name: `Layer ${layers.length + 1}`,
-          imageUrl: data.url,
-          x: Math.round((clipW - defaultW) / 2),
-          y: Math.round((clipH - defaultH) / 2),
-          width: defaultW,
-          height: defaultH,
-          rotation: 0,
-          visible: true,
-          naturalWidth: natural.w,
-          naturalHeight: natural.h,
-        };
-        setLayers(prev => [...prev, newLayer]);
-        setSelectedLayerId(newLayer.id);
-      } finally {
-        setUploading(false);
-      }
+      setEditorFile(file);
     };
+  }, []);
+
+  // Called when user confirms from the editor (passes edited blob)
+  const handleEditorConfirm = useCallback(async (blob: Blob) => {
+    setEditorFile(null);
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", blob, "design.png");
+      const res = await fetch("/api/uploads", { method: "POST", body: formData });
+      const data = await res.json();
+      const clipRect = clipAreaRef.current?.getBoundingClientRect();
+      const clipW = clipRect?.width ?? 200;
+      const clipH = clipRect?.height ?? 200;
+
+      const natural = await new Promise<{ w: number; h: number }>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+        img.onerror = () => resolve({ w: 1, h: 1 });
+        img.src = data.url;
+      });
+
+      const maxW = clipW * 0.6;
+      const maxH = clipH * 0.6;
+      const ratio = natural.w / natural.h;
+      let defaultW: number, defaultH: number;
+      if (ratio > maxW / maxH) {
+        defaultW = maxW;
+        defaultH = maxW / ratio;
+      } else {
+        defaultH = maxH;
+        defaultW = maxH * ratio;
+      }
+      defaultW = Math.round(defaultW);
+      defaultH = Math.round(defaultH);
+
+      const newLayer: DesignLayer = {
+        id: crypto.randomUUID(),
+        name: `Layer ${layers.length + 1}`,
+        imageUrl: data.url,
+        x: Math.round((clipW - defaultW) / 2),
+        y: Math.round((clipH - defaultH) / 2),
+        width: defaultW,
+        height: defaultH,
+        rotation: 0,
+        visible: true,
+        naturalWidth: natural.w,
+        naturalHeight: natural.h,
+      };
+      setLayers(prev => [...prev, newLayer]);
+      setSelectedLayerId(newLayer.id);
+    } finally {
+      setUploading(false);
+    }
   }, [layers.length]);
 
   const removeLayer = (id: string) => {
@@ -458,6 +466,14 @@ export default function Design() {
   if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return null;
 
   return (
+    <>
+    {editorFile && (
+      <ImageEditor
+        file={editorFile}
+        onConfirm={handleEditorConfirm}
+        onCancel={() => setEditorFile(null)}
+      />
+    )}
     <div className="min-h-screen pt-20 flex flex-col bg-background">
       {/* ── Top bar ── */}
       <div className="border-b border-border px-6 md:px-12 py-4 flex items-center justify-between shrink-0">
@@ -940,5 +956,6 @@ export default function Design() {
         </div>
       </div>
     </div>
+    </>
   );
 }
