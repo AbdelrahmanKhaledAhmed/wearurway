@@ -492,10 +492,10 @@ export default function Design() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Main canvas ── */}
-        <div className="flex-1 flex flex-col items-center justify-center p-8">
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
 
           {/* Front / Back toggle */}
-          <div className="flex gap-0 mb-8 border border-border">
+          <div className="flex gap-0 mb-4 border border-border">
             {(["front", "back"] as const).map(s => (
               <button
                 key={s}
@@ -509,13 +509,13 @@ export default function Design() {
 
           {/* Mockup viewer */}
           <div
-            className="relative w-full max-w-sm"
+            className="relative w-full max-w-md"
             style={{
               aspectRatio: "3/4",
               backgroundImage:
                 "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
-              backgroundSize: "16px 16px",
-              backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0px",
+              backgroundSize: "24px 24px",
+              backgroundPosition: "0 0, 0 12px, 12px -12px, -12px 0px",
               backgroundColor: "#1a1a1a",
             }}
           >
