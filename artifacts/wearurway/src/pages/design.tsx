@@ -415,35 +415,67 @@ export default function Design() {
     setExporting(true);
     try {
       const clipRect = clipEl.getBoundingClientRect();
-      const clipW = Math.round(clipRect.width);
-      const clipH = Math.round(clipRect.height);
+      const clipW = clipRect.width;
+      const clipH = clipRect.height;
 
-      // ── Step 1: render layers onto an intermediate canvas that is exactly
-      //    the size of the clip area in screen pixels.  Layer coordinates are
-      //    in clip-space pixels so no scaling is needed here — the canvas
-      //    clips overflow automatically, just like the DOM's overflow:hidden.
-      const intermediate = document.createElement("canvas");
-      intermediate.width = clipW;
-      intermediate.height = clipH;
-      const ic = intermediate.getContext("2d");
-      if (!ic) return;
-      ic.imageSmoothingEnabled = true;
-      ic.imageSmoothingQuality = "high";
-      ic.clearRect(0, 0, clipW, clipH);
+      // ── Determine the best export scale ─────────────────────────────────────
+      // The "natural scale" for each layer is how many original image pixels
+      // map to each clip-space pixel.  Using this scale means drawImage() reads
+      // directly from the original high-res pixels with no intermediate loss.
+      let maxNaturalScale = 1;
+      for (const layer of visibleLayers) {
+        const sx = layer.naturalWidth / layer.width;
+        const sy = layer.naturalHeight / layer.height;
+        maxNaturalScale = Math.max(maxNaturalScale, sx, sy);
+      }
+
+      // Also respect the print-DPI target (300 dpi) so the file is ready for DTF.
+      const printW_cm = (bbox.width / 100) * realWidth;
+      const printH_cm = (bbox.height / 100) * realHeight;
+      const printScaleX = Math.round((printW_cm / 2.54) * 300) / clipW;
+      const printScaleY = Math.round((printH_cm / 2.54) * 300) / clipH;
+      const printScale = Math.max(printScaleX, printScaleY);
+
+      // Use the higher of the two; cap at 8 192 px on the long edge to avoid
+      // browser canvas memory limits.
+      const MAX_SIDE = 8192;
+      const rawScale = Math.max(maxNaturalScale, printScale);
+      const capScale = Math.min(rawScale, MAX_SIDE / clipW, MAX_SIDE / clipH);
+      const exportScale = Math.max(capScale, 1);
+
+      const exportW = Math.round(clipW * exportScale);
+      const exportH = Math.round(clipH * exportScale);
+      const scaleX = exportW / clipW;
+      const scaleY = exportH / clipH;
+
+      // ── Draw every layer directly onto the final canvas ──────────────────────
+      // drawImage() samples from the image's full natural resolution, so there
+      // is no intermediate downscale step — quality is limited only by the
+      // source image.
+      const canvas = document.createElement("canvas");
+      canvas.width = exportW;
+      canvas.height = exportH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.clearRect(0, 0, exportW, exportH);
 
       for (const layer of visibleLayers) {
         await new Promise<void>((resolve) => {
           const img = new Image();
           img.crossOrigin = "anonymous";
           img.onload = () => {
-            const cx = layer.x + layer.width / 2;
-            const cy = layer.y + layer.height / 2;
+            const cx = (layer.x + layer.width / 2) * scaleX;
+            const cy = (layer.y + layer.height / 2) * scaleY;
+            const dw = layer.width * scaleX;
+            const dh = layer.height * scaleY;
             const angle = (layer.rotation * Math.PI) / 180;
-            ic.save();
-            ic.translate(cx, cy);
-            ic.rotate(angle);
-            ic.drawImage(img, -layer.width / 2, -layer.height / 2, layer.width, layer.height);
-            ic.restore();
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(angle);
+            ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+            ctx.restore();
             resolve();
           };
           img.onerror = () => resolve();
@@ -451,30 +483,12 @@ export default function Design() {
         });
       }
 
-      // ── Step 2: scale the intermediate canvas up to print resolution.
-      const printW_cm = (bbox.width / 100) * realWidth;
-      const printH_cm = (bbox.height / 100) * realHeight;
-      const exportW = Math.round((printW_cm / 2.54) * 300);
-      const exportH = Math.round((printH_cm / 2.54) * 300);
+      // ── Download ─────────────────────────────────────────────────────────────
+      const printWcm = Math.round(printW_cm);
+      const printHcm = Math.round(printH_cm);
+      const filename = `design_${printWcm}x${printHcm}cm_${exportW}x${exportH}px.png`;
 
-      const exportCanvas = document.createElement("canvas");
-      exportCanvas.width = exportW;
-      exportCanvas.height = exportH;
-      const ec = exportCanvas.getContext("2d");
-      if (!ec) return;
-      ec.imageSmoothingEnabled = true;
-      ec.imageSmoothingQuality = "high";
-      ec.drawImage(intermediate, 0, 0, exportW, exportH);
-
-      // Build filename from first visible layer's visible area
-      const firstVisible = visibleLayers[0];
-      const vW = Math.max(0, Math.min(clipW, firstVisible.x + firstVisible.width) - Math.max(0, firstVisible.x));
-      const vH = Math.max(0, Math.min(clipH, firstVisible.y + firstVisible.height) - Math.max(0, firstVisible.y));
-      const imgWcm = Math.round((vW / clipW) * realWidth);
-      const imgHcm = Math.round((vH / clipH) * realHeight);
-      const filename = `${imgWcm}x${imgHcm}cm.png`;
-
-      exportCanvas.toBlob(blob => {
+      canvas.toBlob(blob => {
         if (!blob) return;
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
