@@ -439,31 +439,11 @@ export default function Design() {
       }
       if (loaded.length === 0) return;
 
-      // ── Compute the visible bounding box of all layers within the clip area ───
-      // This is the region the user actually sees — exactly what changes when
-      // they move / resize the photo.  Clamp each layer's rect to clip bounds.
-      let visMinX = clipW, visMaxX = 0;
-      let visMinY = clipH, visMaxY = 0;
-      for (const { layer } of loaded) {
-        const lx = Math.max(0, layer.x);
-        const ly = Math.max(0, layer.y);
-        const rx = Math.min(clipW, layer.x + layer.width);
-        const ry = Math.min(clipH, layer.y + layer.height);
-        if (rx > lx && ry > ly) {
-          visMinX = Math.min(visMinX, lx);
-          visMaxX = Math.max(visMaxX, rx);
-          visMinY = Math.min(visMinY, ly);
-          visMaxY = Math.max(visMaxY, ry);
-        }
-      }
-      if (visMaxX <= visMinX || visMaxY <= visMinY) return;
-
-      const visW = visMaxX - visMinX;   // clip-space pixels wide
-      const visH = visMaxY - visMinY;   // clip-space pixels tall
-
-      // cm size that matches the live label shown in the UI
-      const visCmW = (visW / clipW) * realWidth;
-      const visCmH = (visH / clipH) * realHeight;
+      // ── Export region = the full bounding box (clip area) ────────────────────
+      // We always export exactly what is visible inside the clip element —
+      // the entire bounding box, not just the union of layer rects.
+      const visW = clipW;
+      const visH = clipH;
 
       // ── Determine export scale ────────────────────────────────────────────────
       // Natural scale: original image pixels per clip pixel (use real naturalWidth).
@@ -475,10 +455,10 @@ export default function Design() {
           img.naturalHeight / layer.height,
         );
       }
-      // 300 DPI for the visible area
+      // 300 DPI equivalent for the bounding box real-world size
       const printScale = Math.max(
-        (visCmW / 2.54 * 300) / visW,
-        (visCmH / 2.54 * 300) / visH,
+        (realWidth  / 2.54 * 300) / visW,
+        (realHeight / 2.54 * 300) / visH,
       );
       // Cap at 8 192 px on the long edge
       const MAX_SIDE    = 8192;
@@ -491,9 +471,10 @@ export default function Design() {
       const scaleY  = exportH / visH;
 
       // ── Draw directly to the final canvas ────────────────────────────────────
-      // Offset each layer by (-visMinX, -visMinY) so the top-left of the visible
-      // region maps to (0, 0) in the export canvas.  Canvas bounds clip anything
-      // that falls outside, matching the DOM's overflow:hidden exactly.
+      // Layer positions are already relative to the clip element origin (0,0),
+      // so we just scale them up.  A clipping rect enforces the bounding-box
+      // boundary, matching the DOM's overflow:hidden exactly — nothing inside
+      // the box is cut and nothing outside bleeds in.
       const canvas = document.createElement("canvas");
       canvas.width  = exportW;
       canvas.height = exportH;
@@ -503,9 +484,14 @@ export default function Design() {
       ctx.imageSmoothingQuality = "high";
       ctx.clearRect(0, 0, exportW, exportH);
 
+      // Hard clip to the bounding box boundary
+      ctx.beginPath();
+      ctx.rect(0, 0, exportW, exportH);
+      ctx.clip();
+
       for (const { layer, img } of loaded) {
-        const cx    = (layer.x + layer.width  / 2 - visMinX) * scaleX;
-        const cy    = (layer.y + layer.height / 2 - visMinY) * scaleY;
+        const cx    = (layer.x + layer.width  / 2) * scaleX;
+        const cy    = (layer.y + layer.height / 2) * scaleY;
         const dw    = layer.width  * scaleX;
         const dh    = layer.height * scaleY;
         const angle = (layer.rotation * Math.PI) / 180;
@@ -520,8 +506,7 @@ export default function Design() {
       for (const { blobUrl } of loaded) URL.revokeObjectURL(blobUrl);
 
       // ── Download ─────────────────────────────────────────────────────────────
-      // Filename = the print dimensions the user sees in the UI label.
-      const filename = `${Math.round(visCmW)}x${Math.round(visCmH)}cm.png`;
+      const filename = `${Math.round(realWidth)}x${Math.round(realHeight)}cm.png`;
 
       canvas.toBlob(blob => {
         if (!blob) { alert("Export failed — could not generate image."); return; }
