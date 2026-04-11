@@ -435,7 +435,7 @@ export default function Design() {
                   top: `${bbox.y}%`,
                   width: `${bbox.width}%`,
                   height: `${bbox.height}%`,
-                  overflow: "visible",
+                  overflow: "hidden",
                   zIndex: 5,
                 }}
               >
@@ -453,9 +453,14 @@ export default function Design() {
                         top: layer.y,
                         width: layer.width,
                         height: layer.height,
+                        minWidth: layer.width,
+                        minHeight: layer.height,
+                        maxWidth: "none",
+                        maxHeight: "none",
                         cursor: dragRef.current?.layerId === layer.id ? "grabbing" : "grab",
                         userSelect: "none",
                         background: "none",
+                        flexShrink: 0,
                       }}
                     />
                   ) : null
