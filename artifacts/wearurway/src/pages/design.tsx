@@ -414,12 +414,7 @@ export default function Design() {
 
     setExporting(true);
     try {
-      const clipRect = clipEl.getBoundingClientRect();
-      const clipW = clipRect.width;
-      const clipH = clipRect.height;
-
       // ── Load every image fresh via fetch() → blob URL ────────────────────────
-      // Avoids browser CORS cache taint so canvas.toBlob() always works.
       type Loaded = { layer: DesignLayer; img: HTMLImageElement; blobUrl: string };
       const loaded: Loaded[] = [];
       for (const layer of visibleLayers) {
@@ -439,66 +434,66 @@ export default function Design() {
       }
       if (loaded.length === 0) return;
 
-      // ── Export region = the full bounding box (clip area) ────────────────────
-      // We always export exactly what is visible inside the clip element —
-      // the entire bounding box, not just the union of layer rects.
-      const visW = clipW;
-      const visH = clipH;
+      // ── Read clip dimensions right before drawing ─────────────────────────────
+      // Use offsetWidth/offsetHeight (integer, no sub-pixel rounding) to avoid
+      // fractional getBoundingClientRect values that can shift the scale factor.
+      const clipW = clipEl.offsetWidth;
+      const clipH = clipEl.offsetHeight;
+      if (!clipW || !clipH) return;
 
       // ── Determine export scale ────────────────────────────────────────────────
-      // Natural scale: original image pixels per clip pixel (use real naturalWidth).
+      // Take the highest native resolution available from any loaded image.
       let maxNaturalScale = 1;
       for (const { layer, img } of loaded) {
-        maxNaturalScale = Math.max(
-          maxNaturalScale,
-          img.naturalWidth  / layer.width,
-          img.naturalHeight / layer.height,
-        );
+        if (layer.width > 0)  maxNaturalScale = Math.max(maxNaturalScale, img.naturalWidth  / layer.width);
+        if (layer.height > 0) maxNaturalScale = Math.max(maxNaturalScale, img.naturalHeight / layer.height);
       }
-      // 300 DPI equivalent for the bounding box real-world size
+      // 300 DPI target for the real-world bounding box size.
       const printScale = Math.max(
-        (realWidth  / 2.54 * 300) / visW,
-        (realHeight / 2.54 * 300) / visH,
+        (realWidth  / 2.54 * 300) / clipW,
+        (realHeight / 2.54 * 300) / clipH,
       );
-      // Cap at 8 192 px on the long edge
+      // Cap at 8 192 px on the long edge to stay within browser limits.
       const MAX_SIDE    = 8192;
       const rawScale    = Math.max(maxNaturalScale, printScale);
-      const exportScale = Math.min(Math.max(rawScale, 1), MAX_SIDE / visW, MAX_SIDE / visH);
+      const exportScale = Math.min(Math.max(rawScale, 1), MAX_SIDE / clipW, MAX_SIDE / clipH);
 
-      const exportW = Math.round(visW * exportScale);
-      const exportH = Math.round(visH * exportScale);
-      const scaleX  = exportW / visW;
-      const scaleY  = exportH / visH;
+      const exportW = Math.round(clipW * exportScale);
+      const exportH = Math.round(clipH * exportScale);
 
-      // ── Draw directly to the final canvas ────────────────────────────────────
-      // Layer positions are already relative to the clip element origin (0,0),
-      // so we just scale them up.  A clipping rect enforces the bounding-box
-      // boundary, matching the DOM's overflow:hidden exactly — nothing inside
-      // the box is cut and nothing outside bleeds in.
+      // ── Build export canvas ───────────────────────────────────────────────────
+      // Scale the context so we can work entirely in CSS-pixel coordinates (the
+      // same coordinate space as layer.x / layer.y / layer.width / layer.height).
+      // This eliminates any per-axis rounding drift.
       const canvas = document.createElement("canvas");
       canvas.width  = exportW;
       canvas.height = exportH;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
+
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
-      ctx.clearRect(0, 0, exportW, exportH);
 
-      // Hard clip to the bounding box boundary
+      // Scale context: 1 CSS pixel → exportScale canvas pixels.
+      const sx = exportW / clipW;
+      const sy = exportH / clipH;
+      ctx.scale(sx, sy);
+
+      // Enforce the bounding-box boundary in CSS-pixel space.
+      // Anything outside (0,0)-(clipW,clipH) is invisible in the DOM too.
       ctx.beginPath();
-      ctx.rect(0, 0, exportW, exportH);
+      ctx.rect(0, 0, clipW, clipH);
       ctx.clip();
 
+      // Draw each layer at its exact CSS-pixel position — mirrors the DOM exactly.
       for (const { layer, img } of loaded) {
-        const cx    = (layer.x + layer.width  / 2) * scaleX;
-        const cy    = (layer.y + layer.height / 2) * scaleY;
-        const dw    = layer.width  * scaleX;
-        const dh    = layer.height * scaleY;
+        const cx    = layer.x + layer.width  / 2;
+        const cy    = layer.y + layer.height / 2;
         const angle = (layer.rotation * Math.PI) / 180;
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(angle);
-        ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+        ctx.drawImage(img, -layer.width / 2, -layer.height / 2, layer.width, layer.height);
         ctx.restore();
       }
 
