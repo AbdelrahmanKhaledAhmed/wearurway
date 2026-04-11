@@ -565,23 +565,6 @@ export default function Design() {
                 Layers {layers.length > 0 && `(${layers.length})`}
               </p>
 
-              {/* Add Image */}
-              <button
-                onClick={handleAddImage}
-                disabled={uploading || !bbox}
-                className="w-full flex items-center gap-3 border border-border px-4 py-3 mb-4 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <span className="text-lg leading-none">🖼</span>
-                <div className="text-left">
-                  <p className="text-xs font-bold uppercase tracking-widest">
-                    {uploading ? "Uploading…" : "Add Image"}
-                  </p>
-                  {!bbox && (
-                    <p className="text-xs text-muted-foreground mt-0.5">Set bbox in admin first</p>
-                  )}
-                </div>
-              </button>
-
               {layers.length === 0 ? (
                 <p className="text-xs text-muted-foreground uppercase tracking-widest leading-relaxed">
                   No layers yet. Add an image to start designing.
@@ -950,6 +933,28 @@ export default function Design() {
             </div>
           </div>
 
+
+          {/* ── Tools ── */}
+          <div className="p-6 border-b border-border space-y-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Tools</p>
+
+            {/* Add Image */}
+            <button
+              onClick={handleAddImage}
+              disabled={uploading || !bbox}
+              className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span className="text-lg leading-none">🖼</span>
+              <div className="text-left">
+                <p className="text-xs font-bold uppercase tracking-widest">
+                  {uploading ? "Uploading…" : "Add Image"}
+                </p>
+                {!bbox && (
+                  <p className="text-xs text-muted-foreground mt-0.5">Set bbox in admin first</p>
+                )}
+              </div>
+            </button>
+          </div>
 
           {/* ── Export ── */}
           {layers.some(l => l.visible) && realWidth > 0 && (
