@@ -40,7 +40,6 @@ export default function Design() {
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [clipSize, setClipSize] = useState({ w: 0, h: 0 });
   const [dpiWarning, setDpiWarning] = useState(false);
 
   const clipAreaRef = useRef<HTMLDivElement>(null);
@@ -104,36 +103,26 @@ export default function Design() {
     };
   }, [onMouseMove, onMouseUp]);
 
-  // ── Track clip area pixel size (needed for DPI calculation) ────────────────
-  // Dependency on `bbox` ensures this re-runs after bbox loads from the API
-  // and the clip area div appears in the DOM.
+  // ── DPI warning: runs after every render that changes layers / bbox / size ──
+  // Reads the clip area size directly from the DOM (no intermediate state),
+  // so it always reflects the actual rendered dimensions regardless of timing.
+  //
+  // Formula: effectiveDPI = (naturalWidth / layer.width) / (exportW / clipW) × 300
+  //   = naturalWidth × clipW / (layer.width × exportW) × 300
+  // Warning fires when effectiveDPI < 300 for any visible layer.
   useEffect(() => {
-    const el = clipAreaRef.current;
-    if (!el) return;
-    // Read current size immediately (ResizeObserver won't fire for initial size)
-    const rect = el.getBoundingClientRect();
-    setClipSize({ w: rect.width, h: rect.height });
-    const ro = new ResizeObserver(entries => {
-      const entry = entries[0];
-      if (entry) {
-        setClipSize({ w: entry.contentRect.width, h: entry.contentRect.height });
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [bbox]); // re-run whenever bbox changes (clip area appears/disappears)
-
-  // ── DPI warning: check ALL visible layers, not just the selected one ────────
-  // A layer's effective export DPI = (naturalWidth / layer.width) / (exportW / clipW) × 300
-  // Warning triggers if any visible layer would print below 300 DPI.
-  useEffect(() => {
-    if (!bbox || !realWidth || !realHeight || clipSize.w === 0) {
+    if (!bbox || !realWidth || !realHeight) {
+      setDpiWarning(false);
+      return;
+    }
+    const clipW = clipAreaRef.current?.getBoundingClientRect().width ?? 0;
+    if (clipW === 0) {
       setDpiWarning(false);
       return;
     }
     const printW_cm = (bbox.width / 100) * realWidth;
     const exportW = (printW_cm / 2.54) * 300;
-    const scaleX = exportW / clipSize.w;
+    const scaleX = exportW / clipW;
 
     const anyLowDpi = layers.some(l => {
       if (!l.visible || l.naturalWidth === 0) return false;
@@ -141,7 +130,7 @@ export default function Design() {
       return effectiveDPI < 300;
     });
     setDpiWarning(anyLowDpi);
-  }, [layers, clipSize, bbox, realWidth, realHeight]);
+  }, [layers, bbox, realWidth, realHeight]);
 
   const startDrag = (e: React.MouseEvent, layer: DesignLayer) => {
     e.preventDefault();
@@ -357,8 +346,10 @@ export default function Design() {
         });
       }
 
-      // Filename includes pixel dimensions derived from the bounding box at 300 DPI
-      const filename = `design-${side}-${exportW}x${exportH}.png`;
+      // Filename: physical print size in cm + pixel dimensions at 300 DPI
+      const wCm = printW_cm.toFixed(1);
+      const hCm = printH_cm.toFixed(1);
+      const filename = `design-${side}-${wCm}x${hCm}cm_${exportW}x${exportH}px.png`;
 
       canvas.toBlob(blob => {
         if (!blob) return;
