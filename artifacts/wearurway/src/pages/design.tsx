@@ -210,12 +210,13 @@ export default function Design() {
   }, [onTouchStart, onTouchMove, onTouchEnd]);
 
   // ── Track clip area pixel size via ResizeObserver ───────────────────────────
+  // Use offsetWidth/offsetHeight (integer CSS pixels) so the boundary values
+  // match the coordinate space of layer.x/y/width/height exactly.
   useEffect(() => {
     const el = clipAreaRef.current;
     if (!el) return;
     const update = () => {
-      const r = el.getBoundingClientRect();
-      setClipSize({ w: r.width, h: r.height });
+      setClipSize({ w: el.offsetWidth, h: el.offsetHeight });
     };
     update();
     const ro = new ResizeObserver(update);
@@ -316,9 +317,9 @@ export default function Design() {
         return;
       }
 
-      const clipRect = clipAreaRef.current?.getBoundingClientRect();
-      const clipW = clipRect?.width ?? 200;
-      const clipH = clipRect?.height ?? 200;
+      const clipEl2 = clipAreaRef.current;
+      const clipW = clipEl2?.offsetWidth ?? 200;
+      const clipH = clipEl2?.offsetHeight ?? 200;
 
       const natural = await new Promise<{ w: number; h: number }>((resolve) => {
         const img = new Image();
