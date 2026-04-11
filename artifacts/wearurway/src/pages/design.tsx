@@ -171,16 +171,7 @@ export default function Design() {
     return { w, h };
   };
 
-  // DPI = naturalPx * 2.54 / printCm — uses the exact cm shown on the label
-  const layerDpi = (layer: DesignLayer, dim: { w: number; h: number } | null) => {
-    if (!dim || dim.w === 0 || dim.h === 0) return null;
-    const dpiW = (layer.naturalWidth * 2.54) / dim.w;
-    const dpiH = (layer.naturalHeight * 2.54) / dim.h;
-    return Math.round(Math.min(dpiW, dpiH));
-  };
-
   const printDim = selectedLayer ? layerPrintDim(selectedLayer) : null;
-  const currentDpi = selectedLayer ? layerDpi(selectedLayer, printDim) : null;
 
   // ── Zoom helpers ───────────────────────────────────────────────────────────
 
@@ -309,10 +300,9 @@ export default function Design() {
       const printW_cm = (bbox.width / 100) * realWidth;
       const printH_cm = (bbox.height / 100) * realHeight;
 
-      // 300 DPI for DTF print quality: px = cm / 2.54 × 300
-      const DPI = 300;
-      const exportW = Math.round((printW_cm / 2.54) * DPI);
-      const exportH = Math.round((printH_cm / 2.54) * DPI);
+      // Export at 300px/inch for DTF print quality
+      const exportW = Math.round((printW_cm / 2.54) * 300);
+      const exportH = Math.round((printH_cm / 2.54) * 300);
 
       // Scale layers from screen clip-space to export pixel-space
       const scaleX = exportW / clipW;
@@ -529,7 +519,7 @@ export default function Design() {
                       flexDirection: "column",
                       alignItems: "center",
                       gap: 2,
-                      background: currentDpi !== null && currentDpi < 300 ? "rgba(180,30,30,0.85)" : "rgba(0,0,0,0.65)",
+                      background: "rgba(0,0,0,0.65)",
                       color: "#fff",
                       fontFamily: "monospace",
                       fontWeight: 700,
@@ -538,15 +528,10 @@ export default function Design() {
                       padding: "4px 8px",
                       borderRadius: 2,
                       backdropFilter: "blur(4px)",
-                      border: currentDpi !== null && currentDpi < 300 ? "1px solid rgba(255,80,80,0.5)" : "1px solid rgba(255,255,255,0.15)",
+                      border: "1px solid rgba(255,255,255,0.15)",
                       textAlign: "center",
                     }}>
                       <span>{printDim.w} × {printDim.h} cm</span>
-                      {currentDpi !== null && currentDpi < 300 && (
-                        <span style={{ fontSize: "9px", fontWeight: 600, letterSpacing: "0.05em", opacity: 0.95 }}>
-                          ⚠ Low quality — {currentDpi} DPI
-                        </span>
-                      )}
                     </span>
                   </div>
                 )}
@@ -629,21 +614,6 @@ export default function Design() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground uppercase tracking-widest">Image Size</span>
                   <span className="font-mono font-bold text-foreground">{printDim.w} × {printDim.h} cm</span>
-                </div>
-              )}
-              {currentDpi !== null && (
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground uppercase tracking-widest">DPI</span>
-                  <span className={`font-mono font-bold text-xs ${currentDpi >= 300 ? "text-green-400" : "text-red-400"}`}>
-                    {currentDpi} {currentDpi < 300 ? "⚠" : "✓"}
-                  </span>
-                </div>
-              )}
-              {currentDpi !== null && currentDpi < 300 && (
-                <div className="pt-1 border-t border-red-900/40">
-                  <p className="text-red-400 text-xs leading-snug uppercase tracking-wide">
-                    Scale down — printing at this size drops below 300 DPI
-                  </p>
                 </div>
               )}
             </div>
