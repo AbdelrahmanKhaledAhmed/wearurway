@@ -156,14 +156,17 @@ export default function Design() {
     return () => ro.disconnect();
   }, [bbox]);
 
-  // ── Compute selected layer's print dimensions in cm ────────────────────────
+  // ── Compute print dimensions in cm for any layer, capped at box size ───────
   const selectedLayer = layers.find(l => l.id === selectedLayerId) ?? null;
-  const printDim = (() => {
-    if (!selectedLayer || !clipSize || !realWidth || !realHeight) return null;
-    const w = Math.round((selectedLayer.width / clipSize.w) * realWidth);
-    const h = Math.round((selectedLayer.height / clipSize.h) * realHeight);
+
+  const layerPrintDim = (layer: DesignLayer) => {
+    if (!clipSize || !realWidth || !realHeight) return null;
+    const w = Math.min(Math.round((layer.width / clipSize.w) * realWidth), realWidth);
+    const h = Math.min(Math.round((layer.height / clipSize.h) * realHeight), realHeight);
     return { w, h };
-  })();
+  };
+
+  const printDim = selectedLayer ? layerPrintDim(selectedLayer) : null;
 
   // ── Zoom helpers ───────────────────────────────────────────────────────────
 
@@ -661,6 +664,7 @@ export default function Design() {
                   {[...layers].reverse().map((layer, reversedIdx) => {
                     const trueIdx = layers.length - 1 - reversedIdx;
                     const isSelected = selectedLayerId === layer.id;
+                    const dim = layerPrintDim(layer);
                     return (
                       <motion.div
                         key={layer.id}
@@ -685,9 +689,15 @@ export default function Design() {
                           </div>
 
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold uppercase tracking-widest truncate">
-                              {layer.name}
-                            </p>
+                            {dim ? (
+                              <p className="text-xs font-bold font-mono tracking-widest truncate">
+                                {dim.w} × {dim.h} cm
+                              </p>
+                            ) : (
+                              <p className="text-xs font-bold uppercase tracking-widest truncate">
+                                {layer.name}
+                              </p>
+                            )}
                           </div>
 
                           <button
