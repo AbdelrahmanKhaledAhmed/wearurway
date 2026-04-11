@@ -38,6 +38,7 @@ export default function Design() {
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [clipSize, setClipSize] = useState<{ w: number; h: number } | null>(null);
 
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -140,6 +141,29 @@ export default function Design() {
     el.addEventListener("wheel", onClipWheel, { passive: false });
     return () => el.removeEventListener("wheel", onClipWheel);
   }, [onClipWheel]);
+
+  // ── Track clip area pixel size via ResizeObserver ───────────────────────────
+  useEffect(() => {
+    const el = clipAreaRef.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      setClipSize({ w: r.width, h: r.height });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [bbox]);
+
+  // ── Compute selected layer's print dimensions in cm ────────────────────────
+  const selectedLayer = layers.find(l => l.id === selectedLayerId) ?? null;
+  const printDim = (() => {
+    if (!selectedLayer || !clipSize || !realWidth || !realHeight) return null;
+    const w = Math.round((selectedLayer.width / clipSize.w) * realWidth);
+    const h = Math.round((selectedLayer.height / clipSize.h) * realHeight);
+    return { w, h };
+  })();
 
   // ── Zoom helpers ───────────────────────────────────────────────────────────
 
@@ -333,8 +357,6 @@ export default function Design() {
 
   if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return null;
 
-  const selectedLayer = layers.find(l => l.id === selectedLayerId) ?? null;
-
   return (
     <div className="min-h-screen pt-20 flex flex-col bg-background">
       {/* ── Top bar ── */}
@@ -465,6 +487,37 @@ export default function Design() {
                     />
                   ) : null
                 )}
+
+                {/* ── Print dimension label for selected layer ── */}
+                {selectedLayer && selectedLayer.visible && printDim && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: selectedLayer.x + selectedLayer.width / 2,
+                      top: selectedLayer.y + selectedLayer.height / 2,
+                      transform: "translateX(-50%) translateY(-50%)",
+                      pointerEvents: "none",
+                      zIndex: 20,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <span style={{
+                      display: "inline-block",
+                      background: "rgba(0,0,0,0.65)",
+                      color: "#fff",
+                      fontFamily: "monospace",
+                      fontWeight: 700,
+                      fontSize: "11px",
+                      letterSpacing: "0.08em",
+                      padding: "3px 8px",
+                      borderRadius: 2,
+                      backdropFilter: "blur(4px)",
+                      border: "1px solid rgba(255,255,255,0.15)",
+                    }}>
+                      {printDim.w} × {printDim.h} cm
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -536,8 +589,14 @@ export default function Design() {
               </div>
               {realWidth > 0 && (
                 <div className="flex justify-between pt-1 border-t border-border mt-2">
-                  <span className="text-muted-foreground uppercase tracking-widest">Design Area</span>
+                  <span className="text-muted-foreground uppercase tracking-widest">Print Area</span>
                   <span className="font-mono font-bold">{realWidth} × {realHeight} cm</span>
+                </div>
+              )}
+              {printDim && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground uppercase tracking-widest">Image Size</span>
+                  <span className="font-mono font-bold text-foreground">{printDim.w} × {printDim.h} cm</span>
                 </div>
               )}
             </div>
