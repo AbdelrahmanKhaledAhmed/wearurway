@@ -46,6 +46,7 @@ export default function Design() {
   const [exporting, setExporting] = useState(false);
   const [clipSize, setClipSize] = useState<{ w: number; h: number } | null>(null);
   const [editorFile, setEditorFile] = useState<File | null>(null);
+  const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
 
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -299,13 +300,22 @@ export default function Design() {
 
   // Called when user confirms from the editor (passes edited blob)
   const handleEditorConfirm = useCallback(async (blob: Blob) => {
+    const targetLayerId = editingLayerId;
     setEditorFile(null);
+    setEditingLayerId(null);
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append("file", blob, "design.png");
       const res = await fetch("/api/uploads", { method: "POST", body: formData });
       const data = await res.json();
+
+      if (targetLayerId) {
+        // Update existing layer's image in-place
+        setLayers(prev => prev.map(l => l.id === targetLayerId ? { ...l, imageUrl: data.url } : l));
+        return;
+      }
+
       const clipRect = clipAreaRef.current?.getBoundingClientRect();
       const clipW = clipRect?.width ?? 200;
       const clipH = clipRect?.height ?? 200;
@@ -349,7 +359,20 @@ export default function Design() {
     } finally {
       setUploading(false);
     }
-  }, [layers.length]);
+  }, [layers.length, editingLayerId]);
+
+  // Open editor for an existing layer
+  const startEditLayer = useCallback(async (layer: DesignLayer) => {
+    try {
+      const res = await fetch(layer.imageUrl);
+      const blob = await res.blob();
+      const file = new File([blob], "layer.png", { type: blob.type || "image/png" });
+      setEditingLayerId(layer.id);
+      setEditorFile(file);
+    } catch {
+      // silently ignore fetch errors
+    }
+  }, []);
 
   const removeLayer = (id: string) => {
     setLayers(prev => prev.filter(l => l.id !== id));
@@ -471,7 +494,7 @@ export default function Design() {
       <ImageEditor
         file={editorFile}
         onConfirm={handleEditorConfirm}
-        onCancel={() => setEditorFile(null)}
+        onCancel={() => { setEditorFile(null); setEditingLayerId(null); }}
       />
     )}
     <div className="min-h-screen pt-20 flex flex-col bg-background">
@@ -868,6 +891,14 @@ export default function Design() {
 
                         {isSelected && (
                           <div className="px-3 pb-3 space-y-2 border-t border-border pt-2">
+                            {/* Edit button */}
+                            <button
+                              onClick={() => startEditLayer(layer)}
+                              className="w-full text-xs py-1.5 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
+                              title="Edit image"
+                            >
+                              ✏ Edit Image
+                            </button>
                             {/* Zoom row */}
                             <div className="flex gap-1.5">
                               <button

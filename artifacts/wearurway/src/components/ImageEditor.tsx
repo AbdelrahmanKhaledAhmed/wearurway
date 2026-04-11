@@ -110,7 +110,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     setUndoStack(prev => [...prev.slice(-9), snap]);
   }, []);
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     if (undoStack.length === 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -118,7 +118,18 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     if (!ctx) return;
     ctx.putImageData(undoStack[undoStack.length - 1], 0, 0);
     setUndoStack(s => s.slice(0, -1));
-  };
+  }, [undoStack]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleUndo]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
