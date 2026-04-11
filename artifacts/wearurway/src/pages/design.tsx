@@ -14,6 +14,7 @@ interface DesignLayer {
   y: number;
   width: number;
   height: number;
+  rotation: number;
   visible: boolean;
   naturalWidth: number;
   naturalHeight: number;
@@ -27,7 +28,9 @@ interface DragState {
   startLayerY: number;
 }
 
-const ZOOM_STEP = 0.12;
+const ZOOM_STEP_SCROLL = 0.05;
+const ZOOM_STEP_BUTTON = 0.12;
+const ROTATE_STEP = 15;
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -44,6 +47,7 @@ export default function Design() {
 
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
+  const pinchRef = useRef<{ dist: number } | null>(null);
 
   useEffect(() => {
     if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) {
@@ -103,9 +107,13 @@ export default function Design() {
     };
   }, [onMouseMove, onMouseUp]);
 
+  // Only start drag if the layer is already selected — clicking unselected layer just selects it
   const startDrag = (e: React.MouseEvent, layer: DesignLayer) => {
     e.preventDefault();
-    setSelectedLayerId(layer.id);
+    if (selectedLayerId !== layer.id) {
+      setSelectedLayerId(layer.id);
+      return;
+    }
     dragRef.current = {
       layerId: layer.id,
       startMouseX: e.clientX,
@@ -124,10 +132,9 @@ export default function Design() {
       setLayers(layers =>
         layers.map(l => {
           if (l.id !== prev) return l;
-          const factor = e.deltaY < 0 ? 1 + ZOOM_STEP : 1 - ZOOM_STEP;
+          const factor = e.deltaY < 0 ? 1 + ZOOM_STEP_SCROLL : 1 - ZOOM_STEP_SCROLL;
           const newW = Math.max(10, l.width * factor);
           const newH = Math.max(10, l.height * factor);
-          // Keep centre fixed
           const cx = l.x + l.width / 2;
           const cy = l.y + l.height / 2;
           return { ...l, width: newW, height: newH, x: cx - newW / 2, y: cy - newH / 2 };
@@ -143,6 +150,63 @@ export default function Design() {
     el.addEventListener("wheel", onClipWheel, { passive: false });
     return () => el.removeEventListener("wheel", onClipWheel);
   }, [onClipWheel]);
+
+  // ── Pinch-to-zoom on mobile ────────────────────────────────────────────────
+
+  const getTouchDist = (e: TouchEvent) => {
+    const t = e.touches;
+    if (t.length < 2) return 0;
+    const dx = t[0].clientX - t[1].clientX;
+    const dy = t[0].clientY - t[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const onTouchStart = useCallback((e: TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      pinchRef.current = { dist: getTouchDist(e) };
+    }
+  }, []);
+
+  const onTouchMove = useCallback((e: TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      e.preventDefault();
+      const newDist = getTouchDist(e);
+      const ratio = newDist / pinchRef.current.dist;
+      pinchRef.current.dist = newDist;
+      setSelectedLayerId(prev => {
+        if (!prev) return prev;
+        setLayers(layers =>
+          layers.map(l => {
+            if (l.id !== prev) return l;
+            const newW = Math.max(10, l.width * ratio);
+            const newH = Math.max(10, l.height * ratio);
+            const cx = l.x + l.width / 2;
+            const cy = l.y + l.height / 2;
+            return { ...l, width: newW, height: newH, x: cx - newW / 2, y: cy - newH / 2 };
+          })
+        );
+        return prev;
+      });
+    }
+  }, []);
+
+  const onTouchEnd = useCallback(() => {
+    pinchRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    const el = clipAreaRef.current;
+    if (!el) return;
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [onTouchStart, onTouchMove, onTouchEnd]);
 
   // ── Track clip area pixel size via ResizeObserver ───────────────────────────
   useEffect(() => {
@@ -163,7 +227,6 @@ export default function Design() {
 
   const layerPrintDim = (layer: DesignLayer) => {
     if (!clipSize || !realWidth || !realHeight) return null;
-    // Compute the visible (clipped) portion of the layer within the clip area
     const visibleW = Math.max(0, Math.min(clipSize.w, layer.x + layer.width) - Math.max(0, layer.x));
     const visibleH = Math.max(0, Math.min(clipSize.h, layer.y + layer.height) - Math.max(0, layer.y));
     const w = Math.round((visibleW / clipSize.w) * realWidth);
@@ -179,12 +242,24 @@ export default function Design() {
     setLayers(prev =>
       prev.map(l => {
         if (l.id !== selectedLayerId) return l;
-        const factor = direction === "in" ? 1 + ZOOM_STEP : 1 - ZOOM_STEP;
+        const factor = direction === "in" ? 1 + ZOOM_STEP_BUTTON : 1 - ZOOM_STEP_BUTTON;
         const newW = Math.max(10, l.width * factor);
         const newH = Math.max(10, l.height * factor);
         const cx = l.x + l.width / 2;
         const cy = l.y + l.height / 2;
         return { ...l, width: newW, height: newH, x: cx - newW / 2, y: cy - newH / 2 };
+      })
+    );
+  }, [selectedLayerId]);
+
+  // ── Rotate helpers ─────────────────────────────────────────────────────────
+
+  const rotateSelected = useCallback((direction: "cw" | "ccw") => {
+    setLayers(prev =>
+      prev.map(l => {
+        if (l.id !== selectedLayerId) return l;
+        const delta = direction === "cw" ? ROTATE_STEP : -ROTATE_STEP;
+        return { ...l, rotation: (l.rotation + delta + 360) % 360 };
       })
     );
   }, [selectedLayerId]);
@@ -209,7 +284,6 @@ export default function Design() {
         const clipW = clipRect?.width ?? 200;
         const clipH = clipRect?.height ?? 200;
 
-        // Resolve the image's natural dimensions to preserve its real aspect ratio
         const natural = await new Promise<{ w: number; h: number }>((resolve) => {
           const img = new Image();
           img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
@@ -217,7 +291,6 @@ export default function Design() {
           img.src = data.url;
         });
 
-        // Fit inside 60% of the clip area, keeping natural aspect ratio intact
         const maxW = clipW * 0.6;
         const maxH = clipH * 0.6;
         const ratio = natural.w / natural.h;
@@ -240,6 +313,7 @@ export default function Design() {
           y: Math.round((clipH - defaultH) / 2),
           width: defaultW,
           height: defaultH,
+          rotation: 0,
           visible: true,
           naturalWidth: natural.w,
           naturalHeight: natural.h,
@@ -296,7 +370,6 @@ export default function Design() {
       const clipW = clipRect.width;
       const clipH = clipRect.height;
 
-      // The bounding box % × real shirt size = actual physical print area
       const printW_cm = (bbox.width / 100) * realWidth;
       const printH_cm = (bbox.height / 100) * realHeight;
 
@@ -304,7 +377,6 @@ export default function Design() {
       const exportW = Math.round((printW_cm / 2.54) * 300);
       const exportH = Math.round((printH_cm / 2.54) * 300);
 
-      // Scale layers from screen clip-space to export pixel-space
       const scaleX = exportW / clipW;
       const scaleY = exportH / clipH;
 
@@ -316,27 +388,26 @@ export default function Design() {
 
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
-
-      // Transparent background — no fill
       ctx.clearRect(0, 0, exportW, exportH);
 
-      // Draw each visible layer in order (bottom to top)
       for (const layer of visibleLayers) {
         await new Promise<void>((resolve) => {
           const img = new Image();
           img.crossOrigin = "anonymous";
           img.onload = () => {
-            const dx = layer.x * scaleX;
-            const dy = layer.y * scaleY;
+            const cx = (layer.x + layer.width / 2) * scaleX;
+            const cy = (layer.y + layer.height / 2) * scaleY;
             const dw = layer.width * scaleX;
             const dh = layer.height * scaleY;
+            const angle = (layer.rotation * Math.PI) / 180;
 
-            // Clip to bounding box — crop overflow
             ctx.save();
             ctx.beginPath();
             ctx.rect(0, 0, exportW, exportH);
             ctx.clip();
-            ctx.drawImage(img, dx, dy, dw, dh);
+            ctx.translate(cx, cy);
+            ctx.rotate(angle);
+            ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
             ctx.restore();
             resolve();
           };
@@ -345,7 +416,6 @@ export default function Design() {
         });
       }
 
-      // Filename: use the selected/first layer's visible print dimensions
       const firstVisible = visibleLayers[0];
       const clipRect2 = clipEl.getBoundingClientRect();
       const vW = Math.max(0, Math.min(clipRect2.width, firstVisible.x + firstVisible.width) - Math.max(0, firstVisible.x));
@@ -384,7 +454,6 @@ export default function Design() {
           <h1 className="text-sm font-bold uppercase tracking-widest">Design Mode</h1>
         </div>
         <div className="flex items-center gap-4">
-          {/* Export button */}
           {layers.some(l => l.visible) && realWidth > 0 && (
             <button
               onClick={handleExport}
@@ -492,10 +561,16 @@ export default function Design() {
                         minHeight: layer.height,
                         maxWidth: "none",
                         maxHeight: "none",
-                        cursor: dragRef.current?.layerId === layer.id ? "grabbing" : "grab",
+                        transform: `rotate(${layer.rotation}deg)`,
+                        transformOrigin: "center center",
+                        cursor: selectedLayerId === layer.id
+                          ? (dragRef.current?.layerId === layer.id ? "grabbing" : "grab")
+                          : "pointer",
                         userSelect: "none",
                         background: "none",
                         flexShrink: 0,
+                        outline: selectedLayerId === layer.id ? "2px solid rgba(255,255,255,0.4)" : "none",
+                        outlineOffset: "2px",
                       }}
                     />
                   ) : null
@@ -660,6 +735,27 @@ export default function Design() {
                 </button>
               </div>
             )}
+
+            {/* Rotate controls — only when a layer is selected */}
+            {selectedLayer && (
+              <div className="flex items-center gap-2">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground flex-1">Rotate</p>
+                <button
+                  onClick={() => rotateSelected("ccw")}
+                  className="w-9 h-9 border border-border flex items-center justify-center text-base hover:border-foreground hover:bg-muted/10 transition-colors"
+                  title="Rotate Counter-Clockwise"
+                >
+                  ↺
+                </button>
+                <button
+                  onClick={() => rotateSelected("cw")}
+                  className="w-9 h-9 border border-border flex items-center justify-center text-base hover:border-foreground hover:bg-muted/10 transition-colors"
+                  title="Rotate Clockwise"
+                >
+                  ↻
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ── Layers panel ── */}
@@ -690,7 +786,6 @@ export default function Design() {
                           className="flex items-center gap-2 px-3 py-2 cursor-pointer"
                           onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
                         >
-                          {/* Thumbnail — transparent bg, no white frame */}
                           <div className="w-8 h-8 border border-border overflow-hidden shrink-0"
                             style={{
                               backgroundImage: "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
@@ -711,6 +806,9 @@ export default function Design() {
                               <p className="text-xs font-bold uppercase tracking-widest truncate">
                                 {layer.name}
                               </p>
+                            )}
+                            {layer.rotation !== 0 && (
+                              <p className="text-xs text-muted-foreground font-mono">{layer.rotation}°</p>
                             )}
                           </div>
 
@@ -740,6 +838,23 @@ export default function Design() {
                                 title="Zoom In"
                               >
                                 + Zoom
+                              </button>
+                            </div>
+                            {/* Rotate row */}
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => rotateSelected("ccw")}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
+                                title="Rotate CCW"
+                              >
+                                ↺ Rotate
+                              </button>
+                              <button
+                                onClick={() => rotateSelected("cw")}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
+                                title="Rotate CW"
+                              >
+                                ↻ Rotate
                               </button>
                             </div>
                             {/* Order + delete row */}
