@@ -500,8 +500,32 @@ export default function Design() {
       // Clean up blob URLs
       for (const { blobUrl } of loaded) URL.revokeObjectURL(blobUrl);
 
+      // ── Compute filename from the actual visible design size ─────────────────
+      // Union of all visible layer rects, clamped to the clip area, converted
+      // to real-world cm so the name reflects what the user currently sees.
+      let visMinX = clipW, visMaxX = 0;
+      let visMinY = clipH, visMaxY = 0;
+      for (const { layer } of loaded) {
+        const lx = Math.max(0, layer.x);
+        const ly = Math.max(0, layer.y);
+        const rx = Math.min(clipW, layer.x + layer.width);
+        const ry = Math.min(clipH, layer.y + layer.height);
+        if (rx > lx && ry > ly) {
+          visMinX = Math.min(visMinX, lx);
+          visMaxX = Math.max(visMaxX, rx);
+          visMinY = Math.min(visMinY, ly);
+          visMaxY = Math.max(visMaxY, ry);
+        }
+      }
+      const visCmW = visMaxX > visMinX
+        ? Math.round((visMaxX - visMinX) / clipW * realWidth)
+        : Math.round(realWidth);
+      const visCmH = visMaxY > visMinY
+        ? Math.round((visMaxY - visMinY) / clipH * realHeight)
+        : Math.round(realHeight);
+
       // ── Download ─────────────────────────────────────────────────────────────
-      const filename = `${Math.round(realWidth)}x${Math.round(realHeight)}cm.png`;
+      const filename = `${visCmW}x${visCmH}cm.png`;
 
       canvas.toBlob(blob => {
         if (!blob) { alert("Export failed — could not generate image."); return; }
