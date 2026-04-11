@@ -171,16 +171,16 @@ export default function Design() {
     return { w, h };
   };
 
-  // DPI = naturalPx * 2.54 / printCm  (based on full layer size, not just visible portion)
-  const layerDpi = (layer: DesignLayer) => {
-    if (!clipSize || !realWidth || !realHeight) return null;
-    const dpiW = (layer.naturalWidth / layer.width) * clipSize.w * 2.54 / realWidth;
-    const dpiH = (layer.naturalHeight / layer.height) * clipSize.h * 2.54 / realHeight;
+  // DPI = naturalPx * 2.54 / printCm — uses the exact cm shown on the label
+  const layerDpi = (layer: DesignLayer, dim: { w: number; h: number } | null) => {
+    if (!dim || dim.w === 0 || dim.h === 0) return null;
+    const dpiW = (layer.naturalWidth * 2.54) / dim.w;
+    const dpiH = (layer.naturalHeight * 2.54) / dim.h;
     return Math.round(Math.min(dpiW, dpiH));
   };
 
   const printDim = selectedLayer ? layerPrintDim(selectedLayer) : null;
-  const currentDpi = selectedLayer ? layerDpi(selectedLayer) : null;
+  const currentDpi = selectedLayer ? layerDpi(selectedLayer, printDim) : null;
 
   // ── Zoom helpers ───────────────────────────────────────────────────────────
 
@@ -544,7 +544,7 @@ export default function Design() {
                       <span>{printDim.w} × {printDim.h} cm</span>
                       {currentDpi !== null && currentDpi < 300 && (
                         <span style={{ fontSize: "9px", fontWeight: 600, letterSpacing: "0.05em", opacity: 0.95 }}>
-                          ⚠ جودة منخفضة — {currentDpi} DPI
+                          ⚠ Low quality — {currentDpi} DPI
                         </span>
                       )}
                     </span>
@@ -635,14 +635,14 @@ export default function Design() {
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground uppercase tracking-widest">DPI</span>
                   <span className={`font-mono font-bold text-xs ${currentDpi >= 300 ? "text-green-400" : "text-red-400"}`}>
-                    {currentDpi} {currentDpi < 300 ? "⚠ منخفض" : "✓"}
+                    {currentDpi} {currentDpi < 300 ? "⚠" : "✓"}
                   </span>
                 </div>
               )}
               {currentDpi !== null && currentDpi < 300 && (
                 <div className="pt-1 border-t border-red-900/40">
                   <p className="text-red-400 text-xs leading-snug uppercase tracking-wide">
-                    لو كبرت أكتر من كده الـ DPI هيبقي أقل من 300 وجودة الطباعة هتبقي ضعيفة
+                    Scale down — printing at this size drops below 300 DPI
                   </p>
                 </div>
               )}
