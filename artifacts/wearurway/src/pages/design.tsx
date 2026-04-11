@@ -105,9 +105,14 @@ export default function Design() {
   }, [onMouseMove, onMouseUp]);
 
   // ── Track clip area pixel size (needed for DPI calculation) ────────────────
+  // Dependency on `bbox` ensures this re-runs after bbox loads from the API
+  // and the clip area div appears in the DOM.
   useEffect(() => {
     const el = clipAreaRef.current;
     if (!el) return;
+    // Read current size immediately (ResizeObserver won't fire for initial size)
+    const rect = el.getBoundingClientRect();
+    setClipSize({ w: rect.width, h: rect.height });
     const ro = new ResizeObserver(entries => {
       const entry = entries[0];
       if (entry) {
@@ -116,25 +121,27 @@ export default function Design() {
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [bbox]); // re-run whenever bbox changes (clip area appears/disappears)
 
-  // ── DPI warning: recalculate whenever layers / selection / clip size change ─
+  // ── DPI warning: check ALL visible layers, not just the selected one ────────
+  // A layer's effective export DPI = (naturalWidth / layer.width) / (exportW / clipW) × 300
+  // Warning triggers if any visible layer would print below 300 DPI.
   useEffect(() => {
-    if (!selectedLayerId || !bbox || !realWidth || !realHeight || clipSize.w === 0) {
-      setDpiWarning(false);
-      return;
-    }
-    const layer = layers.find(l => l.id === selectedLayerId);
-    if (!layer || !layer.visible || layer.naturalWidth === 0) {
+    if (!bbox || !realWidth || !realHeight || clipSize.w === 0) {
       setDpiWarning(false);
       return;
     }
     const printW_cm = (bbox.width / 100) * realWidth;
     const exportW = (printW_cm / 2.54) * 300;
     const scaleX = exportW / clipSize.w;
-    const effectiveDPI = (layer.naturalWidth / layer.width) / scaleX * 300;
-    setDpiWarning(effectiveDPI < 300);
-  }, [layers, selectedLayerId, clipSize, bbox, realWidth, realHeight]);
+
+    const anyLowDpi = layers.some(l => {
+      if (!l.visible || l.naturalWidth === 0) return false;
+      const effectiveDPI = (l.naturalWidth / l.width) / scaleX * 300;
+      return effectiveDPI < 300;
+    });
+    setDpiWarning(anyLowDpi);
+  }, [layers, clipSize, bbox, realWidth, realHeight]);
 
   const startDrag = (e: React.MouseEvent, layer: DesignLayer) => {
     e.preventDefault();
@@ -620,39 +627,39 @@ export default function Design() {
 
             {/* Zoom controls — only when a layer is selected */}
             {selectedLayer && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <p className="text-xs uppercase tracking-widest text-muted-foreground flex-1">Zoom</p>
-                  <button
-                    onClick={() => zoomSelected("out")}
-                    className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors"
-                    title="Zoom Out"
-                  >
-                    −
-                  </button>
-                  <button
-                    onClick={() => zoomSelected("in")}
-                    className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors"
-                    title="Zoom In"
-                  >
-                    +
-                  </button>
-                </div>
-                <AnimatePresence>
-                  {dpiWarning && (
-                    <motion.p
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.15 }}
-                      className="text-xs text-amber-400 uppercase tracking-widest leading-relaxed overflow-hidden"
-                    >
-                      ⚠ Quality below 300 DPI — image too small for this print size.
-                    </motion.p>
-                  )}
-                </AnimatePresence>
+              <div className="flex items-center gap-2">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground flex-1">Zoom</p>
+                <button
+                  onClick={() => zoomSelected("out")}
+                  className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors"
+                  title="Zoom Out"
+                >
+                  −
+                </button>
+                <button
+                  onClick={() => zoomSelected("in")}
+                  className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors"
+                  title="Zoom In"
+                >
+                  +
+                </button>
               </div>
             )}
+
+            {/* DPI warning — shown whenever any visible layer is below 300 DPI */}
+            <AnimatePresence>
+              {dpiWarning && (
+                <motion.p
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="text-xs text-amber-400 uppercase tracking-widest leading-relaxed overflow-hidden"
+                >
+                  ⚠ Quality below 300 DPI — image resolution too low for this print size.
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* ── Layers panel ── */}
