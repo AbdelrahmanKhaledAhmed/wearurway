@@ -10,9 +10,9 @@ interface DesignLayer {
   id: string;
   name: string;
   imageUrl: string;
-  x: number;       // px relative to clip area
+  x: number;
   y: number;
-  width: number;   // px
+  width: number;
   height: number;
   visible: boolean;
 }
@@ -25,6 +25,8 @@ interface DragState {
   startLayerY: number;
 }
 
+const ZOOM_STEP = 0.12;
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Design() {
@@ -32,10 +34,10 @@ export default function Design() {
   const { selectedProduct, selectedFit, selectedColor, selectedSize, reset } = useCustomizer();
   const [side, setSide] = useState<"front" | "back">("front");
 
-  // Design layers state
   const [layers, setLayers] = useState<DesignLayer[]>([]);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -110,6 +112,51 @@ export default function Design() {
     };
   };
 
+  // ── Scroll wheel zoom on clip area ─────────────────────────────────────────
+
+  const onClipWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+    setSelectedLayerId(prev => {
+      if (!prev) return prev;
+      setLayers(layers =>
+        layers.map(l => {
+          if (l.id !== prev) return l;
+          const factor = e.deltaY < 0 ? 1 + ZOOM_STEP : 1 - ZOOM_STEP;
+          const newW = Math.max(10, l.width * factor);
+          const newH = Math.max(10, l.height * factor);
+          // Keep centre fixed
+          const cx = l.x + l.width / 2;
+          const cy = l.y + l.height / 2;
+          return { ...l, width: newW, height: newH, x: cx - newW / 2, y: cy - newH / 2 };
+        })
+      );
+      return prev;
+    });
+  }, []);
+
+  useEffect(() => {
+    const el = clipAreaRef.current;
+    if (!el) return;
+    el.addEventListener("wheel", onClipWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onClipWheel);
+  }, [onClipWheel]);
+
+  // ── Zoom helpers ───────────────────────────────────────────────────────────
+
+  const zoomSelected = useCallback((direction: "in" | "out") => {
+    setLayers(prev =>
+      prev.map(l => {
+        if (l.id !== selectedLayerId) return l;
+        const factor = direction === "in" ? 1 + ZOOM_STEP : 1 - ZOOM_STEP;
+        const newW = Math.max(10, l.width * factor);
+        const newH = Math.max(10, l.height * factor);
+        const cx = l.x + l.width / 2;
+        const cy = l.y + l.height / 2;
+        return { ...l, width: newW, height: newH, x: cx - newW / 2, y: cy - newH / 2 };
+      })
+    );
+  }, [selectedLayerId]);
+
   // ── Add Image ──────────────────────────────────────────────────────────────
 
   const handleAddImage = useCallback(async () => {
@@ -176,7 +223,80 @@ export default function Design() {
     });
   };
 
+  // ── Export ─────────────────────────────────────────────────────────────────
+
+  const handleExport = useCallback(async () => {
+    const clipEl = clipAreaRef.current;
+    if (!clipEl || !realWidth || !realHeight) return;
+
+    const visibleLayers = layers.filter(l => l.visible);
+    if (visibleLayers.length === 0) return;
+
+    setExporting(true);
+    try {
+      const clipRect = clipEl.getBoundingClientRect();
+      const clipW = clipRect.width;
+      const clipH = clipRect.height;
+
+      // Export canvas matches the real print dimensions
+      const exportW = realWidth;
+      const exportH = realHeight;
+      const scaleX = exportW / clipW;
+      const scaleY = exportH / clipH;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = exportW;
+      canvas.height = exportH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Transparent background — no white fill
+      ctx.clearRect(0, 0, exportW, exportH);
+
+      // Load and draw each visible layer (bottom to top = array order)
+      for (const layer of visibleLayers) {
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => {
+            // Convert clip-space coords to export-space coords
+            const dx = layer.x * scaleX;
+            const dy = layer.y * scaleY;
+            const dw = layer.width * scaleX;
+            const dh = layer.height * scaleY;
+
+            // Clip to bounding box
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, exportW, exportH);
+            ctx.clip();
+            ctx.drawImage(img, dx, dy, dw, dh);
+            ctx.restore();
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = layer.imageUrl;
+        });
+      }
+
+      // Trigger download
+      canvas.toBlob(blob => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `design-${side}-${Date.now()}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }, "image/png");
+    } finally {
+      setExporting(false);
+    }
+  }, [layers, realWidth, realHeight, side]);
+
   if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return null;
+
+  const selectedLayer = layers.find(l => l.id === selectedLayerId) ?? null;
 
   return (
     <div className="min-h-screen pt-20 flex flex-col bg-background">
@@ -191,12 +311,24 @@ export default function Design() {
           </button>
           <h1 className="text-sm font-bold uppercase tracking-widest">Design Mode</h1>
         </div>
-        <button
-          onClick={() => { reset(); setLocation("/"); }}
-          className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Start Over
-        </button>
+        <div className="flex items-center gap-4">
+          {/* Export button */}
+          {layers.some(l => l.visible) && realWidth > 0 && (
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="text-xs uppercase tracking-widest font-bold px-5 py-2 bg-foreground text-background hover:opacity-80 transition-opacity disabled:opacity-40"
+            >
+              {exporting ? "Exporting…" : "Export Design"}
+            </button>
+          )}
+          <button
+            onClick={() => { reset(); setLocation("/"); }}
+            className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Start Over
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -217,7 +349,7 @@ export default function Design() {
             ))}
           </div>
 
-          {/* Mockup viewer — checkerboard shows transparent areas of the PNG */}
+          {/* Mockup viewer */}
           <div
             className="relative w-full max-w-sm"
             style={{
@@ -239,7 +371,6 @@ export default function Design() {
                 className="absolute inset-0"
               >
                 {currentSide?.image ? (
-                  /* Mockup image — sits BELOW design layers so art appears on the shirt */
                   <img
                     src={currentSide.image}
                     alt={`${side} mockup`}
@@ -257,7 +388,7 @@ export default function Design() {
               </motion.div>
             </AnimatePresence>
 
-            {/* ── Design clip area — layers are confined here ── */}
+            {/* ── Design clip area ── */}
             {bbox && (
               <div
                 ref={clipAreaRef}
@@ -271,7 +402,6 @@ export default function Design() {
                   zIndex: 5,
                 }}
               >
-                {/* Design layers — rendered bottom to top by array order */}
                 {layers.map((layer) =>
                   layer.visible ? (
                     <img
@@ -292,6 +422,7 @@ export default function Design() {
                           ? "1px solid rgba(255,255,255,0.6)"
                           : "none",
                         outlineOffset: "1px",
+                        background: "none",
                       }}
                     />
                   ) : null
@@ -299,7 +430,7 @@ export default function Design() {
               </div>
             )}
 
-            {/* ── Bbox border overlay (on top of design layers, below mockup image) ── */}
+            {/* ── Bbox border overlay ── */}
             {bbox && (
               <div
                 style={{
@@ -375,8 +506,8 @@ export default function Design() {
           </div>
 
           {/* ── Tools ── */}
-          <div className="p-6 border-b border-border">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Tools</p>
+          <div className="p-6 border-b border-border space-y-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Tools</p>
 
             {/* Add Image */}
             <button
@@ -394,6 +525,27 @@ export default function Design() {
                 )}
               </div>
             </button>
+
+            {/* Zoom controls — only when a layer is selected */}
+            {selectedLayer && (
+              <div className="flex items-center gap-2">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground flex-1">Zoom</p>
+                <button
+                  onClick={() => zoomSelected("out")}
+                  className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors"
+                  title="Zoom Out"
+                >
+                  −
+                </button>
+                <button
+                  onClick={() => zoomSelected("in")}
+                  className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors"
+                  title="Zoom In"
+                >
+                  +
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ── Layers panel ── */}
@@ -409,7 +561,6 @@ export default function Design() {
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {/* Layers listed top-to-bottom = highest z on top */}
                   {[...layers].reverse().map((layer, reversedIdx) => {
                     const trueIdx = layers.length - 1 - reversedIdx;
                     const isSelected = selectedLayerId === layer.id;
@@ -424,8 +575,15 @@ export default function Design() {
                           className="flex items-center gap-2 px-3 py-2 cursor-pointer"
                           onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
                         >
-                          {/* Layer thumbnail */}
-                          <div className="w-8 h-8 border border-border overflow-hidden shrink-0 bg-muted/10">
+                          {/* Thumbnail — transparent bg, no white frame */}
+                          <div className="w-8 h-8 border border-border overflow-hidden shrink-0"
+                            style={{
+                              backgroundImage: "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
+                              backgroundSize: "6px 6px",
+                              backgroundPosition: "0 0, 0 3px, 3px -3px, -3px 0px",
+                              backgroundColor: "#1a1a1a",
+                            }}
+                          >
                             <img src={layer.imageUrl} alt="" className="w-full h-full object-contain" />
                           </div>
 
@@ -435,7 +593,6 @@ export default function Design() {
                             </p>
                           </div>
 
-                          {/* Visibility toggle */}
                           <button
                             onClick={e => { e.stopPropagation(); toggleVisibility(layer.id); }}
                             className="text-muted-foreground hover:text-foreground transition-colors text-xs p-0.5"
@@ -445,32 +602,51 @@ export default function Design() {
                           </button>
                         </div>
 
-                        {/* Selected layer actions */}
                         {isSelected && (
-                          <div className="px-3 pb-3 flex gap-1.5 border-t border-border pt-2">
-                            <button
-                              onClick={() => moveLayerUp(layer.id)}
-                              disabled={trueIdx === layers.length - 1}
-                              className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors disabled:opacity-30 uppercase tracking-widest"
-                              title="Move up"
-                            >
-                              ↑ Up
-                            </button>
-                            <button
-                              onClick={() => moveLayerDown(layer.id)}
-                              disabled={trueIdx === 0}
-                              className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors disabled:opacity-30 uppercase tracking-widest"
-                              title="Move down"
-                            >
-                              ↓ Down
-                            </button>
-                            <button
-                              onClick={() => removeLayer(layer.id)}
-                              className="text-xs py-1 px-2 border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors uppercase tracking-widest"
-                              title="Delete layer"
-                            >
-                              ✕
-                            </button>
+                          <div className="px-3 pb-3 space-y-2 border-t border-border pt-2">
+                            {/* Zoom row */}
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => zoomSelected("out")}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
+                                title="Zoom Out"
+                              >
+                                − Zoom
+                              </button>
+                              <button
+                                onClick={() => zoomSelected("in")}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
+                                title="Zoom In"
+                              >
+                                + Zoom
+                              </button>
+                            </div>
+                            {/* Order + delete row */}
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => moveLayerUp(layer.id)}
+                                disabled={trueIdx === layers.length - 1}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors disabled:opacity-30 uppercase tracking-widest"
+                                title="Move up"
+                              >
+                                ↑ Up
+                              </button>
+                              <button
+                                onClick={() => moveLayerDown(layer.id)}
+                                disabled={trueIdx === 0}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors disabled:opacity-30 uppercase tracking-widest"
+                                title="Move down"
+                              >
+                                ↓ Down
+                              </button>
+                              <button
+                                onClick={() => removeLayer(layer.id)}
+                                className="text-xs py-1 px-2 border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors uppercase tracking-widest"
+                                title="Delete layer"
+                              >
+                                ✕
+                              </button>
+                            </div>
                           </div>
                         )}
                       </motion.div>
