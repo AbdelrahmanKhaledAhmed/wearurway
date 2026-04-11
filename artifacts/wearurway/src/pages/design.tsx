@@ -554,35 +554,6 @@ export default function Design() {
       />
     )}
     <div className="min-h-screen pt-20 flex flex-col bg-background">
-      {/* ── Top bar ── */}
-      <div className="border-b border-border px-6 md:px-12 py-4 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-6">
-          <button
-            onClick={() => setLocation("/sizes")}
-            className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
-          >
-            ← Back
-          </button>
-          <h1 className="text-sm font-bold uppercase tracking-widest">Design Mode</h1>
-        </div>
-        <div className="flex items-center gap-4">
-          {layers.some(l => l.visible) && realWidth > 0 && (
-            <button
-              onClick={handleExport}
-              disabled={exporting}
-              className="text-xs uppercase tracking-widest font-bold px-5 py-2 bg-foreground text-background hover:opacity-80 transition-opacity disabled:opacity-40"
-            >
-              {exporting ? "Exporting…" : "Export Design"}
-            </button>
-          )}
-          <button
-            onClick={() => { reset(); setLocation("/"); }}
-            className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Start Over
-          </button>
-        </div>
-      </div>
 
       <div className="flex flex-1 overflow-hidden">
 
@@ -1041,6 +1012,19 @@ export default function Design() {
               </div>
             )}
           </div>
+
+          {/* ── Export ── */}
+          {layers.some(l => l.visible) && realWidth > 0 && (
+            <div className="px-4 pb-4 pt-2">
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="w-full text-xs uppercase tracking-widest font-bold px-5 py-3 bg-foreground text-background hover:opacity-80 transition-opacity disabled:opacity-40"
+              >
+                {exporting ? "Exporting…" : "Export Design"}
+              </button>
+            </div>
+          )}
 
           {/* ── (layers moved to left sidebar) ── */}
           <div className="flex-1" /></div>
