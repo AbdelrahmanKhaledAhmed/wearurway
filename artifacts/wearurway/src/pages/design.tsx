@@ -580,9 +580,11 @@ export default function Design() {
             }
           }
         }
-        // Hard alpha threshold — no semi-transparent fringes for DTF
+        // High-contrast alpha S-curve — preserves smooth curves while eliminating
+        // faint semi-transparent fringes for DTF. 8x boost around the midpoint:
+        // alpha < ~112 → 0,  alpha > ~144 → 255,  curve boundary stays smooth.
         for (let i = 3; i < dst.length; i += 4) {
-          dst[i] = src[i] < 128 ? 0 : 255;
+          dst[i] = Math.max(0, Math.min(255, Math.round(8 * (src[i] - 128) + 128)));
         }
         ctx.putImageData(new ImageData(dst, w, h), 0, 0);
       }
