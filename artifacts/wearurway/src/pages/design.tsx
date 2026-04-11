@@ -29,7 +29,7 @@ interface DragState {
 }
 
 const ZOOM_STEP_SCROLL = 0.05;
-const ZOOM_STEP_BUTTON = 0.05;
+const ZOOM_STEP_BUTTON = 0.01;
 const ROTATE_STEP = 1;
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -48,6 +48,8 @@ export default function Design() {
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const pinchRef = useRef<{ dist: number } | null>(null);
+  const holdActionRef = useRef<(() => void) | null>(null);
+  const holdTimerRef = useRef<{ timeout: ReturnType<typeof setTimeout> | null; interval: ReturnType<typeof setInterval> | null }>({ timeout: null, interval: null });
 
   useEffect(() => {
     if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) {
@@ -108,8 +110,8 @@ export default function Design() {
   }, [onMouseMove, onMouseUp]);
 
   const startDrag = (e: React.MouseEvent, layer: DesignLayer) => {
+    if (layer.id !== selectedLayerId) return;
     e.preventDefault();
-    setSelectedLayerId(layer.id);
     dragRef.current = {
       layerId: layer.id,
       startMouseX: e.clientX,
@@ -259,6 +261,25 @@ export default function Design() {
       })
     );
   }, [selectedLayerId]);
+
+  // ── Hold-to-repeat for zoom/rotate buttons ────────────────────────────────
+
+  const startHold = useCallback((action: () => void) => {
+    holdActionRef.current = action;
+    action();
+    holdTimerRef.current.timeout = setTimeout(() => {
+      holdTimerRef.current.interval = setInterval(() => {
+        holdActionRef.current?.();
+      }, 60);
+    }, 350);
+  }, []);
+
+  const stopHold = useCallback(() => {
+    if (holdTimerRef.current.timeout) clearTimeout(holdTimerRef.current.timeout);
+    if (holdTimerRef.current.interval) clearInterval(holdTimerRef.current.interval);
+    holdTimerRef.current = { timeout: null, interval: null };
+    holdActionRef.current = null;
+  }, []);
 
   // ── Add Image ──────────────────────────────────────────────────────────────
 
@@ -712,15 +733,23 @@ export default function Design() {
               <div className="flex items-center gap-2">
                 <p className="text-xs uppercase tracking-widest text-muted-foreground flex-1">Zoom</p>
                 <button
-                  onClick={() => zoomSelected("out")}
-                  className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors"
+                  onMouseDown={() => startHold(() => zoomSelected("out"))}
+                  onMouseUp={stopHold}
+                  onMouseLeave={stopHold}
+                  onTouchStart={e => { e.preventDefault(); startHold(() => zoomSelected("out")); }}
+                  onTouchEnd={stopHold}
+                  className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors select-none"
                   title="Zoom Out"
                 >
                   −
                 </button>
                 <button
-                  onClick={() => zoomSelected("in")}
-                  className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors"
+                  onMouseDown={() => startHold(() => zoomSelected("in"))}
+                  onMouseUp={stopHold}
+                  onMouseLeave={stopHold}
+                  onTouchStart={e => { e.preventDefault(); startHold(() => zoomSelected("in")); }}
+                  onTouchEnd={stopHold}
+                  className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors select-none"
                   title="Zoom In"
                 >
                   +
@@ -733,15 +762,23 @@ export default function Design() {
               <div className="flex items-center gap-2">
                 <p className="text-xs uppercase tracking-widest text-muted-foreground flex-1">Rotate</p>
                 <button
-                  onClick={() => rotateSelected("ccw")}
-                  className="w-9 h-9 border border-border flex items-center justify-center text-base hover:border-foreground hover:bg-muted/10 transition-colors"
+                  onMouseDown={() => startHold(() => rotateSelected("ccw"))}
+                  onMouseUp={stopHold}
+                  onMouseLeave={stopHold}
+                  onTouchStart={e => { e.preventDefault(); startHold(() => rotateSelected("ccw")); }}
+                  onTouchEnd={stopHold}
+                  className="w-9 h-9 border border-border flex items-center justify-center text-base hover:border-foreground hover:bg-muted/10 transition-colors select-none"
                   title="Rotate Counter-Clockwise"
                 >
                   ↺
                 </button>
                 <button
-                  onClick={() => rotateSelected("cw")}
-                  className="w-9 h-9 border border-border flex items-center justify-center text-base hover:border-foreground hover:bg-muted/10 transition-colors"
+                  onMouseDown={() => startHold(() => rotateSelected("cw"))}
+                  onMouseUp={stopHold}
+                  onMouseLeave={stopHold}
+                  onTouchStart={e => { e.preventDefault(); startHold(() => rotateSelected("cw")); }}
+                  onTouchEnd={stopHold}
+                  className="w-9 h-9 border border-border flex items-center justify-center text-base hover:border-foreground hover:bg-muted/10 transition-colors select-none"
                   title="Rotate Clockwise"
                 >
                   ↻
@@ -818,15 +855,23 @@ export default function Design() {
                             {/* Zoom row */}
                             <div className="flex gap-1.5">
                               <button
-                                onClick={() => zoomSelected("out")}
-                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
+                                onMouseDown={() => startHold(() => zoomSelected("out"))}
+                                onMouseUp={stopHold}
+                                onMouseLeave={stopHold}
+                                onTouchStart={e => { e.preventDefault(); startHold(() => zoomSelected("out")); }}
+                                onTouchEnd={stopHold}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
                                 title="Zoom Out"
                               >
                                 − Zoom
                               </button>
                               <button
-                                onClick={() => zoomSelected("in")}
-                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
+                                onMouseDown={() => startHold(() => zoomSelected("in"))}
+                                onMouseUp={stopHold}
+                                onMouseLeave={stopHold}
+                                onTouchStart={e => { e.preventDefault(); startHold(() => zoomSelected("in")); }}
+                                onTouchEnd={stopHold}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
                                 title="Zoom In"
                               >
                                 + Zoom
@@ -835,15 +880,23 @@ export default function Design() {
                             {/* Rotate row */}
                             <div className="flex gap-1.5">
                               <button
-                                onClick={() => rotateSelected("ccw")}
-                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
+                                onMouseDown={() => startHold(() => rotateSelected("ccw"))}
+                                onMouseUp={stopHold}
+                                onMouseLeave={stopHold}
+                                onTouchStart={e => { e.preventDefault(); startHold(() => rotateSelected("ccw")); }}
+                                onTouchEnd={stopHold}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
                                 title="Rotate CCW"
                               >
                                 ↺ Rotate
                               </button>
                               <button
-                                onClick={() => rotateSelected("cw")}
-                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
+                                onMouseDown={() => startHold(() => rotateSelected("cw"))}
+                                onMouseUp={stopHold}
+                                onMouseLeave={stopHold}
+                                onTouchStart={e => { e.preventDefault(); startHold(() => rotateSelected("cw")); }}
+                                onTouchEnd={stopHold}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
                                 title="Rotate CW"
                               >
                                 ↻ Rotate
