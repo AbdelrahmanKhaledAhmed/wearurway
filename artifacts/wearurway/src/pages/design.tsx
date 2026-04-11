@@ -419,9 +419,7 @@ export default function Design() {
       const clipH = clipRect.height;
 
       // ── Load every image fresh via fetch() → blob URL ────────────────────────
-      // Bypasses the browser's CORS-unaware image cache so the canvas is never
-      // tainted and toBlob() always succeeds.  The loaded img element gives us
-      // the REAL current naturalWidth/naturalHeight (stale stored values are ignored).
+      // Avoids browser CORS cache taint so canvas.toBlob() always works.
       type Loaded = { layer: DesignLayer; img: HTMLImageElement; blobUrl: string };
       const loaded: Loaded[] = [];
       for (const layer of visibleLayers) {
@@ -433,19 +431,42 @@ export default function Design() {
           const img = await new Promise<HTMLImageElement>((resolve, reject) => {
             const i = new Image();
             i.onload = () => resolve(i);
-            i.onerror = () => reject(new Error("img load failed"));
+            i.onerror = () => reject(new Error("load failed"));
             i.src = blobUrl;
           });
           loaded.push({ layer, img, blobUrl });
-        } catch {
-          // skip layers whose image can't be fetched
-        }
+        } catch { /* skip */ }
       }
       if (loaded.length === 0) return;
 
-      // ── Determine export resolution ───────────────────────────────────────────
-      // naturalScale = how many original pixels correspond to 1 clip-space pixel
-      // for each layer — using this scale means drawImage() samples at 1:1 quality.
+      // ── Compute the visible bounding box of all layers within the clip area ───
+      // This is the region the user actually sees — exactly what changes when
+      // they move / resize the photo.  Clamp each layer's rect to clip bounds.
+      let visMinX = clipW, visMaxX = 0;
+      let visMinY = clipH, visMaxY = 0;
+      for (const { layer } of loaded) {
+        const lx = Math.max(0, layer.x);
+        const ly = Math.max(0, layer.y);
+        const rx = Math.min(clipW, layer.x + layer.width);
+        const ry = Math.min(clipH, layer.y + layer.height);
+        if (rx > lx && ry > ly) {
+          visMinX = Math.min(visMinX, lx);
+          visMaxX = Math.max(visMaxX, rx);
+          visMinY = Math.min(visMinY, ly);
+          visMaxY = Math.max(visMaxY, ry);
+        }
+      }
+      if (visMaxX <= visMinX || visMaxY <= visMinY) return;
+
+      const visW = visMaxX - visMinX;   // clip-space pixels wide
+      const visH = visMaxY - visMinY;   // clip-space pixels tall
+
+      // cm size that matches the live label shown in the UI
+      const visCmW = (visW / clipW) * realWidth;
+      const visCmH = (visH / clipH) * realHeight;
+
+      // ── Determine export scale ────────────────────────────────────────────────
+      // Natural scale: original image pixels per clip pixel (use real naturalWidth).
       let maxNaturalScale = 1;
       for (const { layer, img } of loaded) {
         maxNaturalScale = Math.max(
@@ -454,24 +475,25 @@ export default function Design() {
           img.naturalHeight / layer.height,
         );
       }
-
-      // Also target 300 DPI for the print area (realWidth × realHeight cm).
-      // realWidth/realHeight are the clip-area dimensions in cm.
-      const printScaleX = (realWidth  / 2.54 * 300) / clipW;
-      const printScaleY = (realHeight / 2.54 * 300) / clipH;
-      const printScale  = Math.max(printScaleX, printScaleY);
-
-      // Use whichever is larger; hard-cap at 8 192 px to avoid OOM.
+      // 300 DPI for the visible area
+      const printScale = Math.max(
+        (visCmW / 2.54 * 300) / visW,
+        (visCmH / 2.54 * 300) / visH,
+      );
+      // Cap at 8 192 px on the long edge
       const MAX_SIDE    = 8192;
       const rawScale    = Math.max(maxNaturalScale, printScale);
-      const exportScale = Math.min(Math.max(rawScale, 1), MAX_SIDE / clipW, MAX_SIDE / clipH);
+      const exportScale = Math.min(Math.max(rawScale, 1), MAX_SIDE / visW, MAX_SIDE / visH);
 
-      const exportW = Math.round(clipW * exportScale);
-      const exportH = Math.round(clipH * exportScale);
-      const scaleX  = exportW / clipW;
-      const scaleY  = exportH / clipH;
+      const exportW = Math.round(visW * exportScale);
+      const exportH = Math.round(visH * exportScale);
+      const scaleX  = exportW / visW;
+      const scaleY  = exportH / visH;
 
       // ── Draw directly to the final canvas ────────────────────────────────────
+      // Offset each layer by (-visMinX, -visMinY) so the top-left of the visible
+      // region maps to (0, 0) in the export canvas.  Canvas bounds clip anything
+      // that falls outside, matching the DOM's overflow:hidden exactly.
       const canvas = document.createElement("canvas");
       canvas.width  = exportW;
       canvas.height = exportH;
@@ -482,8 +504,8 @@ export default function Design() {
       ctx.clearRect(0, 0, exportW, exportH);
 
       for (const { layer, img } of loaded) {
-        const cx    = (layer.x + layer.width  / 2) * scaleX;
-        const cy    = (layer.y + layer.height / 2) * scaleY;
+        const cx    = (layer.x + layer.width  / 2 - visMinX) * scaleX;
+        const cy    = (layer.y + layer.height / 2 - visMinY) * scaleY;
         const dw    = layer.width  * scaleX;
         const dh    = layer.height * scaleY;
         const angle = (layer.rotation * Math.PI) / 180;
@@ -498,8 +520,8 @@ export default function Design() {
       for (const { blobUrl } of loaded) URL.revokeObjectURL(blobUrl);
 
       // ── Download ─────────────────────────────────────────────────────────────
-      // Filename: <realWidth>x<realHeight>cm — the actual print-area size in cm.
-      const filename = `${Math.round(realWidth)}x${Math.round(realHeight)}cm_${exportW}x${exportH}px.png`;
+      // Filename = the print dimensions the user sees in the UI label.
+      const filename = `${Math.round(visCmW)}x${Math.round(visCmH)}cm.png`;
 
       canvas.toBlob(blob => {
         if (!blob) { alert("Export failed — could not generate image."); return; }
