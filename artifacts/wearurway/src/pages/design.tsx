@@ -238,9 +238,11 @@ export default function Design() {
       const clipW = clipRect.width;
       const clipH = clipRect.height;
 
-      // Export canvas matches the real print dimensions
-      const exportW = realWidth;
-      const exportH = realHeight;
+      // 300 DPI print resolution: px = cm / 2.54 * 300
+      const DPI = 300;
+      const exportW = Math.round((realWidth / 2.54) * DPI);
+      const exportH = Math.round((realHeight / 2.54) * DPI);
+
       const scaleX = exportW / clipW;
       const scaleY = exportH / clipH;
 
@@ -250,22 +252,24 @@ export default function Design() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+
       // Transparent background — no white fill
       ctx.clearRect(0, 0, exportW, exportH);
 
-      // Load and draw each visible layer (bottom to top = array order)
+      // Load and draw each visible layer in order (bottom to top)
       for (const layer of visibleLayers) {
         await new Promise<void>((resolve) => {
           const img = new Image();
           img.crossOrigin = "anonymous";
           img.onload = () => {
-            // Convert clip-space coords to export-space coords
             const dx = layer.x * scaleX;
             const dy = layer.y * scaleY;
             const dw = layer.width * scaleX;
             const dh = layer.height * scaleY;
 
-            // Clip to bounding box
+            // Clip strictly to bounding box — crop any overflow
             ctx.save();
             ctx.beginPath();
             ctx.rect(0, 0, exportW, exportH);
@@ -279,13 +283,15 @@ export default function Design() {
         });
       }
 
-      // Trigger download
+      // File named with real print dimensions
+      const filename = `design-${side}-${realWidth}x${realHeight}cm-${exportW}x${exportH}px.png`;
+
       canvas.toBlob(blob => {
         if (!blob) return;
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `design-${side}-${Date.now()}.png`;
+        a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
       }, "image/png");
@@ -418,10 +424,6 @@ export default function Design() {
                         height: layer.height,
                         cursor: dragRef.current?.layerId === layer.id ? "grabbing" : "grab",
                         userSelect: "none",
-                        outline: selectedLayerId === layer.id
-                          ? "1px solid rgba(255,255,255,0.6)"
-                          : "none",
-                        outlineOffset: "1px",
                         background: "none",
                       }}
                     />
