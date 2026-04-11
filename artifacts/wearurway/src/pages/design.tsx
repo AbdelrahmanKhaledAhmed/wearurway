@@ -227,7 +227,7 @@ export default function Design() {
 
   const handleExport = useCallback(async () => {
     const clipEl = clipAreaRef.current;
-    if (!clipEl || !realWidth || !realHeight) return;
+    if (!clipEl || !realWidth || !realHeight || !bbox) return;
 
     const visibleLayers = layers.filter(l => l.visible);
     if (visibleLayers.length === 0) return;
@@ -238,11 +238,16 @@ export default function Design() {
       const clipW = clipRect.width;
       const clipH = clipRect.height;
 
-      // 300 DPI print resolution: px = cm / 2.54 * 300
-      const DPI = 300;
-      const exportW = Math.round((realWidth / 2.54) * DPI);
-      const exportH = Math.round((realHeight / 2.54) * DPI);
+      // The bounding box % × real shirt size = actual physical print area
+      const printW_cm = (bbox.width / 100) * realWidth;
+      const printH_cm = (bbox.height / 100) * realHeight;
 
+      // 300 DPI for DTF print quality: px = cm / 2.54 × 300
+      const DPI = 300;
+      const exportW = Math.round((printW_cm / 2.54) * DPI);
+      const exportH = Math.round((printH_cm / 2.54) * DPI);
+
+      // Scale layers from screen clip-space to export pixel-space
       const scaleX = exportW / clipW;
       const scaleY = exportH / clipH;
 
@@ -255,10 +260,10 @@ export default function Design() {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
 
-      // Transparent background — no white fill
+      // Transparent background — no fill
       ctx.clearRect(0, 0, exportW, exportH);
 
-      // Load and draw each visible layer in order (bottom to top)
+      // Draw each visible layer in order (bottom to top)
       for (const layer of visibleLayers) {
         await new Promise<void>((resolve) => {
           const img = new Image();
@@ -269,7 +274,7 @@ export default function Design() {
             const dw = layer.width * scaleX;
             const dh = layer.height * scaleY;
 
-            // Clip strictly to bounding box — crop any overflow
+            // Clip to bounding box — crop overflow
             ctx.save();
             ctx.beginPath();
             ctx.rect(0, 0, exportW, exportH);
@@ -283,8 +288,10 @@ export default function Design() {
         });
       }
 
-      // File named with real print dimensions
-      const filename = `design-${side}-${realWidth}x${realHeight}cm-${exportW}x${exportH}px.png`;
+      // Filename: print area in cm + pixel dimensions for DTF
+      const wCm = printW_cm.toFixed(1).replace(".", "_");
+      const hCm = printH_cm.toFixed(1).replace(".", "_");
+      const filename = `design-${side}-${wCm}x${hCm}cm-${exportW}x${exportH}px.png`;
 
       canvas.toBlob(blob => {
         if (!blob) return;
@@ -298,7 +305,7 @@ export default function Design() {
     } finally {
       setExporting(false);
     }
-  }, [layers, realWidth, realHeight, side]);
+  }, [layers, realWidth, realHeight, bbox, side]);
 
   if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return null;
 
