@@ -174,14 +174,38 @@ export default function Design() {
         const res = await fetch("/api/uploads", { method: "POST", body: formData });
         const data = await res.json();
         const clipRect = clipAreaRef.current?.getBoundingClientRect();
-        const defaultW = Math.round((clipRect?.width ?? 200) * 0.6);
-        const defaultH = defaultW;
+        const clipW = clipRect?.width ?? 200;
+        const clipH = clipRect?.height ?? 200;
+
+        // Resolve the image's natural dimensions to preserve its real aspect ratio
+        const natural = await new Promise<{ w: number; h: number }>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+          img.onerror = () => resolve({ w: 1, h: 1 });
+          img.src = data.url;
+        });
+
+        // Fit inside 60% of the clip area, keeping natural aspect ratio intact
+        const maxW = clipW * 0.6;
+        const maxH = clipH * 0.6;
+        const ratio = natural.w / natural.h;
+        let defaultW: number, defaultH: number;
+        if (ratio > maxW / maxH) {
+          defaultW = maxW;
+          defaultH = maxW / ratio;
+        } else {
+          defaultH = maxH;
+          defaultW = maxH * ratio;
+        }
+        defaultW = Math.round(defaultW);
+        defaultH = Math.round(defaultH);
+
         const newLayer: DesignLayer = {
           id: crypto.randomUUID(),
           name: `Layer ${layers.length + 1}`,
           imageUrl: data.url,
-          x: Math.round(((clipRect?.width ?? 200) - defaultW) / 2),
-          y: Math.round(((clipRect?.height ?? 200) - defaultH) / 2),
+          x: Math.round((clipW - defaultW) / 2),
+          y: Math.round((clipH - defaultH) / 2),
           width: defaultW,
           height: defaultH,
           visible: true,
