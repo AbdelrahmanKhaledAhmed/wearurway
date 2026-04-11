@@ -623,6 +623,7 @@ export default function Design() {
                         userSelect: "none",
                         background: "none",
                         flexShrink: 0,
+                        imageRendering: "high-quality" as React.CSSProperties["imageRendering"],
                       }}
                     />
                   ) : null
@@ -827,7 +828,7 @@ export default function Design() {
           </div>
 
           {/* ── Layers panel ── */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto no-scrollbar">
             <div className="p-6">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">
                 Layers {layers.length > 0 && `(${layers.length})`}
