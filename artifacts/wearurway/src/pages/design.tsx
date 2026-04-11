@@ -230,8 +230,8 @@ export default function Design() {
     if (!clipSize || !realWidth || !realHeight) return null;
     const visibleW = Math.max(0, Math.min(clipSize.w, layer.x + layer.width) - Math.max(0, layer.x));
     const visibleH = Math.max(0, Math.min(clipSize.h, layer.y + layer.height) - Math.max(0, layer.y));
-    const w = Math.round((visibleW / clipSize.w) * realWidth);
-    const h = Math.round((visibleH / clipSize.h) * realHeight);
+    const w = Math.round((visibleW / clipSize.w) * realWidth * 10) / 10;
+    const h = Math.round((visibleH / clipSize.h) * realHeight * 10) / 10;
     return { w, h };
   };
 
