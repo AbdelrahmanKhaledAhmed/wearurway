@@ -565,6 +565,23 @@ export default function Design() {
                 Layers {layers.length > 0 && `(${layers.length})`}
               </p>
 
+              {/* Add Image */}
+              <button
+                onClick={handleAddImage}
+                disabled={uploading || !bbox}
+                className="w-full flex items-center gap-3 border border-border px-4 py-3 mb-4 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <span className="text-lg leading-none">🖼</span>
+                <div className="text-left">
+                  <p className="text-xs font-bold uppercase tracking-widest">
+                    {uploading ? "Uploading…" : "Add Image"}
+                  </p>
+                  {!bbox && (
+                    <p className="text-xs text-muted-foreground mt-0.5">Set bbox in admin first</p>
+                  )}
+                </div>
+              </button>
+
               {layers.length === 0 ? (
                 <p className="text-xs text-muted-foreground uppercase tracking-widest leading-relaxed">
                   No layers yet. Add an image to start designing.
@@ -933,85 +950,6 @@ export default function Design() {
             </div>
           </div>
 
-          {/* ── Tools ── */}
-          <div className="p-6 border-b border-border space-y-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Tools</p>
-
-            {/* Add Image */}
-            <button
-              onClick={handleAddImage}
-              disabled={uploading || !bbox}
-              className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <span className="text-lg leading-none">🖼</span>
-              <div className="text-left">
-                <p className="text-xs font-bold uppercase tracking-widest">
-                  {uploading ? "Uploading…" : "Add Image"}
-                </p>
-                {!bbox && (
-                  <p className="text-xs text-muted-foreground mt-0.5">Set bbox in admin first</p>
-                )}
-              </div>
-            </button>
-
-            {/* Zoom controls — only when a layer is selected */}
-            {selectedLayer && (
-              <div className="flex items-center gap-2">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground flex-1">Zoom</p>
-                <button
-                  onMouseDown={() => startHold(() => zoomSelected("out"))}
-                  onMouseUp={stopHold}
-                  onMouseLeave={stopHold}
-                  onTouchStart={e => { e.preventDefault(); startHold(() => zoomSelected("out")); }}
-                  onTouchEnd={stopHold}
-                  className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors select-none"
-                  title="Zoom Out"
-                >
-                  −
-                </button>
-                <button
-                  onMouseDown={() => startHold(() => zoomSelected("in"))}
-                  onMouseUp={stopHold}
-                  onMouseLeave={stopHold}
-                  onTouchStart={e => { e.preventDefault(); startHold(() => zoomSelected("in")); }}
-                  onTouchEnd={stopHold}
-                  className="w-9 h-9 border border-border flex items-center justify-center text-base font-bold hover:border-foreground hover:bg-muted/10 transition-colors select-none"
-                  title="Zoom In"
-                >
-                  +
-                </button>
-              </div>
-            )}
-
-            {/* Rotate controls — only when a layer is selected */}
-            {selectedLayer && (
-              <div className="flex items-center gap-2">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground flex-1">Rotate</p>
-                <button
-                  onMouseDown={() => startHold(() => rotateSelected("ccw"))}
-                  onMouseUp={stopHold}
-                  onMouseLeave={stopHold}
-                  onTouchStart={e => { e.preventDefault(); startHold(() => rotateSelected("ccw")); }}
-                  onTouchEnd={stopHold}
-                  className="w-9 h-9 border border-border flex items-center justify-center text-base hover:border-foreground hover:bg-muted/10 transition-colors select-none"
-                  title="Rotate Counter-Clockwise"
-                >
-                  ↺
-                </button>
-                <button
-                  onMouseDown={() => startHold(() => rotateSelected("cw"))}
-                  onMouseUp={stopHold}
-                  onMouseLeave={stopHold}
-                  onTouchStart={e => { e.preventDefault(); startHold(() => rotateSelected("cw")); }}
-                  onTouchEnd={stopHold}
-                  className="w-9 h-9 border border-border flex items-center justify-center text-base hover:border-foreground hover:bg-muted/10 transition-colors select-none"
-                  title="Rotate Clockwise"
-                >
-                  ↻
-                </button>
-              </div>
-            )}
-          </div>
 
           {/* ── Export ── */}
           {layers.some(l => l.visible) && realWidth > 0 && (
