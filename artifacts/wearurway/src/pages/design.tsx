@@ -285,19 +285,71 @@ export default function Design() {
     holdActionRef.current = null;
   }, []);
 
-  // ── Add Image — open editor first ─────────────────────────────────────────
+  // ── Add Image — place first, then auto-open editor ────────────────────────
 
   const handleAddImage = useCallback(() => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
     input.click();
-    input.onchange = () => {
+    input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
-      setEditorFile(file);
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file, file.name);
+        const res = await fetch("/api/uploads", { method: "POST", body: formData });
+        const data = await res.json();
+
+        const clipEl2 = clipAreaRef.current;
+        const clipW = clipEl2?.offsetWidth ?? 200;
+        const clipH = clipEl2?.offsetHeight ?? 200;
+
+        const natural = await new Promise<{ w: number; h: number }>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+          img.onerror = () => resolve({ w: 1, h: 1 });
+          img.src = data.url;
+        });
+
+        const maxW = clipW * 0.6;
+        const maxH = clipH * 0.6;
+        const ratio = natural.w / natural.h;
+        let defaultW: number, defaultH: number;
+        if (ratio > maxW / maxH) {
+          defaultW = maxW;
+          defaultH = maxW / ratio;
+        } else {
+          defaultH = maxH;
+          defaultW = maxH * ratio;
+        }
+        defaultW = Math.round(defaultW);
+        defaultH = Math.round(defaultH);
+
+        const newLayer: DesignLayer = {
+          id: crypto.randomUUID(),
+          name: `Layer ${layers.length + 1}`,
+          imageUrl: data.url,
+          x: Math.round((clipW - defaultW) / 2),
+          y: Math.round((clipH - defaultH) / 2),
+          width: defaultW,
+          height: defaultH,
+          rotation: 0,
+          visible: true,
+          naturalWidth: natural.w,
+          naturalHeight: natural.h,
+        };
+        setLayers(prev => [...prev, newLayer]);
+        setSelectedLayerId(newLayer.id);
+        // Auto-open editor so user can immediately refine (remove bg, crop, etc.)
+        setEditingLayerId(newLayer.id);
+        setEditorFile(file);
+      } finally {
+        setUploading(false);
+      }
     };
-  }, []);
+  }, [layers.length]);
 
   // Called when user confirms from the editor (passes edited blob)
   const handleEditorConfirm = useCallback(async (blob: Blob) => {
@@ -500,6 +552,40 @@ export default function Design() {
 
       // Clean up blob URLs
       for (const { blobUrl } of loaded) URL.revokeObjectURL(blobUrl);
+
+      // ── DTF edge sharpening ───────────────────────────────────────────────────
+      // Sharpen kernel + hard alpha threshold so edges are crisp for DTF printing.
+      {
+        const id = ctx.getImageData(0, 0, exportW, exportH);
+        const src = id.data;
+        const dst = new Uint8ClampedArray(src);
+        const w = exportW, h = exportH;
+        // Strong unsharp kernel: centre=9, neighbours=−1 (8-connected)
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const i = (y * w + x) * 4;
+            if (src[i + 3] === 0) continue;          // skip fully transparent
+            for (let c = 0; c < 3; c++) {
+              const v =
+                9  * src[i + c]
+                - src[((y-1)*w + (x-1))*4 + c]
+                - src[((y-1)*w +  x   )*4 + c]
+                - src[((y-1)*w + (x+1))*4 + c]
+                - src[( y   *w + (x-1))*4 + c]
+                - src[( y   *w + (x+1))*4 + c]
+                - src[((y+1)*w + (x-1))*4 + c]
+                - src[((y+1)*w +  x   )*4 + c]
+                - src[((y+1)*w + (x+1))*4 + c];
+              dst[i + c] = Math.max(0, Math.min(255, v));
+            }
+          }
+        }
+        // Hard alpha threshold — no semi-transparent fringes for DTF
+        for (let i = 3; i < dst.length; i += 4) {
+          dst[i] = src[i] < 128 ? 0 : 255;
+        }
+        ctx.putImageData(new ImageData(dst, w, h), 0, 0);
+      }
 
       // ── Compute filename from the actual visible design size ─────────────────
       // Union of all visible layer rects, clamped to the clip area, converted
