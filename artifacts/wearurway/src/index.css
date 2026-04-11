@@ -187,6 +187,10 @@
     @apply font-sans antialiased bg-background text-foreground;
     overflow-x: hidden;
   }
+  img {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
 }
 
 @layer utilities {
