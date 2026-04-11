@@ -99,6 +99,39 @@ function globalRecolor(imageData: ImageData, startX: number, startY: number, new
   }
 }
 
+// Auto-crop canvas to bounding box of non-transparent pixels
+function trimTransparency(src: HTMLCanvasElement): HTMLCanvasElement {
+  const ctx = src.getContext("2d");
+  if (!ctx) return src;
+  const { width, height } = src;
+  const data = ctx.getImageData(0, 0, width, height).data;
+
+  let minX = width, maxX = 0, minY = height, maxY = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const a = data[(y * width + x) * 4 + 3];
+      if (a > 0) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (minX > maxX || minY > maxY) return src;
+
+  const trimW = maxX - minX + 1;
+  const trimH = maxY - minY + 1;
+  const out = document.createElement("canvas");
+  out.width = trimW;
+  out.height = trimH;
+  const outCtx = out.getContext("2d");
+  if (!outCtx) return src;
+  outCtx.drawImage(src, minX, minY, trimW, trimH, 0, 0, trimW, trimH);
+  return out;
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
@@ -190,7 +223,8 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   const handleConfirm = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.toBlob(blob => {
+    const trimmed = trimTransparency(canvas);
+    trimmed.toBlob(blob => {
       if (blob) onConfirm(blob);
     }, "image/png");
   };

@@ -415,48 +415,35 @@ export default function Design() {
     setExporting(true);
     try {
       const clipRect = clipEl.getBoundingClientRect();
-      const clipW = clipRect.width;
-      const clipH = clipRect.height;
+      const clipW = Math.round(clipRect.width);
+      const clipH = Math.round(clipRect.height);
 
-      const printW_cm = (bbox.width / 100) * realWidth;
-      const printH_cm = (bbox.height / 100) * realHeight;
-
-      // Export at 300px/inch for DTF print quality
-      const exportW = Math.round((printW_cm / 2.54) * 300);
-      const exportH = Math.round((printH_cm / 2.54) * 300);
-
-      const scaleX = exportW / clipW;
-      const scaleY = exportH / clipH;
-
-      const canvas = document.createElement("canvas");
-      canvas.width = exportW;
-      canvas.height = exportH;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.clearRect(0, 0, exportW, exportH);
+      // ── Step 1: render layers onto an intermediate canvas that is exactly
+      //    the size of the clip area in screen pixels.  Layer coordinates are
+      //    in clip-space pixels so no scaling is needed here — the canvas
+      //    clips overflow automatically, just like the DOM's overflow:hidden.
+      const intermediate = document.createElement("canvas");
+      intermediate.width = clipW;
+      intermediate.height = clipH;
+      const ic = intermediate.getContext("2d");
+      if (!ic) return;
+      ic.imageSmoothingEnabled = true;
+      ic.imageSmoothingQuality = "high";
+      ic.clearRect(0, 0, clipW, clipH);
 
       for (const layer of visibleLayers) {
         await new Promise<void>((resolve) => {
           const img = new Image();
           img.crossOrigin = "anonymous";
           img.onload = () => {
-            const cx = (layer.x + layer.width / 2) * scaleX;
-            const cy = (layer.y + layer.height / 2) * scaleY;
-            const dw = layer.width * scaleX;
-            const dh = layer.height * scaleY;
+            const cx = layer.x + layer.width / 2;
+            const cy = layer.y + layer.height / 2;
             const angle = (layer.rotation * Math.PI) / 180;
-
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(0, 0, exportW, exportH);
-            ctx.clip();
-            ctx.translate(cx, cy);
-            ctx.rotate(angle);
-            ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
-            ctx.restore();
+            ic.save();
+            ic.translate(cx, cy);
+            ic.rotate(angle);
+            ic.drawImage(img, -layer.width / 2, -layer.height / 2, layer.width, layer.height);
+            ic.restore();
             resolve();
           };
           img.onerror = () => resolve();
@@ -464,15 +451,30 @@ export default function Design() {
         });
       }
 
+      // ── Step 2: scale the intermediate canvas up to print resolution.
+      const printW_cm = (bbox.width / 100) * realWidth;
+      const printH_cm = (bbox.height / 100) * realHeight;
+      const exportW = Math.round((printW_cm / 2.54) * 300);
+      const exportH = Math.round((printH_cm / 2.54) * 300);
+
+      const exportCanvas = document.createElement("canvas");
+      exportCanvas.width = exportW;
+      exportCanvas.height = exportH;
+      const ec = exportCanvas.getContext("2d");
+      if (!ec) return;
+      ec.imageSmoothingEnabled = true;
+      ec.imageSmoothingQuality = "high";
+      ec.drawImage(intermediate, 0, 0, exportW, exportH);
+
+      // Build filename from first visible layer's visible area
       const firstVisible = visibleLayers[0];
-      const clipRect2 = clipEl.getBoundingClientRect();
-      const vW = Math.max(0, Math.min(clipRect2.width, firstVisible.x + firstVisible.width) - Math.max(0, firstVisible.x));
-      const vH = Math.max(0, Math.min(clipRect2.height, firstVisible.y + firstVisible.height) - Math.max(0, firstVisible.y));
-      const imgWcm = Math.round((vW / clipRect2.width) * realWidth);
-      const imgHcm = Math.round((vH / clipRect2.height) * realHeight);
+      const vW = Math.max(0, Math.min(clipW, firstVisible.x + firstVisible.width) - Math.max(0, firstVisible.x));
+      const vH = Math.max(0, Math.min(clipH, firstVisible.y + firstVisible.height) - Math.max(0, firstVisible.y));
+      const imgWcm = Math.round((vW / clipW) * realWidth);
+      const imgHcm = Math.round((vH / clipH) * realHeight);
       const filename = `${imgWcm}x${imgHcm}cm.png`;
 
-      canvas.toBlob(blob => {
+      exportCanvas.toBlob(blob => {
         if (!blob) return;
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -484,7 +486,7 @@ export default function Design() {
     } finally {
       setExporting(false);
     }
-  }, [layers, realWidth, realHeight, bbox, side]);
+  }, [layers, realWidth, realHeight, bbox]);
 
   if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return null;
 
@@ -530,33 +532,192 @@ export default function Design() {
 
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Main canvas ── */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4">
+        {/* ── Left sidebar — Layers ── */}
+        <div className="w-56 border-r border-border flex flex-col shrink-0 overflow-hidden">
+          <div className="flex-1 overflow-y-auto no-scrollbar">
+            <div className="p-5">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">
+                Layers {layers.length > 0 && `(${layers.length})`}
+              </p>
+
+              {layers.length === 0 ? (
+                <p className="text-xs text-muted-foreground uppercase tracking-widest leading-relaxed">
+                  No layers yet. Add an image to start designing.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {[...layers].reverse().map((layer, reversedIdx) => {
+                    const trueIdx = layers.length - 1 - reversedIdx;
+                    const isSelected = selectedLayerId === layer.id;
+                    const dim = layerPrintDim(layer);
+                    return (
+                      <motion.div
+                        key={layer.id}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className={`border transition-colors ${isSelected ? "border-foreground bg-muted/10" : "border-border hover:border-muted-foreground/40"}`}
+                      >
+                        <div
+                          className="flex items-center gap-2 px-3 py-2 cursor-pointer"
+                          onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
+                        >
+                          <div className="w-8 h-8 border border-border overflow-hidden shrink-0"
+                            style={{
+                              backgroundImage: "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
+                              backgroundSize: "6px 6px",
+                              backgroundPosition: "0 0, 0 3px, 3px -3px, -3px 0px",
+                              backgroundColor: "#1a1a1a",
+                            }}
+                          >
+                            <img src={layer.imageUrl} alt="" className="w-full h-full object-contain" />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            {dim ? (
+                              <p className="text-xs font-bold font-mono tracking-widest truncate">
+                                {dim.w} × {dim.h} cm
+                              </p>
+                            ) : (
+                              <p className="text-xs font-bold uppercase tracking-widest truncate">
+                                {layer.name}
+                              </p>
+                            )}
+                            {layer.rotation !== 0 && (
+                              <p className="text-xs text-muted-foreground font-mono">{layer.rotation}°</p>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={e => { e.stopPropagation(); toggleVisibility(layer.id); }}
+                            className="text-muted-foreground hover:text-foreground transition-colors text-xs p-0.5"
+                            title={layer.visible ? "Hide" : "Show"}
+                          >
+                            {layer.visible ? "👁" : "🙈"}
+                          </button>
+                        </div>
+
+                        {isSelected && (
+                          <div className="px-3 pb-3 space-y-2 border-t border-border pt-2">
+                            <button
+                              onClick={() => startEditLayer(layer)}
+                              className="w-full text-xs py-1.5 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
+                              title="Edit image"
+                            >
+                              ✏ Edit Image
+                            </button>
+                            <div className="flex gap-1.5">
+                              <button
+                                onMouseDown={() => startHold(() => zoomSelected("out"))}
+                                onMouseUp={stopHold}
+                                onMouseLeave={stopHold}
+                                onTouchStart={e => { e.preventDefault(); startHold(() => zoomSelected("out")); }}
+                                onTouchEnd={stopHold}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
+                                title="Zoom Out"
+                              >
+                                − Zoom
+                              </button>
+                              <button
+                                onMouseDown={() => startHold(() => zoomSelected("in"))}
+                                onMouseUp={stopHold}
+                                onMouseLeave={stopHold}
+                                onTouchStart={e => { e.preventDefault(); startHold(() => zoomSelected("in")); }}
+                                onTouchEnd={stopHold}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
+                                title="Zoom In"
+                              >
+                                + Zoom
+                              </button>
+                            </div>
+                            <div className="flex gap-1.5">
+                              <button
+                                onMouseDown={() => startHold(() => rotateSelected("ccw"))}
+                                onMouseUp={stopHold}
+                                onMouseLeave={stopHold}
+                                onTouchStart={e => { e.preventDefault(); startHold(() => rotateSelected("ccw")); }}
+                                onTouchEnd={stopHold}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
+                                title="Rotate CCW"
+                              >
+                                ↺ Rotate
+                              </button>
+                              <button
+                                onMouseDown={() => startHold(() => rotateSelected("cw"))}
+                                onMouseUp={stopHold}
+                                onMouseLeave={stopHold}
+                                onTouchStart={e => { e.preventDefault(); startHold(() => rotateSelected("cw")); }}
+                                onTouchEnd={stopHold}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
+                                title="Rotate CW"
+                              >
+                                ↻ Rotate
+                              </button>
+                            </div>
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => moveLayerUp(layer.id)}
+                                disabled={trueIdx === layers.length - 1}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors disabled:opacity-30 uppercase tracking-widest"
+                                title="Move up"
+                              >
+                                ↑ Up
+                              </button>
+                              <button
+                                onClick={() => moveLayerDown(layer.id)}
+                                disabled={trueIdx === 0}
+                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors disabled:opacity-30 uppercase tracking-widest"
+                                title="Move down"
+                              >
+                                ↓ Down
+                              </button>
+                              <button
+                                onClick={() => removeLayer(layer.id)}
+                                className="text-xs py-1 px-2 border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors uppercase tracking-widest"
+                                title="Delete layer"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Main canvas — checkerboard fills entire center ── */}
+        <div
+          className="flex-1 flex flex-col items-center justify-center p-4"
+          style={{
+            backgroundImage:
+              "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
+            backgroundSize: "24px 24px",
+            backgroundPosition: "0 0, 0 12px, 12px -12px, -12px 0px",
+            backgroundColor: "#1a1a1a",
+          }}
+        >
 
           {/* Front / Back toggle */}
-          <div className="flex gap-0 mb-4 border border-border">
+          <div className="flex gap-0 mb-4 border border-border/60">
             {(["front", "back"] as const).map(s => (
               <button
                 key={s}
                 onClick={() => setSide(s)}
-                className={`px-6 py-2 text-xs uppercase tracking-widest font-medium transition-colors ${side === s ? "bg-foreground text-background" : "bg-transparent text-foreground hover:bg-muted/20"}`}
+                className={`px-6 py-2 text-xs uppercase tracking-widest font-medium transition-colors ${side === s ? "bg-foreground text-background" : "bg-background/20 text-foreground hover:bg-muted/20"}`}
               >
                 {s}
               </button>
             ))}
           </div>
 
-          {/* Mockup viewer */}
+          {/* Mockup viewer — transparent so center checkerboard shows through */}
           <div
             className="relative w-full max-w-md"
-            style={{
-              aspectRatio: "3/4",
-              backgroundImage:
-                "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
-              backgroundSize: "24px 24px",
-              backgroundPosition: "0 0, 0 12px, 12px -12px, -12px 0px",
-              backgroundColor: "#1a1a1a",
-            }}
+            style={{ aspectRatio: "3/4" }}
           >
             <AnimatePresence mode="wait">
               <motion.div
@@ -827,167 +988,11 @@ export default function Design() {
             )}
           </div>
 
-          {/* ── Layers panel ── */}
-          <div className="flex-1 overflow-y-auto no-scrollbar">
-            <div className="p-6">
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">
-                Layers {layers.length > 0 && `(${layers.length})`}
-              </p>
-
-              {layers.length === 0 ? (
-                <p className="text-xs text-muted-foreground uppercase tracking-widest leading-relaxed">
-                  No layers yet. Add an image to start designing.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {[...layers].reverse().map((layer, reversedIdx) => {
-                    const trueIdx = layers.length - 1 - reversedIdx;
-                    const isSelected = selectedLayerId === layer.id;
-                    const dim = layerPrintDim(layer);
-                    return (
-                      <motion.div
-                        key={layer.id}
-                        initial={{ opacity: 0, x: 8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className={`border transition-colors ${isSelected ? "border-foreground bg-muted/10" : "border-border hover:border-muted-foreground/40"}`}
-                      >
-                        <div
-                          className="flex items-center gap-2 px-3 py-2 cursor-pointer"
-                          onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
-                        >
-                          <div className="w-8 h-8 border border-border overflow-hidden shrink-0"
-                            style={{
-                              backgroundImage: "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
-                              backgroundSize: "6px 6px",
-                              backgroundPosition: "0 0, 0 3px, 3px -3px, -3px 0px",
-                              backgroundColor: "#1a1a1a",
-                            }}
-                          >
-                            <img src={layer.imageUrl} alt="" className="w-full h-full object-contain" />
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            {dim ? (
-                              <p className="text-xs font-bold font-mono tracking-widest truncate">
-                                {dim.w} × {dim.h} cm
-                              </p>
-                            ) : (
-                              <p className="text-xs font-bold uppercase tracking-widest truncate">
-                                {layer.name}
-                              </p>
-                            )}
-                            {layer.rotation !== 0 && (
-                              <p className="text-xs text-muted-foreground font-mono">{layer.rotation}°</p>
-                            )}
-                          </div>
-
-                          <button
-                            onClick={e => { e.stopPropagation(); toggleVisibility(layer.id); }}
-                            className="text-muted-foreground hover:text-foreground transition-colors text-xs p-0.5"
-                            title={layer.visible ? "Hide" : "Show"}
-                          >
-                            {layer.visible ? "👁" : "🙈"}
-                          </button>
-                        </div>
-
-                        {isSelected && (
-                          <div className="px-3 pb-3 space-y-2 border-t border-border pt-2">
-                            {/* Edit button */}
-                            <button
-                              onClick={() => startEditLayer(layer)}
-                              className="w-full text-xs py-1.5 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
-                              title="Edit image"
-                            >
-                              ✏ Edit Image
-                            </button>
-                            {/* Zoom row */}
-                            <div className="flex gap-1.5">
-                              <button
-                                onMouseDown={() => startHold(() => zoomSelected("out"))}
-                                onMouseUp={stopHold}
-                                onMouseLeave={stopHold}
-                                onTouchStart={e => { e.preventDefault(); startHold(() => zoomSelected("out")); }}
-                                onTouchEnd={stopHold}
-                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
-                                title="Zoom Out"
-                              >
-                                − Zoom
-                              </button>
-                              <button
-                                onMouseDown={() => startHold(() => zoomSelected("in"))}
-                                onMouseUp={stopHold}
-                                onMouseLeave={stopHold}
-                                onTouchStart={e => { e.preventDefault(); startHold(() => zoomSelected("in")); }}
-                                onTouchEnd={stopHold}
-                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
-                                title="Zoom In"
-                              >
-                                + Zoom
-                              </button>
-                            </div>
-                            {/* Rotate row */}
-                            <div className="flex gap-1.5">
-                              <button
-                                onMouseDown={() => startHold(() => rotateSelected("ccw"))}
-                                onMouseUp={stopHold}
-                                onMouseLeave={stopHold}
-                                onTouchStart={e => { e.preventDefault(); startHold(() => rotateSelected("ccw")); }}
-                                onTouchEnd={stopHold}
-                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
-                                title="Rotate CCW"
-                              >
-                                ↺ Rotate
-                              </button>
-                              <button
-                                onMouseDown={() => startHold(() => rotateSelected("cw"))}
-                                onMouseUp={stopHold}
-                                onMouseLeave={stopHold}
-                                onTouchStart={e => { e.preventDefault(); startHold(() => rotateSelected("cw")); }}
-                                onTouchEnd={stopHold}
-                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
-                                title="Rotate CW"
-                              >
-                                ↻ Rotate
-                              </button>
-                            </div>
-                            {/* Order + delete row */}
-                            <div className="flex gap-1.5">
-                              <button
-                                onClick={() => moveLayerUp(layer.id)}
-                                disabled={trueIdx === layers.length - 1}
-                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors disabled:opacity-30 uppercase tracking-widest"
-                                title="Move up"
-                              >
-                                ↑ Up
-                              </button>
-                              <button
-                                onClick={() => moveLayerDown(layer.id)}
-                                disabled={trueIdx === 0}
-                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors disabled:opacity-30 uppercase tracking-widest"
-                                title="Move down"
-                              >
-                                ↓ Down
-                              </button>
-                              <button
-                                onClick={() => removeLayer(layer.id)}
-                                className="text-xs py-1 px-2 border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors uppercase tracking-widest"
-                                title="Delete layer"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+          {/* ── (layers moved to left sidebar) ── */}
+          <div className="flex-1" /></div>
       </div>
     </div>
     </>
   );
 }
+
