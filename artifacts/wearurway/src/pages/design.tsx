@@ -418,42 +418,62 @@ export default function Design() {
       const clipW = clipRect.width;
       const clipH = clipRect.height;
 
-      // ── Determine the best export scale ─────────────────────────────────────
-      // The "natural scale" for each layer is how many original image pixels
-      // map to each clip-space pixel.  Using this scale means drawImage() reads
-      // directly from the original high-res pixels with no intermediate loss.
-      let maxNaturalScale = 1;
+      // ── Load every image fresh via fetch() → blob URL ────────────────────────
+      // Bypasses the browser's CORS-unaware image cache so the canvas is never
+      // tainted and toBlob() always succeeds.  The loaded img element gives us
+      // the REAL current naturalWidth/naturalHeight (stale stored values are ignored).
+      type Loaded = { layer: DesignLayer; img: HTMLImageElement; blobUrl: string };
+      const loaded: Loaded[] = [];
       for (const layer of visibleLayers) {
-        const sx = layer.naturalWidth / layer.width;
-        const sy = layer.naturalHeight / layer.height;
-        maxNaturalScale = Math.max(maxNaturalScale, sx, sy);
+        try {
+          const res = await fetch(layer.imageUrl);
+          if (!res.ok) continue;
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const i = new Image();
+            i.onload = () => resolve(i);
+            i.onerror = () => reject(new Error("img load failed"));
+            i.src = blobUrl;
+          });
+          loaded.push({ layer, img, blobUrl });
+        } catch {
+          // skip layers whose image can't be fetched
+        }
+      }
+      if (loaded.length === 0) return;
+
+      // ── Determine export resolution ───────────────────────────────────────────
+      // naturalScale = how many original pixels correspond to 1 clip-space pixel
+      // for each layer — using this scale means drawImage() samples at 1:1 quality.
+      let maxNaturalScale = 1;
+      for (const { layer, img } of loaded) {
+        maxNaturalScale = Math.max(
+          maxNaturalScale,
+          img.naturalWidth  / layer.width,
+          img.naturalHeight / layer.height,
+        );
       }
 
-      // Also respect the print-DPI target (300 dpi) so the file is ready for DTF.
-      const printW_cm = (bbox.width / 100) * realWidth;
-      const printH_cm = (bbox.height / 100) * realHeight;
-      const printScaleX = Math.round((printW_cm / 2.54) * 300) / clipW;
-      const printScaleY = Math.round((printH_cm / 2.54) * 300) / clipH;
-      const printScale = Math.max(printScaleX, printScaleY);
+      // Also target 300 DPI for the print area (realWidth × realHeight cm).
+      // realWidth/realHeight are the clip-area dimensions in cm.
+      const printScaleX = (realWidth  / 2.54 * 300) / clipW;
+      const printScaleY = (realHeight / 2.54 * 300) / clipH;
+      const printScale  = Math.max(printScaleX, printScaleY);
 
-      // Use the higher of the two; cap at 8 192 px on the long edge to avoid
-      // browser canvas memory limits.
-      const MAX_SIDE = 8192;
-      const rawScale = Math.max(maxNaturalScale, printScale);
-      const capScale = Math.min(rawScale, MAX_SIDE / clipW, MAX_SIDE / clipH);
-      const exportScale = Math.max(capScale, 1);
+      // Use whichever is larger; hard-cap at 8 192 px to avoid OOM.
+      const MAX_SIDE    = 8192;
+      const rawScale    = Math.max(maxNaturalScale, printScale);
+      const exportScale = Math.min(Math.max(rawScale, 1), MAX_SIDE / clipW, MAX_SIDE / clipH);
 
       const exportW = Math.round(clipW * exportScale);
       const exportH = Math.round(clipH * exportScale);
-      const scaleX = exportW / clipW;
-      const scaleY = exportH / clipH;
+      const scaleX  = exportW / clipW;
+      const scaleY  = exportH / clipH;
 
-      // ── Draw every layer directly onto the final canvas ──────────────────────
-      // drawImage() samples from the image's full natural resolution, so there
-      // is no intermediate downscale step — quality is limited only by the
-      // source image.
+      // ── Draw directly to the final canvas ────────────────────────────────────
       const canvas = document.createElement("canvas");
-      canvas.width = exportW;
+      canvas.width  = exportW;
       canvas.height = exportH;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
@@ -461,35 +481,28 @@ export default function Design() {
       ctx.imageSmoothingQuality = "high";
       ctx.clearRect(0, 0, exportW, exportH);
 
-      for (const layer of visibleLayers) {
-        await new Promise<void>((resolve) => {
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          img.onload = () => {
-            const cx = (layer.x + layer.width / 2) * scaleX;
-            const cy = (layer.y + layer.height / 2) * scaleY;
-            const dw = layer.width * scaleX;
-            const dh = layer.height * scaleY;
-            const angle = (layer.rotation * Math.PI) / 180;
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.rotate(angle);
-            ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
-            ctx.restore();
-            resolve();
-          };
-          img.onerror = () => resolve();
-          img.src = layer.imageUrl;
-        });
+      for (const { layer, img } of loaded) {
+        const cx    = (layer.x + layer.width  / 2) * scaleX;
+        const cy    = (layer.y + layer.height / 2) * scaleY;
+        const dw    = layer.width  * scaleX;
+        const dh    = layer.height * scaleY;
+        const angle = (layer.rotation * Math.PI) / 180;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+        ctx.restore();
       }
 
+      // Clean up blob URLs
+      for (const { blobUrl } of loaded) URL.revokeObjectURL(blobUrl);
+
       // ── Download ─────────────────────────────────────────────────────────────
-      const printWcm = Math.round(printW_cm);
-      const printHcm = Math.round(printH_cm);
-      const filename = `design_${printWcm}x${printHcm}cm_${exportW}x${exportH}px.png`;
+      // Filename: <realWidth>x<realHeight>cm — the actual print-area size in cm.
+      const filename = `${Math.round(realWidth)}x${Math.round(realHeight)}cm_${exportW}x${exportH}px.png`;
 
       canvas.toBlob(blob => {
-        if (!blob) return;
+        if (!blob) { alert("Export failed — could not generate image."); return; }
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
