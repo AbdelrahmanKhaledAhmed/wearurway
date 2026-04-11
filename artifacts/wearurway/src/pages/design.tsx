@@ -29,8 +29,8 @@ interface DragState {
 }
 
 const ZOOM_STEP_SCROLL = 0.05;
-const ZOOM_STEP_BUTTON = 0.12;
-const ROTATE_STEP = 15;
+const ZOOM_STEP_BUTTON = 0.05;
+const ROTATE_STEP = 1;
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -107,13 +107,9 @@ export default function Design() {
     };
   }, [onMouseMove, onMouseUp]);
 
-  // Only start drag if the layer is already selected — clicking unselected layer just selects it
   const startDrag = (e: React.MouseEvent, layer: DesignLayer) => {
     e.preventDefault();
-    if (selectedLayerId !== layer.id) {
-      setSelectedLayerId(layer.id);
-      return;
-    }
+    setSelectedLayerId(layer.id);
     dragRef.current = {
       layerId: layer.id,
       startMouseX: e.clientX,
@@ -563,14 +559,10 @@ export default function Design() {
                         maxHeight: "none",
                         transform: `rotate(${layer.rotation}deg)`,
                         transformOrigin: "center center",
-                        cursor: selectedLayerId === layer.id
-                          ? (dragRef.current?.layerId === layer.id ? "grabbing" : "grab")
-                          : "pointer",
+                        cursor: dragRef.current?.layerId === layer.id ? "grabbing" : "grab",
                         userSelect: "none",
                         background: "none",
                         flexShrink: 0,
-                        outline: selectedLayerId === layer.id ? "2px solid rgba(255,255,255,0.4)" : "none",
-                        outlineOffset: "2px",
                       }}
                     />
                   ) : null
