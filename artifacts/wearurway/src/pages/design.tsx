@@ -15,8 +15,6 @@ interface DesignLayer {
   width: number;
   height: number;
   visible: boolean;
-  naturalWidth: number;
-  naturalHeight: number;
 }
 
 interface DragState {
@@ -40,7 +38,6 @@ export default function Design() {
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [dpiWarning, setDpiWarning] = useState(false);
 
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -102,36 +99,6 @@ export default function Design() {
       window.removeEventListener("mouseup", onMouseUp);
     };
   }, [onMouseMove, onMouseUp]);
-
-  // ── DPI warning: runs after every render that changes layers / bbox / size ──
-  // Reads the clip area size directly from the DOM (no intermediate state),
-  // so it always reflects the actual rendered dimensions regardless of timing.
-  //
-  // Formula: effectiveDPI = (naturalWidth / layer.width) / (exportW / clipW) × 300
-  //   = naturalWidth × clipW / (layer.width × exportW) × 300
-  // Warning fires when effectiveDPI < 300 for any visible layer.
-  useEffect(() => {
-    if (!bbox || !realWidth || !realHeight) {
-      setDpiWarning(false);
-      return;
-    }
-    const clipW = clipAreaRef.current?.getBoundingClientRect().width ?? 0;
-    if (clipW === 0) {
-      setDpiWarning(false);
-      return;
-    }
-    // Export canvas = realWidth × realHeight at 300 DPI.
-    // Filling the bbox on screen = printing at realWidth × realHeight cm.
-    const exportW = (realWidth / 2.54) * 300;
-    const scaleX = exportW / clipW;
-
-    const anyLowDpi = layers.some(l => {
-      if (!l.visible || l.naturalWidth === 0) return false;
-      const effectiveDPI = (l.naturalWidth / l.width) / scaleX * 300;
-      return effectiveDPI < 300;
-    });
-    setDpiWarning(anyLowDpi);
-  }, [layers, bbox, realWidth, realHeight]);
 
   const startDrag = (e: React.MouseEvent, layer: DesignLayer) => {
     e.preventDefault();
@@ -242,8 +209,6 @@ export default function Design() {
           width: defaultW,
           height: defaultH,
           visible: true,
-          naturalWidth: natural.w,
-          naturalHeight: natural.h,
         };
         setLayers(prev => [...prev, newLayer]);
         setSelectedLayerId(newLayer.id);
@@ -297,12 +262,14 @@ export default function Design() {
       const clipW = clipRect.width;
       const clipH = clipRect.height;
 
-      // realWidth/realHeight are the full physical print area in cm.
-      // The bbox only positions the clip area on the mockup; it does NOT
-      // shrink the print size — filling the box = printing at realWidth × realHeight.
+      // The bounding box % × real shirt size = actual physical print area
+      const printW_cm = (bbox.width / 100) * realWidth;
+      const printH_cm = (bbox.height / 100) * realHeight;
+
+      // 300 DPI for DTF print quality: px = cm / 2.54 × 300
       const DPI = 300;
-      const exportW = Math.round((realWidth / 2.54) * DPI);
-      const exportH = Math.round((realHeight / 2.54) * DPI);
+      const exportW = Math.round((printW_cm / 2.54) * DPI);
+      const exportH = Math.round((printH_cm / 2.54) * DPI);
 
       // Scale layers from screen clip-space to export pixel-space
       const scaleX = exportW / clipW;
@@ -345,8 +312,10 @@ export default function Design() {
         });
       }
 
-      // Filename: physical print size in cm + pixel dimensions at 300 DPI
-      const filename = `design-${side}-${realWidth}x${realHeight}cm_${exportW}x${exportH}px.png`;
+      // Filename: print area in cm + pixel dimensions for DTF
+      const wCm = printW_cm.toFixed(1).replace(".", "_");
+      const hCm = printH_cm.toFixed(1).replace(".", "_");
+      const filename = `design-${side}-${wCm}x${hCm}cm-${exportW}x${exportH}px.png`;
 
       canvas.toBlob(blob => {
         if (!blob) return;
@@ -537,24 +506,6 @@ export default function Design() {
               No bounding box set — configure it in the Admin Panel
             </p>
           )}
-
-          {/* ── DPI warning banner ── */}
-          <AnimatePresence>
-            {dpiWarning && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.2 }}
-                className="mt-4 flex items-start gap-2 border border-amber-500/60 bg-amber-500/10 px-4 py-3 max-w-sm"
-              >
-                <span className="text-amber-400 text-base leading-none mt-0.5">⚠</span>
-                <p className="text-xs text-amber-400 uppercase tracking-widest leading-relaxed">
-                  You are increasing the size too much. If you print at this size, the DPI will be lower than 300 and the quality will not be good.
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
         {/* ── Right sidebar ── */}
@@ -583,22 +534,12 @@ export default function Design() {
                 <span className="text-muted-foreground uppercase tracking-widest">Size</span>
                 <span className="font-bold uppercase">{selectedSize.name}</span>
               </div>
-              {realWidth > 0 && (() => {
-                const reqW = Math.round((realWidth / 2.54) * 300);
-                const reqH = Math.round((realHeight / 2.54) * 300);
-                return (
-                  <div className="pt-1 border-t border-border mt-2 space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground uppercase tracking-widest">Print Size</span>
-                      <span className="font-mono font-bold">{realWidth} × {realHeight} cm</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground uppercase tracking-widest">@ 300 DPI</span>
-                      <span className="font-mono text-muted-foreground">{reqW} × {reqH} px</span>
-                    </div>
-                  </div>
-                );
-              })()}
+              {realWidth > 0 && (
+                <div className="flex justify-between pt-1 border-t border-border mt-2">
+                  <span className="text-muted-foreground uppercase tracking-widest">Design Area</span>
+                  <span className="font-mono font-bold">{realWidth} × {realHeight} cm</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -643,21 +584,6 @@ export default function Design() {
                 </button>
               </div>
             )}
-
-            {/* DPI warning — shown whenever any visible layer is below 300 DPI */}
-            <AnimatePresence>
-              {dpiWarning && (
-                <motion.p
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="text-xs text-amber-400 uppercase tracking-widest leading-relaxed overflow-hidden"
-                >
-                  ⚠ Image too small — DPI will be below 300 when printed at {realWidth} × {realHeight} cm.
-                </motion.p>
-              )}
-            </AnimatePresence>
           </div>
 
           {/* ── Layers panel ── */}
