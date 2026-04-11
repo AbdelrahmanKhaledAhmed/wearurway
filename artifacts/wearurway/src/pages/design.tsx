@@ -120,8 +120,9 @@ export default function Design() {
       setDpiWarning(false);
       return;
     }
-    const printW_cm = (bbox.width / 100) * realWidth;
-    const exportW = (printW_cm / 2.54) * 300;
+    // Export canvas = realWidth × realHeight at 300 DPI.
+    // Filling the bbox on screen = printing at realWidth × realHeight cm.
+    const exportW = (realWidth / 2.54) * 300;
     const scaleX = exportW / clipW;
 
     const anyLowDpi = layers.some(l => {
@@ -296,14 +297,12 @@ export default function Design() {
       const clipW = clipRect.width;
       const clipH = clipRect.height;
 
-      // The bounding box % × real shirt size = actual physical print area
-      const printW_cm = (bbox.width / 100) * realWidth;
-      const printH_cm = (bbox.height / 100) * realHeight;
-
-      // 300 DPI for DTF print quality: px = cm / 2.54 × 300
+      // realWidth/realHeight are the full physical print area in cm.
+      // The bbox only positions the clip area on the mockup; it does NOT
+      // shrink the print size — filling the box = printing at realWidth × realHeight.
       const DPI = 300;
-      const exportW = Math.round((printW_cm / 2.54) * DPI);
-      const exportH = Math.round((printH_cm / 2.54) * DPI);
+      const exportW = Math.round((realWidth / 2.54) * DPI);
+      const exportH = Math.round((realHeight / 2.54) * DPI);
 
       // Scale layers from screen clip-space to export pixel-space
       const scaleX = exportW / clipW;
@@ -347,9 +346,7 @@ export default function Design() {
       }
 
       // Filename: physical print size in cm + pixel dimensions at 300 DPI
-      const wCm = printW_cm.toFixed(1);
-      const hCm = printH_cm.toFixed(1);
-      const filename = `design-${side}-${wCm}x${hCm}cm_${exportW}x${exportH}px.png`;
+      const filename = `design-${side}-${realWidth}x${realHeight}cm_${exportW}x${exportH}px.png`;
 
       canvas.toBlob(blob => {
         if (!blob) return;
@@ -553,7 +550,7 @@ export default function Design() {
               >
                 <span className="text-amber-400 text-base leading-none mt-0.5">⚠</span>
                 <p className="text-xs text-amber-400 uppercase tracking-widest leading-relaxed">
-                  If you increase the size more, the quality will not be good enough for print at 300 DPI.
+                  You are increasing the size too much. If you print at this size, the DPI will be lower than 300 and the quality will not be good.
                 </p>
               </motion.div>
             )}
@@ -586,12 +583,22 @@ export default function Design() {
                 <span className="text-muted-foreground uppercase tracking-widest">Size</span>
                 <span className="font-bold uppercase">{selectedSize.name}</span>
               </div>
-              {realWidth > 0 && (
-                <div className="flex justify-between pt-1 border-t border-border mt-2">
-                  <span className="text-muted-foreground uppercase tracking-widest">Design Area</span>
-                  <span className="font-mono font-bold">{realWidth} × {realHeight} cm</span>
-                </div>
-              )}
+              {realWidth > 0 && (() => {
+                const reqW = Math.round((realWidth / 2.54) * 300);
+                const reqH = Math.round((realHeight / 2.54) * 300);
+                return (
+                  <div className="pt-1 border-t border-border mt-2 space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground uppercase tracking-widest">Print Size</span>
+                      <span className="font-mono font-bold">{realWidth} × {realHeight} cm</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground uppercase tracking-widest">@ 300 DPI</span>
+                      <span className="font-mono text-muted-foreground">{reqW} × {reqH} px</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -647,7 +654,7 @@ export default function Design() {
                   transition={{ duration: 0.15 }}
                   className="text-xs text-amber-400 uppercase tracking-widest leading-relaxed overflow-hidden"
                 >
-                  ⚠ Quality below 300 DPI — image resolution too low for this print size.
+                  ⚠ Image too small — DPI will be below 300 when printed at {realWidth} × {realHeight} cm.
                 </motion.p>
               )}
             </AnimatePresence>
