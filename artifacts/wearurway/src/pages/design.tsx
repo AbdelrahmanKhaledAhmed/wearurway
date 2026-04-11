@@ -161,8 +161,11 @@ export default function Design() {
 
   const layerPrintDim = (layer: DesignLayer) => {
     if (!clipSize || !realWidth || !realHeight) return null;
-    const w = Math.min(Math.round((layer.width / clipSize.w) * realWidth), realWidth);
-    const h = Math.min(Math.round((layer.height / clipSize.h) * realHeight), realHeight);
+    // Compute the visible (clipped) portion of the layer within the clip area
+    const visibleW = Math.max(0, Math.min(clipSize.w, layer.x + layer.width) - Math.max(0, layer.x));
+    const visibleH = Math.max(0, Math.min(clipSize.h, layer.y + layer.height) - Math.max(0, layer.y));
+    const w = Math.round((visibleW / clipSize.w) * realWidth);
+    const h = Math.round((visibleH / clipSize.h) * realHeight);
     return { w, h };
   };
 
@@ -492,12 +495,12 @@ export default function Design() {
                 )}
 
                 {/* ── Print dimension label for selected layer ── */}
-                {selectedLayer && selectedLayer.visible && printDim && (
+                {selectedLayer && selectedLayer.visible && printDim && clipSize && (
                   <div
                     style={{
                       position: "absolute",
-                      left: selectedLayer.x + selectedLayer.width / 2,
-                      top: selectedLayer.y + selectedLayer.height / 2,
+                      left: (Math.max(0, selectedLayer.x) + Math.min(clipSize.w, selectedLayer.x + selectedLayer.width)) / 2,
+                      top: (Math.max(0, selectedLayer.y) + Math.min(clipSize.h, selectedLayer.y + selectedLayer.height)) / 2,
                       transform: "translateX(-50%) translateY(-50%)",
                       pointerEvents: "none",
                       zIndex: 20,
