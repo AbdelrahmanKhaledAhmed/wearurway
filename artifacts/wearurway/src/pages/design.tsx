@@ -15,6 +15,8 @@ interface DesignLayer {
   width: number;
   height: number;
   visible: boolean;
+  naturalWidth: number;
+  naturalHeight: number;
 }
 
 interface DragState {
@@ -169,7 +171,16 @@ export default function Design() {
     return { w, h };
   };
 
+  // DPI = naturalPx * 2.54 / printCm  (based on full layer size, not just visible portion)
+  const layerDpi = (layer: DesignLayer) => {
+    if (!clipSize || !realWidth || !realHeight) return null;
+    const dpiW = (layer.naturalWidth / layer.width) * clipSize.w * 2.54 / realWidth;
+    const dpiH = (layer.naturalHeight / layer.height) * clipSize.h * 2.54 / realHeight;
+    return Math.round(Math.min(dpiW, dpiH));
+  };
+
   const printDim = selectedLayer ? layerPrintDim(selectedLayer) : null;
+  const currentDpi = selectedLayer ? layerDpi(selectedLayer) : null;
 
   // ── Zoom helpers ───────────────────────────────────────────────────────────
 
@@ -239,6 +250,8 @@ export default function Design() {
           width: defaultW,
           height: defaultH,
           visible: true,
+          naturalWidth: natural.w,
+          naturalHeight: natural.h,
         };
         setLayers(prev => [...prev, newLayer]);
         setSelectedLayerId(newLayer.id);
@@ -342,10 +355,14 @@ export default function Design() {
         });
       }
 
-      // Filename: print area in cm + pixel dimensions for DTF
-      const wCm = printW_cm.toFixed(1).replace(".", "_");
-      const hCm = printH_cm.toFixed(1).replace(".", "_");
-      const filename = `design-${side}-${wCm}x${hCm}cm-${exportW}x${exportH}px.png`;
+      // Filename: use the selected/first layer's visible print dimensions
+      const firstVisible = visibleLayers[0];
+      const clipRect2 = clipEl.getBoundingClientRect();
+      const vW = Math.max(0, Math.min(clipRect2.width, firstVisible.x + firstVisible.width) - Math.max(0, firstVisible.x));
+      const vH = Math.max(0, Math.min(clipRect2.height, firstVisible.y + firstVisible.height) - Math.max(0, firstVisible.y));
+      const imgWcm = Math.round((vW / clipRect2.width) * realWidth);
+      const imgHcm = Math.round((vH / clipRect2.height) * realHeight);
+      const filename = `${imgWcm}x${imgHcm}cm.png`;
 
       canvas.toBlob(blob => {
         if (!blob) return;
@@ -508,19 +525,28 @@ export default function Design() {
                     }}
                   >
                     <span style={{
-                      display: "inline-block",
-                      background: "rgba(0,0,0,0.65)",
+                      display: "inline-flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 2,
+                      background: currentDpi !== null && currentDpi < 300 ? "rgba(180,30,30,0.85)" : "rgba(0,0,0,0.65)",
                       color: "#fff",
                       fontFamily: "monospace",
                       fontWeight: 700,
                       fontSize: "11px",
                       letterSpacing: "0.08em",
-                      padding: "3px 8px",
+                      padding: "4px 8px",
                       borderRadius: 2,
                       backdropFilter: "blur(4px)",
-                      border: "1px solid rgba(255,255,255,0.15)",
+                      border: currentDpi !== null && currentDpi < 300 ? "1px solid rgba(255,80,80,0.5)" : "1px solid rgba(255,255,255,0.15)",
+                      textAlign: "center",
                     }}>
-                      {printDim.w} × {printDim.h} cm
+                      <span>{printDim.w} × {printDim.h} cm</span>
+                      {currentDpi !== null && currentDpi < 300 && (
+                        <span style={{ fontSize: "9px", fontWeight: 600, letterSpacing: "0.05em", opacity: 0.95 }}>
+                          ⚠ جودة منخفضة — {currentDpi} DPI
+                        </span>
+                      )}
                     </span>
                   </div>
                 )}
@@ -603,6 +629,21 @@ export default function Design() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground uppercase tracking-widest">Image Size</span>
                   <span className="font-mono font-bold text-foreground">{printDim.w} × {printDim.h} cm</span>
+                </div>
+              )}
+              {currentDpi !== null && (
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground uppercase tracking-widest">DPI</span>
+                  <span className={`font-mono font-bold text-xs ${currentDpi >= 300 ? "text-green-400" : "text-red-400"}`}>
+                    {currentDpi} {currentDpi < 300 ? "⚠ منخفض" : "✓"}
+                  </span>
+                </div>
+              )}
+              {currentDpi !== null && currentDpi < 300 && (
+                <div className="pt-1 border-t border-red-900/40">
+                  <p className="text-red-400 text-xs leading-snug uppercase tracking-wide">
+                    لو كبرت أكتر من كده الـ DPI هيبقي أقل من 300 وجودة الطباعة هتبقي ضعيفة
+                  </p>
                 </div>
               )}
             </div>
