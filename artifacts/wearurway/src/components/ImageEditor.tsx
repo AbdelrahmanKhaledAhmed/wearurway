@@ -55,6 +55,33 @@ function floodFill(imageData: ImageData, startX: number, startY: number, tol: nu
   }
 }
 
+// Erode the alpha channel by `radius` pixels — removes anti-aliased fringe
+// left behind after a flood fill by making any opaque pixel that borders a
+// transparent pixel also transparent.
+function erodeAlpha(imageData: ImageData, radius = 1) {
+  const { data, width, height } = imageData;
+  const orig = new Uint8ClampedArray(data); // snapshot before erosion
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (orig[i + 3] === 0) continue; // already transparent — skip
+
+      // If any neighbour within radius is transparent, erase this pixel too
+      let kill = false;
+      outer: for (let dy = -radius; dy <= radius && !kill; dy++) {
+        for (let dx = -radius; dx <= radius && !kill; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || nx >= width || ny < 0 || ny >= height) { kill = true; break outer; }
+          if (orig[(ny * width + nx) * 4 + 3] === 0) { kill = true; break outer; }
+        }
+      }
+      if (kill) data[i + 3] = 0;
+    }
+  }
+}
+
 // Replace all pixels similar to clicked pixel with new color
 function globalRecolor(imageData: ImageData, startX: number, startY: number, newHex: string, tol: number) {
   const { data, width } = imageData;
@@ -151,6 +178,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       if (tool === "remove") {
         floodFill(imageData, x, y, tolerance);
+        erodeAlpha(imageData, 2);
       } else {
         globalRecolor(imageData, x, y, recolor, tolerance);
       }
