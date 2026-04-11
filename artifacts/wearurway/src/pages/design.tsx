@@ -519,11 +519,11 @@ export default function Design() {
         }
       }
       const visCmW = visMaxX > visMinX
-        ? Math.round((visMaxX - visMinX) / clipW * realWidth)
-        : Math.round(realWidth);
+        ? Math.round((visMaxX - visMinX) / clipW * realWidth * 10) / 10
+        : Math.round(realWidth * 10) / 10;
       const visCmH = visMaxY > visMinY
-        ? Math.round((visMaxY - visMinY) / clipH * realHeight)
-        : Math.round(realHeight);
+        ? Math.round((visMaxY - visMinY) / clipH * realHeight * 10) / 10
+        : Math.round(realHeight * 10) / 10;
 
       // ── Download ─────────────────────────────────────────────────────────────
       const filename = `${visCmW}x${visCmH}cm.png`;
