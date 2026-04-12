@@ -168,7 +168,12 @@ export const AddSizeBody = zod.object({
   name: zod.string(),
   realWidth: zod.number(),
   realHeight: zod.number(),
-  image: zod.string().optional(),
+  available: zod.boolean().optional(),
+  comingSoon: zod.boolean().optional(),
+  heightMin: zod.number().optional(),
+  heightMax: zod.number().optional(),
+  weightMin: zod.number().optional(),
+  weightMax: zod.number().optional(),
 });
 
 export const UpdateSizeParams = zod.object({
@@ -180,7 +185,12 @@ export const UpdateSizeBody = zod.object({
   name: zod.string().optional(),
   realWidth: zod.number().optional(),
   realHeight: zod.number().optional(),
-  image: zod.string().optional(),
+  available: zod.boolean().optional(),
+  comingSoon: zod.boolean().optional(),
+  heightMin: zod.number().optional(),
+  heightMax: zod.number().optional(),
+  weightMin: zod.number().optional(),
+  weightMax: zod.number().optional(),
 });
 
 export const UpdateSizeResponse = zod.object({
@@ -188,8 +198,13 @@ export const UpdateSizeResponse = zod.object({
   name: zod.string(),
   realWidth: zod.number(),
   realHeight: zod.number(),
-  image: zod.string().optional(),
   fitId: zod.string(),
+  available: zod.boolean().optional(),
+  comingSoon: zod.boolean().optional(),
+  heightMin: zod.number().optional(),
+  heightMax: zod.number().optional(),
+  weightMin: zod.number().optional(),
+  weightMax: zod.number().optional(),
 });
 
 export const DeleteSizeParams = zod.object({

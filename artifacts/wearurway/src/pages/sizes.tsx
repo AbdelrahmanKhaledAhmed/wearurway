@@ -124,11 +124,6 @@ export default function Sizes() {
                     Coming Soon
                   </span>
                 )}
-                {size.available && !size.comingSoon && (
-                  <span className="mt-4 inline-block px-3 py-1 bg-foreground text-background text-xs font-medium tracking-widest uppercase">
-                    Available
-                  </span>
-                )}
               </motion.div>
             ))}
           </div>

@@ -1117,14 +1117,25 @@ function SizesManager() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const emptyForm = { name: "", realWidth: 0, realHeight: 0, available: true, comingSoon: false, heightMin: 0, heightMax: 0, weightMin: 0, weightMax: 0 };
   const [isOpen, setIsOpen] = useState(false);
   const [editingSizeId, setEditingSizeId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", realWidth: 0, realHeight: 0, image: "" });
+  const [form, setForm] = useState(emptyForm);
 
-  const openAdd = () => { setEditingSizeId(null); setForm({ name: "", realWidth: 0, realHeight: 0, image: "" }); setIsOpen(true); };
+  const openAdd = () => { setEditingSizeId(null); setForm(emptyForm); setIsOpen(true); };
   const openEdit = (size: NonNullable<typeof sizes>[0]) => {
     setEditingSizeId(size.id);
-    setForm({ name: size.name, realWidth: size.realWidth, realHeight: size.realHeight, image: size.image ?? "" });
+    setForm({
+      name: size.name,
+      realWidth: size.realWidth,
+      realHeight: size.realHeight,
+      available: size.available ?? true,
+      comingSoon: size.comingSoon ?? false,
+      heightMin: size.heightMin ?? 0,
+      heightMax: size.heightMax ?? 0,
+      weightMin: size.weightMin ?? 0,
+      weightMax: size.weightMax ?? 0,
+    });
     setIsOpen(true);
   };
 
@@ -1140,6 +1151,12 @@ function SizesManager() {
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetSizesQueryKey(selectedFitId) }); toast({ title: "Size added" }); setIsOpen(false); }
       });
     }
+  };
+
+  const handleToggle = (sizeId: string, field: "available" | "comingSoon", value: boolean) => {
+    updateSize.mutate({ fitId: selectedFitId, sizeId, data: { [field]: value } }, {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetSizesQueryKey(selectedFitId) })
+    });
   };
 
   const getFitLabel = (fitId: string) => {
@@ -1165,14 +1182,14 @@ function SizesManager() {
           onClick={openAdd}
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
-          className="group h-[120px] border border-dashed border-border flex flex-col justify-center items-center cursor-pointer hover:border-foreground transition-colors"
+          className="group h-[100px] border border-dashed border-border flex flex-col justify-center items-center cursor-pointer hover:border-foreground transition-colors"
         >
           <Plus className="w-6 h-6 text-muted-foreground group-hover:text-foreground transition-colors mb-1" />
           <span className="text-xs uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Add Size</span>
         </motion.div>
       )}
 
-      {/* Size cards — similar to sizes.tsx but with buttons beside */}
+      {/* Size cards — matching sizes.tsx / fits.tsx style */}
       <div className="space-y-4">
         {sizes?.map((size, i) => (
           <motion.div
@@ -1182,18 +1199,17 @@ function SizesManager() {
             transition={{ delay: i * 0.05 }}
             className="flex gap-4 items-start"
           >
-            {/* Size card */}
-            <div className="flex-1 border border-border p-6 flex gap-6 items-center bg-card">
-              <div className="w-24 h-24 border border-border bg-muted/10 flex items-center justify-center overflow-hidden shrink-0">
-                {size.image
-                  ? <img src={size.image} alt={size.name} className="w-full h-full object-contain" />
-                  : <span className="text-xs text-muted-foreground uppercase tracking-widest text-center px-1">No Image</span>
-                }
+            {/* Size card matching sizes.tsx */}
+            <div className={`flex-1 p-6 border border-border flex flex-col justify-center items-center text-center min-h-[160px] ${size.available ? "bg-card" : "opacity-60 bg-muted/20"}`}>
+              <h3 className="text-2xl font-bold uppercase tracking-tight mb-2">{size.name}</h3>
+              <p className="text-sm font-mono text-foreground mb-2">{size.realWidth} x {size.realHeight} CM</p>
+              <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+                {(size.heightMin || size.heightMax) ? <span>{size.heightMin} ~ {size.heightMax} cm tall</span> : null}
+                {(size.weightMin || size.weightMax) ? <span>{size.weightMin} ~ {size.weightMax} kg</span> : null}
               </div>
-              <div>
-                <h3 className="text-3xl font-bold uppercase tracking-tight">{size.name}</h3>
-                <p className="text-sm font-mono text-muted-foreground mt-1">{size.realWidth}W × {size.realHeight}H cm</p>
-              </div>
+              {size.comingSoon && (
+                <span className="mt-3 inline-block px-3 py-1 bg-muted text-muted-foreground text-xs font-medium tracking-widest uppercase">Coming Soon</span>
+              )}
             </div>
 
             {/* Action buttons beside */}
@@ -1205,6 +1221,16 @@ function SizesManager() {
                 onClick={() => deleteSize.mutate({ fitId: selectedFitId, sizeId: size.id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetSizesQueryKey(selectedFitId) }) })}>
                 <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
               </Button>
+              <div className="border border-border p-2 space-y-2 mt-1">
+                <div className="flex items-center gap-2">
+                  <Switch id={`sz-avail-${size.id}`} checked={size.available ?? true} onCheckedChange={v => handleToggle(size.id, "available", v)} />
+                  <Label htmlFor={`sz-avail-${size.id}`} className="text-xs uppercase tracking-widest cursor-pointer whitespace-nowrap">Available</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch id={`sz-soon-${size.id}`} checked={size.comingSoon ?? false} onCheckedChange={v => handleToggle(size.id, "comingSoon", v)} />
+                  <Label htmlFor={`sz-soon-${size.id}`} className="text-xs uppercase tracking-widest cursor-pointer whitespace-nowrap">Soon</Label>
+                </div>
+              </div>
             </AdminActions>
           </motion.div>
         ))}
@@ -1231,7 +1257,24 @@ function SizesManager() {
                 <Input type="number" value={form.realHeight || ""} onChange={e => setForm({ ...form, realHeight: Number(e.target.value) })} className="rounded-none" placeholder="66" />
               </div>
             </div>
-            <ImageUploader label="Size Chart Image" value={form.image} onChange={url => setForm({ ...form, image: url })} uploadPath="/api/size-charts" />
+            <div className="space-y-2">
+              <Label className="uppercase tracking-widest text-xs">Person Height Range (cm)</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <Input type="number" value={form.heightMin || ""} onChange={e => setForm({ ...form, heightMin: Number(e.target.value) })} className="rounded-none" placeholder="Min e.g. 175" />
+                <Input type="number" value={form.heightMax || ""} onChange={e => setForm({ ...form, heightMax: Number(e.target.value) })} className="rounded-none" placeholder="Max e.g. 180" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="uppercase tracking-widest text-xs">Person Weight Range (kg)</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <Input type="number" value={form.weightMin || ""} onChange={e => setForm({ ...form, weightMin: Number(e.target.value) })} className="rounded-none" placeholder="Min e.g. 75" />
+                <Input type="number" value={form.weightMax || ""} onChange={e => setForm({ ...form, weightMax: Number(e.target.value) })} className="rounded-none" placeholder="Max e.g. 80" />
+              </div>
+            </div>
+            <div className="flex gap-6">
+              <div className="flex items-center gap-2"><Switch id="sz-form-avail" checked={form.available} onCheckedChange={v => setForm({ ...form, available: v })} /><Label htmlFor="sz-form-avail" className="text-xs uppercase tracking-widest cursor-pointer">Available</Label></div>
+              <div className="flex items-center gap-2"><Switch id="sz-form-soon" checked={form.comingSoon} onCheckedChange={v => setForm({ ...form, comingSoon: v })} /><Label htmlFor="sz-form-soon" className="text-xs uppercase tracking-widest cursor-pointer">Coming Soon</Label></div>
+            </div>
             <Button type="submit" className="w-full rounded-none uppercase tracking-widest font-bold h-11" disabled={addSize.isPending || updateSize.isPending}>
               {editingSizeId ? "Save Changes" : "Add Size"}
             </Button>

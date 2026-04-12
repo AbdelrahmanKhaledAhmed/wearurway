@@ -42,8 +42,13 @@ router.post("/fits/:fitId/sizes", (req, res) => {
     name: body.data.name,
     realWidth: body.data.realWidth,
     realHeight: body.data.realHeight,
-    image: body.data.image,
     fitId: params.data.fitId,
+    available: body.data.available ?? true,
+    comingSoon: body.data.comingSoon ?? false,
+    heightMin: body.data.heightMin,
+    heightMax: body.data.heightMax,
+    weightMin: body.data.weightMin,
+    weightMax: body.data.weightMax,
   };
 
   updateStore((store) => {
@@ -75,7 +80,12 @@ router.patch("/fits/:fitId/sizes/:sizeId", (req, res) => {
       if (body.data.name !== undefined) size.name = body.data.name;
       if (body.data.realWidth !== undefined) size.realWidth = body.data.realWidth;
       if (body.data.realHeight !== undefined) size.realHeight = body.data.realHeight;
-      if (body.data.image !== undefined) size.image = body.data.image;
+      if (body.data.available !== undefined) size.available = body.data.available;
+      if (body.data.comingSoon !== undefined) size.comingSoon = body.data.comingSoon;
+      if (body.data.heightMin !== undefined) size.heightMin = body.data.heightMin;
+      if (body.data.heightMax !== undefined) size.heightMax = body.data.heightMax;
+      if (body.data.weightMin !== undefined) size.weightMin = body.data.weightMin;
+      if (body.data.weightMax !== undefined) size.weightMax = body.data.weightMax;
     }
   });
 
