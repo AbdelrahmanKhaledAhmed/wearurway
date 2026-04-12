@@ -48,7 +48,7 @@ export default function Design() {
   const [side, setSide] = useState<"front" | "back">("front");
   const [localFrontBbox, setLocalFrontBbox] = useState<BBox | null>(null);
   const [localBackBbox, setLocalBackBbox] = useState<BBox | null>(null);
-  const [mockupSize, setMockupSize] = useState(100);
+  const [mockupSize, setMockupSize] = useState(320);
 
   const [layers, setLayers] = useState<DesignLayer[]>([]);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
@@ -836,7 +836,7 @@ export default function Design() {
 
         {/* ── Main canvas — checkerboard fills entire center ── */}
         <div
-          className="flex-1 flex flex-col items-center justify-center px-4"
+          className="flex-1 flex flex-col items-center justify-center px-4 overflow-auto"
           style={{
             backgroundImage:
               "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
@@ -862,7 +862,7 @@ export default function Design() {
           {/* Mockup viewer — transparent so center checkerboard shows through */}
           <div
             className="relative"
-            style={{ width: `${mockupSize}%`, maxWidth: "28rem", aspectRatio: "3/4" }}
+            style={{ width: `${mockupSize}px`, aspectRatio: "3/4" }}
           >
             <AnimatePresence mode="wait">
               <motion.div
@@ -1022,16 +1022,16 @@ export default function Design() {
 
               {/* Mockup size controls */}
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-widest">Mockup Size ({mockupSize}%)</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-widest">Mockup Size ({mockupSize}px)</p>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setMockupSize(prev => Math.max(30, prev - 5))}
+                    onClick={() => setMockupSize(prev => Math.max(160, prev - 40))}
                     className="flex-1 py-3 text-sm font-bold uppercase tracking-widest border border-border bg-background hover:border-foreground hover:bg-muted/20 transition-colors"
                   >
                     − Smaller
                   </button>
                   <button
-                    onClick={() => setMockupSize(prev => Math.min(150, prev + 5))}
+                    onClick={() => setMockupSize(prev => Math.min(700, prev + 40))}
                     className="flex-1 py-3 text-sm font-bold uppercase tracking-widest border border-border bg-background hover:border-foreground hover:bg-muted/20 transition-colors"
                   >
                     + Bigger
