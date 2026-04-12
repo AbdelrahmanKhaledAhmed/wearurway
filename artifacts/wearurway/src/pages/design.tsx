@@ -49,6 +49,7 @@ export default function Design() {
   const [localFrontBbox, setLocalFrontBbox] = useState<BBox | null>(null);
   const [localBackBbox, setLocalBackBbox] = useState<BBox | null>(null);
   const [mockupSize, setMockupSize] = useState(320);
+  const [mockupOffsetY, setMockupOffsetY] = useState(0);
 
   const [layers, setLayers] = useState<DesignLayer[]>([]);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
@@ -836,7 +837,7 @@ export default function Design() {
 
         {/* ── Main canvas — checkerboard fills entire center ── */}
         <div
-          className="flex-1 flex flex-col items-center justify-center px-4 overflow-auto"
+          className="flex-1 relative overflow-hidden"
           style={{
             backgroundImage:
               "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
@@ -846,8 +847,8 @@ export default function Design() {
           }}
         >
 
-          {/* Front / Back toggle */}
-          <div className="flex gap-0 mb-4 border border-border/60">
+          {/* Front / Back toggle — pinned at top center */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex gap-0 border border-border/60">
             {(["front", "back"] as const).map(s => (
               <button
                 key={s}
@@ -859,10 +860,11 @@ export default function Design() {
             ))}
           </div>
 
-          {/* Mockup viewer — transparent so center checkerboard shows through */}
+          {/* Mockup viewer — centered absolutely, offset by mockupOffsetY */}
+          <div className="absolute inset-0 flex items-center justify-center">
           <div
             className="relative"
-            style={{ width: `${mockupSize}px`, aspectRatio: "3/4" }}
+            style={{ width: `${mockupSize}px`, aspectRatio: "3/4", transform: `translateY(${mockupOffsetY}px)` }}
           >
             <AnimatePresence mode="wait">
               <motion.div
@@ -1005,12 +1007,8 @@ export default function Design() {
             )}
           </div>
 
-          {!bbox && currentSide?.image && !isAdminPreview && (
-            <p className="text-xs text-muted-foreground uppercase tracking-widest mt-6">
-              No bounding box set — configure it in the Admin Panel
-            </p>
-          )}
-        </div>
+          </div>{/* close absolute inset-0 wrapper */}
+        </div>{/* close chess area */}
 
         {/* ── Right sidebar ── */}
         <div className="w-72 border-l border-border flex flex-col shrink-0 overflow-hidden">
@@ -1022,19 +1020,38 @@ export default function Design() {
 
               {/* Mockup size controls */}
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-widest">Mockup Size ({mockupSize}px)</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-widest">Size</p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setMockupSize(prev => Math.max(160, prev - 40))}
-                    className="flex-1 py-3 text-sm font-bold uppercase tracking-widest border border-border bg-background hover:border-foreground hover:bg-muted/20 transition-colors"
+                    className="flex-1 py-2.5 text-sm font-bold uppercase tracking-widest border border-border bg-background hover:border-foreground hover:bg-muted/20 transition-colors"
                   >
                     − Smaller
                   </button>
                   <button
                     onClick={() => setMockupSize(prev => Math.min(700, prev + 40))}
-                    className="flex-1 py-3 text-sm font-bold uppercase tracking-widest border border-border bg-background hover:border-foreground hover:bg-muted/20 transition-colors"
+                    className="flex-1 py-2.5 text-sm font-bold uppercase tracking-widest border border-border bg-background hover:border-foreground hover:bg-muted/20 transition-colors"
                   >
                     + Bigger
+                  </button>
+                </div>
+              </div>
+
+              {/* Mockup position controls */}
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-widest">Position</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setMockupOffsetY(prev => prev - 20)}
+                    className="flex-1 py-2.5 text-sm font-bold uppercase tracking-widest border border-border bg-background hover:border-foreground hover:bg-muted/20 transition-colors"
+                  >
+                    ↑ Up
+                  </button>
+                  <button
+                    onClick={() => setMockupOffsetY(prev => prev + 20)}
+                    className="flex-1 py-2.5 text-sm font-bold uppercase tracking-widest border border-border bg-background hover:border-foreground hover:bg-muted/20 transition-colors"
+                  >
+                    ↓ Down
                   </button>
                 </div>
               </div>
