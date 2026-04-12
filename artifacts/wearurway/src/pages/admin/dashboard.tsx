@@ -809,6 +809,59 @@ function BoundingBoxEditor({
   );
 }
 
+function MockupFilenameInput({ label, value, onChange }: {
+  label: string; value: string; onChange: (url: string) => void;
+}) {
+  const PREFIX = "/api/uploads/mockups/";
+  const filename = value.startsWith(PREFIX) ? value.slice(PREFIX.length) : (value ? value : "");
+  const [input, setInput] = useState(filename);
+
+  useEffect(() => {
+    const f = value.startsWith(PREFIX) ? value.slice(PREFIX.length) : (value ? value : "");
+    setInput(f);
+  }, [value]);
+
+  const handleChange = (v: string) => {
+    setInput(v);
+    if (v.trim()) {
+      onChange(`${PREFIX}${v.trim()}`);
+    } else {
+      onChange("");
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <Label className="uppercase tracking-widest text-xs">{label}</Label>
+      <div className="flex gap-2 items-center">
+        <Input
+          value={input}
+          onChange={e => handleChange(e.target.value)}
+          placeholder="e.g. black_front.png"
+          className="rounded-none h-9 font-mono text-xs flex-1"
+        />
+        {input && (
+          <button
+            type="button"
+            onClick={() => { setInput(""); onChange(""); }}
+            className="text-xs px-2 py-1 border border-border text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      {value && (
+        <div className="flex items-start gap-3">
+          <div className="w-16 h-16 border border-border overflow-hidden bg-muted/10 shrink-0">
+            <img src={value} alt="preview" className="w-full h-full object-contain" />
+          </div>
+          <p className="text-[10px] text-muted-foreground font-mono break-all leading-relaxed">{value}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MockupsManager() {
   const { data: products } = useGetProducts();
   const { data: fits } = useGetFits();
@@ -999,7 +1052,7 @@ function MockupsManager() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Left: mockup image + bbox editor */}
             <div className="space-y-4">
-              <ImageUploader
+              <MockupFilenameInput
                 label={`${activeSide === "front" ? "Front" : "Back"} Mockup Image`}
                 value={currentImage}
                 onChange={setCurrentImage}
@@ -1013,7 +1066,7 @@ function MockupsManager() {
                 />
               ) : (
                 <div className="border border-dashed border-border aspect-[3/4] flex flex-col items-center justify-center text-muted-foreground gap-3">
-                  <span className="text-xs uppercase tracking-widest">Upload an image first</span>
+                  <span className="text-xs uppercase tracking-widest">Enter a filename above</span>
                   <span className="text-xs text-muted-foreground/60">Then draw the design bounding box on it</span>
                 </div>
               )}
