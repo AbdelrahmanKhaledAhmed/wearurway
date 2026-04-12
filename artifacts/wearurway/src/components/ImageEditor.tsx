@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
-type Tool = "brush-erase" | "flood-fill" | "recolor";
+type Tool = "move" | "brush-erase" | "flood-fill" | "recolor";
 
 interface Props {
   file: File;
@@ -89,6 +89,9 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   const areaRef       = useRef<HTMLDivElement>(null);     // outer container for zoom wheel
   const wrapperRef    = useRef<HTMLDivElement>(null);     // inner div — receives CSS transform
   const isDrawing     = useRef(false);
+  const isMoving      = useRef(false);
+  const lastBrushPoint = useRef<{ x: number; y: number } | null>(null);
+  const moveStartRef  = useRef<{ pointerX: number; pointerY: number; panX: number; panY: number } | null>(null);
   const undoRef       = useRef<ImageData[]>([]);
   const redoRef       = useRef<ImageData[]>([]);
 
@@ -202,28 +205,51 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   }, [doUndo, doRedo]);
 
   useEffect(() => {
-    const fn = () => { isDrawing.current = false; };
+    const fn = () => {
+      isDrawing.current = false;
+      isMoving.current = false;
+      lastBrushPoint.current = null;
+      moveStartRef.current = null;
+    };
     window.addEventListener("mouseup", fn);
     return () => window.removeEventListener("mouseup", fn);
   }, []);
 
+  const clampPan = useCallback((nextPan: { x: number; y: number }, nextZoom = zoomRef.current) => {
+    const area = areaRef.current;
+    if (!area || !dispSize) return nextPan;
+    const scaledW = dispSize.w * nextZoom;
+    const scaledH = dispSize.h * nextZoom;
+    const maxX = Math.max(0, (scaledW - area.clientWidth) / 2 + 48);
+    const maxY = Math.max(0, (scaledH - area.clientHeight) / 2 + 48);
+    return {
+      x: Math.min(maxX, Math.max(-maxX, nextPan.x)),
+      y: Math.min(maxY, Math.max(-maxY, nextPan.y)),
+    };
+  }, [dispSize]);
+
   // ── Zoom (CSS transform on wrapper div) ──────────────────────────────────────
-  // Formula: pan_new = pan_old + (cursor_viewport - wrapper_visual_left) * (1 - zoom_new/zoom_old)
-  // Derived from: keeping the pixel under the cursor fixed as zoom changes.
+  // Keeps the exact image point under the cursor stationary while zooming.
   const applyZoom = useCallback((factor: number, cx?: number, cy?: number) => {
-    const wrapper = wrapperRef.current; if (!wrapper) return;
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
     const rect = wrapper.getBoundingClientRect();
-    const ancX = cx ?? rect.left + rect.width  / 2;
-    const ancY = cy ?? rect.top  + rect.height / 2;
+    const ancX = cx ?? rect.left + rect.width / 2;
+    const ancY = cy ?? rect.top + rect.height / 2;
     const prevZ = zoomRef.current;
-    const nextZ = Math.max(1, Math.min(10, prevZ * factor));
+    const nextZ = Math.max(1, Math.min(40, prevZ * factor));
+    if (nextZ === prevZ) return;
+    const localX = (ancX - rect.left) / prevZ;
+    const localY = (ancY - rect.top) / prevZ;
+    const nextPan = nextZ === 1
+      ? { x: 0, y: 0 }
+      : clampPan({
+          x: panRef.current.x + localX * (prevZ - nextZ),
+          y: panRef.current.y + localY * (prevZ - nextZ),
+        }, nextZ);
     setZoom(nextZ);
-    if (nextZ === 1) { setPan({ x:0, y:0 }); return; }
-    setPan(p => ({
-      x: p.x + (ancX - rect.left) * (1 - nextZ / prevZ),
-      y: p.y + (ancY - rect.top)  * (1 - nextZ / prevZ),
-    }));
-  }, []);
+    setPan(nextPan);
+  }, [clampPan]);
 
   useEffect(() => {
     const el = areaRef.current; if (!el) return;
@@ -239,6 +265,20 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   // Since both cursor canvas and image canvas share identical pixel dimensions AND
   // identical CSS layout size, offsetX/offsetY from the image canvas events index
   // into the cursor canvas at exactly the same screen position — guaranteed alignment.
+  const pointFromEvent = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const c = canvasRef.current;
+    const rect = c?.getBoundingClientRect();
+    if (!c || !rect || !dispSize) return null;
+    const displayX = ((e.clientX - rect.left) / rect.width) * dispSize.w;
+    const displayY = ((e.clientY - rect.top) / rect.height) * dispSize.h;
+    return {
+      displayX,
+      displayY,
+      imageX: displayX * (c.width / dispSize.w),
+      imageY: displayY * (c.height / dispSize.h),
+    };
+  };
+
   const drawCursor = (ox: number, oy: number) => {
     const cc = cursorRef.current;
     const c  = canvasRef.current;
@@ -247,7 +287,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     ctx.clearRect(0, 0, cc.width, cc.height);
     if (toolRef.current !== "brush-erase") return;
     // Cursor radius in cursor-canvas pixels (same as display CSS pixels since 1:1)
-    const r = brushRef.current * (dispSize.w / c.width);
+    const r = (brushRef.current / 2) * (dispSize.w / c.width);
     ctx.beginPath();
     ctx.arc(ox, oy, Math.max(1, r), 0, Math.PI * 2);
     ctx.strokeStyle = "rgba(255,255,255,0.9)";
@@ -261,35 +301,58 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   };
 
   // ── Brush erase — uses same offsetX/Y so guaranteed same position as cursor ──
-  const applyBrush = (ox: number, oy: number) => {
+  const applyBrush = (imgX: number, imgY: number) => {
     const c = canvasRef.current; if (!c || !dispSize) return;
     const ctx = c.getContext("2d"); if (!ctx) return;
-    // Map display (CSS) position → image pixel position
-    const imgX = ox * (c.width  / dispSize.w);
-    const imgY = oy * (c.height / dispSize.h);
+    const radius = brushRef.current / 2;
+    const last = lastBrushPoint.current;
     ctx.save();
     ctx.globalCompositeOperation = "destination-out";
-    ctx.beginPath();
-    ctx.arc(imgX, imgY, brushRef.current, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.imageSmoothingEnabled = false;
+    if (last) {
+      ctx.lineWidth = brushRef.current;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
+      ctx.lineTo(imgX, imgY);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(imgX, imgY, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
+    lastBrushPoint.current = { x: imgX, y: imgY };
   };
 
   // ── Canvas mouse events ──────────────────────────────────────────────────────
   const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!loaded || !dispSize) return;
-    const ox = e.nativeEvent.offsetX;
-    const oy = e.nativeEvent.offsetY;
+    const point = pointFromEvent(e);
+    if (!point) return;
+    const { displayX, displayY, imageX, imageY } = point;
+    if (toolRef.current === "move") {
+      isMoving.current = true;
+      moveStartRef.current = {
+        pointerX: e.clientX,
+        pointerY: e.clientY,
+        panX: panRef.current.x,
+        panY: panRef.current.y,
+      };
+      return;
+    }
     if (toolRef.current === "brush-erase") {
       isDrawing.current = true;
+      lastBrushPoint.current = null;
       saveUndo();
-      applyBrush(ox, oy);
-      drawCursor(ox, oy);
+      applyBrush(imageX, imageY);
+      drawCursor(displayX, displayY);
     } else {
       const c = canvasRef.current; if (!c) return;
       const ctx = c.getContext("2d"); if (!ctx) return;
-      const imgX = Math.floor(ox * (c.width  / dispSize.w));
-      const imgY = Math.floor(oy * (c.height / dispSize.h));
+      const imgX = Math.floor(imageX);
+      const imgY = Math.floor(imageY);
       saveUndo();
       setProcessing(true);
       setTimeout(() => {
@@ -303,14 +366,33 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   };
 
   const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const ox = e.nativeEvent.offsetX;
-    const oy = e.nativeEvent.offsetY;
-    drawCursor(ox, oy);
-    if (toolRef.current === "brush-erase" && isDrawing.current) applyBrush(ox, oy);
+    if (toolRef.current === "move" && isMoving.current && moveStartRef.current) {
+      const start = moveStartRef.current;
+      setPan(clampPan({
+        x: start.panX + e.clientX - start.pointerX,
+        y: start.panY + e.clientY - start.pointerY,
+      }));
+      return;
+    }
+    const point = pointFromEvent(e);
+    if (!point) return;
+    drawCursor(point.displayX, point.displayY);
+    if (toolRef.current === "brush-erase" && isDrawing.current) applyBrush(point.imageX, point.imageY);
   };
 
-  const onMouseUp    = () => { isDrawing.current = false; };
-  const onMouseLeave = () => { isDrawing.current = false; clearCursor(); };
+  const onMouseUp = () => {
+    isDrawing.current = false;
+    isMoving.current = false;
+    lastBrushPoint.current = null;
+    moveStartRef.current = null;
+  };
+  const onMouseLeave = () => {
+    isDrawing.current = false;
+    isMoving.current = false;
+    lastBrushPoint.current = null;
+    moveStartRef.current = null;
+    clearCursor();
+  };
 
   // ── Confirm ──────────────────────────────────────────────────────────────────
   const handleConfirm = () => {
@@ -328,6 +410,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   void histSig;
 
   const toolHint: Record<Tool, string> = {
+    "move":        "Click and drag to move around the zoomed image.",
     "brush-erase": "Paint to erase. Hold & drag for smooth strokes.",
     "flood-fill":  "Click on a color to erase all connected similar pixels.",
     "recolor":     "Click on any color to replace all similar colors.",
@@ -371,6 +454,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Tool</p>
             <div className="flex flex-col gap-2">
               {([
+                { id:"move",        label:"✋ Move" },
                 { id:"brush-erase", label:"✏ Brush Erase" },
                 { id:"flood-fill",  label:"✂ Fill Remove"  },
                 { id:"recolor",     label:"🎨 Change Color" },
@@ -443,7 +527,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
               <button onClick={() => applyZoom(1.2)}
                 className="flex-1 py-1.5 text-sm font-bold border border-border hover:border-foreground transition-colors">+</button>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">Scroll on image to zoom</p>
+            <p className="text-xs text-muted-foreground mt-2">Scroll on image to zoom toward the cursor. Use Move to pan when zoomed in.</p>
           </div>
 
           {/* Tip */}
@@ -474,6 +558,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
               height:          dispSize ? `${dispSize.h}px` : 0,
               transformOrigin: "0 0",
               transform:       canTransform,
+              transition:       isMoving.current || isDrawing.current ? "none" : "transform 120ms ease-out",
               boxShadow:       "0 0 0 1px rgba(255,255,255,0.08)",
             }}
           >
@@ -488,7 +573,8 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
                 display:  "block",
                 width:    dispSize ? `${dispSize.w}px` : "auto",
                 height:   dispSize ? `${dispSize.h}px` : "auto",
-                cursor:   tool === "brush-erase" ? "none" : processing ? "wait" : "crosshair",
+                cursor:   processing ? "wait" : tool === "brush-erase" ? "none" : tool === "move" ? (isMoving.current ? "grabbing" : "grab") : "crosshair",
+                imageRendering: zoom >= 6 ? "pixelated" : "auto",
               }}
             />
             {/* Cursor canvas — absolute overlay, IDENTICAL pixel dimensions to image canvas.

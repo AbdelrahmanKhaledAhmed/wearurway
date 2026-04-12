@@ -34,6 +34,8 @@ interface DragState {
 
 const ZOOM_STEP_SCROLL = 0.05;
 const ZOOM_STEP_BUTTON = 0.01;
+const MIN_LAYER_SIZE = 10;
+const MAX_LAYER_SCALE = 30;
 const ROTATE_STEP = 1;
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -169,26 +171,47 @@ export default function Design() {
     };
   };
 
+  const scaleLayerAtPoint = useCallback((layer: DesignLayer, factor: number, anchorX?: number, anchorY?: number) => {
+    const baseW = Math.max(1, layer.naturalWidth || layer.width);
+    const baseH = Math.max(1, layer.naturalHeight || layer.height);
+    const maxW = baseW * MAX_LAYER_SCALE;
+    const maxH = baseH * MAX_LAYER_SCALE;
+    const nextW = Math.max(MIN_LAYER_SIZE, Math.min(maxW, layer.width * factor));
+    const nextH = Math.max(MIN_LAYER_SIZE, Math.min(maxH, layer.height * factor));
+    const appliedFactorX = nextW / layer.width;
+    const appliedFactorY = nextH / layer.height;
+    const px = anchorX ?? layer.x + layer.width / 2;
+    const py = anchorY ?? layer.y + layer.height / 2;
+
+    return {
+      ...layer,
+      width: nextW,
+      height: nextH,
+      x: px - (px - layer.x) * appliedFactorX,
+      y: py - (py - layer.y) * appliedFactorY,
+    };
+  }, []);
+
   // ── Scroll wheel zoom on clip area ─────────────────────────────────────────
 
   const onClipWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
+    const clipRect = clipAreaRef.current?.getBoundingClientRect();
+    if (!clipRect) return;
+    const anchorX = e.clientX - clipRect.left;
+    const anchorY = e.clientY - clipRect.top;
     setSelectedLayerId(prev => {
       if (!prev) return prev;
       setLayers(layers =>
         layers.map(l => {
           if (l.id !== prev) return l;
           const factor = e.deltaY < 0 ? 1 + ZOOM_STEP_SCROLL : 1 - ZOOM_STEP_SCROLL;
-          const newW = Math.max(10, l.width * factor);
-          const newH = Math.max(10, l.height * factor);
-          const cx = l.x + l.width / 2;
-          const cy = l.y + l.height / 2;
-          return { ...l, width: newW, height: newH, x: cx - newW / 2, y: cy - newH / 2 };
+          return scaleLayerAtPoint(l, factor, anchorX, anchorY);
         })
       );
       return prev;
     });
-  }, []);
+  }, [scaleLayerAtPoint]);
 
   useEffect(() => {
     const el = clipAreaRef.current;
@@ -290,14 +313,10 @@ export default function Design() {
       prev.map(l => {
         if (l.id !== selectedLayerId) return l;
         const factor = direction === "in" ? 1 + ZOOM_STEP_BUTTON : 1 - ZOOM_STEP_BUTTON;
-        const newW = Math.max(10, l.width * factor);
-        const newH = Math.max(10, l.height * factor);
-        const cx = l.x + l.width / 2;
-        const cy = l.y + l.height / 2;
-        return { ...l, width: newW, height: newH, x: cx - newW / 2, y: cy - newH / 2 };
+        return scaleLayerAtPoint(l, factor);
       })
     );
-  }, [selectedLayerId]);
+  }, [selectedLayerId, scaleLayerAtPoint]);
 
   // ── Rotate helpers ─────────────────────────────────────────────────────────
 

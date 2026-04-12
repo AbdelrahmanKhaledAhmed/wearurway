@@ -40,6 +40,7 @@ A premium streetwear customization website with a multi-step product configurato
 - Wouter for routing
 - Customization flow: Landing → Products → Fits → Colors → Sizes
 - Admin flow: /admin (login) → /admin/dashboard
+- Design editor supports cursor-centered mouse-wheel zoom on selected image layers, free layer dragging, and an edit-image modal with deep cursor-centered zoom, Move/pan tool, and a precise circular brush erase tool for manual background cleanup.
 
 ### Backend (artifacts/api-server)
 
