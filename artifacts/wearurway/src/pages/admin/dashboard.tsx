@@ -1068,7 +1068,7 @@ function MockupsManager() {
 
               <Button
                 variant="outline"
-                className="w-full rounded-none uppercase tracking-widest font-bold h-12"
+                className="w-full rounded-none uppercase tracking-widest font-bold h-40 text-lg"
                 onClick={handlePreviewInDesigner}
                 disabled={!mockupParams}
               >
