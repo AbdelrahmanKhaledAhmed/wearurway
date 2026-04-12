@@ -7,6 +7,7 @@ import sizesRouter from "./sizes.js";
 import mockupsRouter from "./mockups.js";
 import adminRouter from "./admin.js";
 import uploadsRouter from "./uploads.js";
+import sizeChartsRouter from "./size-charts.js";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(sizesRouter);
 router.use(mockupsRouter);
 router.use(adminRouter);
 router.use(uploadsRouter);
+router.use(sizeChartsRouter);
 
 export default router;

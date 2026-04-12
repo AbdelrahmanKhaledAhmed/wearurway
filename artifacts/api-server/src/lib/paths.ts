@@ -8,6 +8,10 @@ export const UPLOADS_DIR = process.env.UPLOADS_DIR
   ? path.resolve(process.env.UPLOADS_DIR)
   : path.join(__dirname, "..", "..", "uploads");
 
+export const SIZE_CHARTS_DIR = process.env.SIZE_CHARTS_DIR
+  ? path.resolve(process.env.SIZE_CHARTS_DIR)
+  : path.join(__dirname, "..", "..", "size-charts");
+
 export const FRONTEND_DIR = process.env.FRONTEND_DIR
   ? path.resolve(process.env.FRONTEND_DIR)
   : path.join(__dirname, "..", "..", "wearurway", "dist", "public");

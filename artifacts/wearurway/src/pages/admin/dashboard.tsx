@@ -94,8 +94,8 @@ export default function AdminDashboard() {
 
 // ─── Image Upload Helper ────────────────────────────────────────────────────
 
-function ImageUploader({ value, onChange, label = "Image" }: {
-  value: string; onChange: (url: string) => void; label?: string;
+function ImageUploader({ value, onChange, label = "Image", uploadPath = "/api/uploads" }: {
+  value: string; onChange: (url: string) => void; label?: string; uploadPath?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -106,7 +106,7 @@ function ImageUploader({ value, onChange, label = "Image" }: {
       const fd = new FormData();
       fd.append("file", file);
       const token = localStorage.getItem("wearurway_admin_token");
-      const res = await fetch("/api/uploads", {
+      const res = await fetch(uploadPath, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: fd,
@@ -116,6 +116,20 @@ function ImageUploader({ value, onChange, label = "Image" }: {
       onChange(data.url);
     } catch { /* silent */ }
     finally { setUploading(false); }
+  };
+
+  const handleRemove = async () => {
+    if (value) {
+      const token = localStorage.getItem("wearurway_admin_token");
+      const match = value.match(/^(\/api\/[^/]+)\/([^/]+)$/);
+      if (match) {
+        await fetch(`${match[1]}/${match[2]}`, {
+          method: "DELETE",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }).catch(() => {});
+      }
+    }
+    onChange("");
   };
 
   return (
@@ -128,17 +142,7 @@ function ImageUploader({ value, onChange, label = "Image" }: {
           </div>
           <button
             type="button"
-            onClick={async () => {
-              const filename = value.split("/").pop();
-              if (filename) {
-                const token = localStorage.getItem("wearurway_admin_token");
-                await fetch(`/api/uploads/${filename}`, {
-                  method: "DELETE",
-                  headers: token ? { Authorization: `Bearer ${token}` } : {},
-                }).catch(() => {});
-              }
-              onChange("");
-            }}
+            onClick={handleRemove}
             className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs leading-none hover:opacity-80 transition-opacity"
             title="Remove image"
           >
@@ -147,7 +151,7 @@ function ImageUploader({ value, onChange, label = "Image" }: {
         </div>
       ) : (
         <div className="flex gap-2 items-center">
-          <Input value={value} onChange={e => onChange(e.target.value)} placeholder="/api/uploads/image.png" className="rounded-none h-10 flex-1" />
+          <Input value={value} onChange={e => onChange(e.target.value)} placeholder={`${uploadPath}/image.png`} className="rounded-none h-10 flex-1" />
           <Button type="button" variant="outline" className="rounded-none h-10 whitespace-nowrap" onClick={() => inputRef.current?.click()} disabled={uploading}>
             <Upload className="w-4 h-4 mr-2" />{uploading ? "Uploading..." : "Upload"}
           </Button>
@@ -1192,7 +1196,7 @@ function SizesManager() {
                 <Input type="number" value={form.realHeight || ""} onChange={e => setForm({ ...form, realHeight: Number(e.target.value) })} className="rounded-none" placeholder="66" />
               </div>
             </div>
-            <ImageUploader label="Size Chart Image" value={form.image} onChange={url => setForm({ ...form, image: url })} />
+            <ImageUploader label="Size Chart Image" value={form.image} onChange={url => setForm({ ...form, image: url })} uploadPath="/api/size-charts" />
             <Button type="submit" className="w-full rounded-none uppercase tracking-widest font-bold h-11" disabled={addSize.isPending || updateSize.isPending}>
               {editingSizeId ? "Save Changes" : "Add Size"}
             </Button>
