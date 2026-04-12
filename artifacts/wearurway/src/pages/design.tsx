@@ -69,6 +69,7 @@ export default function Design() {
   const [clipSize, setClipSize] = useState<{ w: number; h: number } | null>(null);
   const [editorFile, setEditorFile] = useState<File | null>(null);
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
+  const [newUploadLayerId, setNewUploadLayerId] = useState<string | null>(null);
 
   const [showPlaceholder, setShowPlaceholder] = useState(() => localStorage.getItem("wearurway_show_placeholder") !== "false");
   const [showDimLabel, setShowDimLabel] = useState(() => localStorage.getItem("wearurway_show_dim_label") !== "false");
@@ -418,6 +419,7 @@ export default function Design() {
         setSelectedLayerId(newLayer.id);
         // Auto-open editor so user can immediately refine (remove bg, crop, etc.)
         setEditingLayerId(newLayer.id);
+        setNewUploadLayerId(newLayer.id);
         setEditorFile(file);
       } finally {
         setUploading(false);
@@ -430,6 +432,7 @@ export default function Design() {
     const targetLayerId = editingLayerId;
     setEditorFile(null);
     setEditingLayerId(null);
+    setNewUploadLayerId(null);
     setUploading(true);
     try {
       const objectUrl = URL.createObjectURL(blob);
@@ -896,7 +899,19 @@ export default function Design() {
       <ImageEditor
         file={editorFile}
         onConfirm={handleEditorConfirm}
-        onCancel={() => { setEditorFile(null); setEditingLayerId(null); }}
+        onCancel={() => {
+          if (newUploadLayerId) {
+            setLayers(prev => {
+              const layer = prev.find(l => l.id === newUploadLayerId);
+              if (layer?.imageUrl.startsWith("blob:")) URL.revokeObjectURL(layer.imageUrl);
+              return prev.filter(l => l.id !== newUploadLayerId);
+            });
+            setSelectedLayerId(null);
+            setNewUploadLayerId(null);
+          }
+          setEditorFile(null);
+          setEditingLayerId(null);
+        }}
       />
     )}
     <div className="h-screen overflow-hidden pt-20 flex flex-col bg-background">
