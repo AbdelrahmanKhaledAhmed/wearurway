@@ -28,15 +28,32 @@ import { motion } from "framer-motion";
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
-  const { data: adminMe, isLoading: isAuthLoading } = useGetAdminMe();
-  const logoutMutation = useAdminLogout();
   const queryClient = useQueryClient();
 
+  // Immediately block if no token is stored — no API call needed
+  const [hasToken] = useState(() => !!localStorage.getItem("wearurway_admin_token"));
+
+  // Force a fresh auth check every time this page is visited (ignore cache)
   useEffect(() => {
-    if (!isAuthLoading && adminMe && !adminMe.authenticated) {
+    if (hasToken) {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/me"] });
+    }
+  }, [hasToken, queryClient]);
+
+  const { data: adminMe, isFetching: isAuthLoading, isError: isAuthError } = useGetAdminMe({
+    query: { enabled: hasToken },
+  });
+  const logoutMutation = useAdminLogout();
+
+  useEffect(() => {
+    if (!hasToken) {
+      setLocation("/admin");
+      return;
+    }
+    if (!isAuthLoading && (isAuthError || (adminMe && !adminMe.authenticated))) {
       setLocation("/admin");
     }
-  }, [adminMe, isAuthLoading, setLocation]);
+  }, [hasToken, adminMe, isAuthLoading, isAuthError, setLocation]);
 
   const handleLogout = () => {
     logoutMutation.mutate({}, {
@@ -48,7 +65,8 @@ export default function AdminDashboard() {
     });
   };
 
-  if (isAuthLoading) {
+  // Show verifying until we have a confirmed fresh response
+  if (!hasToken || isAuthLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-sm uppercase tracking-widest text-muted-foreground animate-pulse">Verifying...</p>
