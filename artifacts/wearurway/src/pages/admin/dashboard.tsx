@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
+import { useCustomizer } from "@/hooks/use-customizer";
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -661,6 +662,8 @@ function MockupsManager() {
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const { setProduct, setFit, setColor, setSize } = useCustomizer();
 
   // Filtered fits/colors based on selection
   const filteredFits = fits?.filter(f => f.productId === selectedProductId) ?? [];
@@ -668,6 +671,22 @@ function MockupsManager() {
   const { data: filteredColors } = useGetColors(selectedFitId, {
     query: { enabled: !!selectedFitId, queryKey: getGetColorsQueryKey(selectedFitId) }
   });
+
+  const { data: fitSizes } = useGetSizes(selectedFitId, {
+    query: { enabled: !!selectedFitId, queryKey: getGetSizesQueryKey(selectedFitId) }
+  });
+
+  const handleOpenInDesigner = () => {
+    const product = products?.find(p => p.id === selectedProductId) ?? null;
+    const fit = fits?.find(f => f.id === selectedFitId) ?? null;
+    const color = filteredColors?.find(c => c.id === selectedColorId) ?? null;
+    const size = fitSizes?.[0] ?? null;
+    setProduct(product);
+    setFit(fit);
+    setColor(color);
+    setSize(size);
+    setLocation("/design");
+  };
 
   useEffect(() => {
     if (products && products.length > 0 && !selectedProductId) {
@@ -952,8 +971,14 @@ function MockupsManager() {
                 <h3 className="text-xs font-bold uppercase tracking-widest">Mockup Size in Designer</h3>
                 <p className="text-xs text-muted-foreground uppercase tracking-widest">
                   Current size: <span className="text-foreground font-mono">{viewerWidthPct}%</span> of canvas width.
-                  You can also resize live from the designer page while logged in as admin.
                 </p>
+                <Button
+                  className="w-full rounded-none uppercase tracking-widest text-xs font-bold h-11"
+                  onClick={handleOpenInDesigner}
+                  disabled={!selectedProductId || !selectedFitId || !selectedColorId || !fitSizes?.length}
+                >
+                  Resize in Designer →
+                </Button>
                 <div className="flex items-center gap-3">
                   <Button
                     variant="outline"
