@@ -1005,69 +1005,6 @@ export default function Design() {
               </div>
             )}
 
-            {/* ── Admin resize controls ── */}
-            {isAdmin && (
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "-44px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  zIndex: 20,
-                  background: "rgba(0,0,0,0.75)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  backdropFilter: "blur(8px)",
-                  padding: "4px 10px",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "monospace" }}>
-                  Admin
-                </span>
-                <button
-                  onClick={() => handleAdminResize("smaller")}
-                  disabled={effectiveWidth <= 20 || saveMockupMutation.isPending}
-                  style={{
-                    background: "transparent",
-                    border: "1px solid rgba(255,255,255,0.3)",
-                    color: "#fff",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    padding: "2px 10px",
-                    cursor: "pointer",
-                    opacity: effectiveWidth <= 20 ? 0.3 : 1,
-                    fontFamily: "monospace",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  − Smaller
-                </button>
-                <span style={{ fontSize: "11px", color: "#fff", fontFamily: "monospace", fontWeight: 700, minWidth: "36px", textAlign: "center" }}>
-                  {effectiveWidth}%
-                </span>
-                <button
-                  onClick={() => handleAdminResize("bigger")}
-                  disabled={effectiveWidth >= 100 || saveMockupMutation.isPending}
-                  style={{
-                    background: "transparent",
-                    border: "1px solid rgba(255,255,255,0.3)",
-                    color: "#fff",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    padding: "2px 10px",
-                    cursor: "pointer",
-                    opacity: effectiveWidth >= 100 ? 0.3 : 1,
-                    fontFamily: "monospace",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  + Bigger
-                </button>
-              </div>
-            )}
           </div>
 
           {!bbox && currentSide?.image && (
@@ -1158,6 +1095,74 @@ export default function Design() {
           <div className="flex-1" /></div>
       </div>
     </div>
+
+    {/* ── Admin resize overlay (fixed, always visible) ── */}
+    {isAdmin && (
+      <div
+        style={{
+          position: "fixed",
+          bottom: "24px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          zIndex: 9999,
+          background: "rgba(0,0,0,0.82)",
+          border: "1px solid rgba(255,255,255,0.18)",
+          backdropFilter: "blur(12px)",
+          padding: "8px 16px",
+          borderRadius: "4px",
+          whiteSpace: "nowrap",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
+        }}
+      >
+        <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.12em", fontFamily: "monospace" }}>
+          Admin · Mockup Size
+        </span>
+        <button
+          onClick={() => handleAdminResize("smaller")}
+          disabled={effectiveWidth <= 20 || saveMockupMutation.isPending}
+          style={{
+            background: "transparent",
+            border: "1px solid rgba(255,255,255,0.3)",
+            color: "#fff",
+            fontSize: "12px",
+            fontWeight: 700,
+            padding: "4px 14px",
+            cursor: effectiveWidth <= 20 ? "not-allowed" : "pointer",
+            opacity: effectiveWidth <= 20 ? 0.3 : 1,
+            fontFamily: "monospace",
+            letterSpacing: "0.05em",
+            borderRadius: "2px",
+          }}
+        >
+          − Smaller
+        </button>
+        <span style={{ fontSize: "13px", color: "#fff", fontFamily: "monospace", fontWeight: 700, minWidth: "40px", textAlign: "center" }}>
+          {saveMockupMutation.isPending ? "…" : `${effectiveWidth}%`}
+        </span>
+        <button
+          onClick={() => handleAdminResize("bigger")}
+          disabled={effectiveWidth >= 100 || saveMockupMutation.isPending}
+          style={{
+            background: "transparent",
+            border: "1px solid rgba(255,255,255,0.3)",
+            color: "#fff",
+            fontSize: "12px",
+            fontWeight: 700,
+            padding: "4px 14px",
+            cursor: effectiveWidth >= 100 ? "not-allowed" : "pointer",
+            opacity: effectiveWidth >= 100 ? 0.3 : 1,
+            fontFamily: "monospace",
+            letterSpacing: "0.05em",
+            borderRadius: "2px",
+          }}
+        >
+          + Bigger
+        </button>
+      </div>
+    )}
     </>
   );
 }
