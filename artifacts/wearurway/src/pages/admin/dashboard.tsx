@@ -255,7 +255,8 @@ function ProductsManager() {
   };
 
   const handleToggle = (id: string, field: "available" | "comingSoon", value: boolean) => {
-    updateProduct.mutate({ id, data: { [field]: value } }, {
+    const other = field === "available" ? "comingSoon" : "available";
+    updateProduct.mutate({ id, data: { [field]: value, ...(value ? { [other]: false } : {}) } }, {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() })
     });
   };
@@ -336,8 +337,8 @@ function ProductsManager() {
             </div>
             <ImageUploader label="Product Image" value={form.image} onChange={url => setForm({ ...form, image: url })} />
             <div className="flex gap-6">
-              <div className="flex items-center gap-2"><Switch id="p-avail" checked={form.available} onCheckedChange={v => setForm({ ...form, available: v })} /><Label htmlFor="p-avail" className="text-xs uppercase tracking-widest cursor-pointer">Available</Label></div>
-              <div className="flex items-center gap-2"><Switch id="p-soon" checked={form.comingSoon} onCheckedChange={v => setForm({ ...form, comingSoon: v })} /><Label htmlFor="p-soon" className="text-xs uppercase tracking-widest cursor-pointer">Coming Soon</Label></div>
+              <div className="flex items-center gap-2"><Switch id="p-avail" checked={form.available} onCheckedChange={v => setForm({ ...form, available: v, ...(v ? { comingSoon: false } : {}) })} /><Label htmlFor="p-avail" className="text-xs uppercase tracking-widest cursor-pointer">Available</Label></div>
+              <div className="flex items-center gap-2"><Switch id="p-soon" checked={form.comingSoon} onCheckedChange={v => setForm({ ...form, comingSoon: v, ...(v ? { available: false } : {}) })} /><Label htmlFor="p-soon" className="text-xs uppercase tracking-widest cursor-pointer">Coming Soon</Label></div>
             </div>
             <Button type="submit" className="w-full rounded-none uppercase tracking-widest font-bold h-11" disabled={createProduct.isPending || updateProduct.isPending}>
               {editId ? "Save Changes" : "Create Product"}
@@ -399,7 +400,8 @@ function FitsManager() {
   };
 
   const handleToggle = (id: string, field: "available" | "comingSoon", value: boolean) => {
-    updateFit.mutate({ id, data: { [field]: value } }, {
+    const other = field === "available" ? "comingSoon" : "available";
+    updateFit.mutate({ id, data: { [field]: value, ...(value ? { [other]: false } : {}) } }, {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetFitsQueryKey() })
     });
   };
@@ -490,8 +492,8 @@ function FitsManager() {
               </div>
             )}
             <div className="flex gap-6">
-              <div className="flex items-center gap-2"><Switch id="f-form-avail" checked={form.available} onCheckedChange={v => setForm({ ...form, available: v })} /><Label htmlFor="f-form-avail" className="text-xs uppercase tracking-widest cursor-pointer">Available</Label></div>
-              <div className="flex items-center gap-2"><Switch id="f-form-soon" checked={form.comingSoon} onCheckedChange={v => setForm({ ...form, comingSoon: v })} /><Label htmlFor="f-form-soon" className="text-xs uppercase tracking-widest cursor-pointer">Coming Soon</Label></div>
+              <div className="flex items-center gap-2"><Switch id="f-form-avail" checked={form.available} onCheckedChange={v => setForm({ ...form, available: v, ...(v ? { comingSoon: false } : {}) })} /><Label htmlFor="f-form-avail" className="text-xs uppercase tracking-widest cursor-pointer">Available</Label></div>
+              <div className="flex items-center gap-2"><Switch id="f-form-soon" checked={form.comingSoon} onCheckedChange={v => setForm({ ...form, comingSoon: v, ...(v ? { available: false } : {}) })} /><Label htmlFor="f-form-soon" className="text-xs uppercase tracking-widest cursor-pointer">Coming Soon</Label></div>
             </div>
             <Button type="submit" className="w-full rounded-none uppercase tracking-widest font-bold h-11" disabled={createFit.isPending || updateFit.isPending}>
               {editId ? "Save Changes" : "Create Fit"}
@@ -1154,7 +1156,8 @@ function SizesManager() {
   };
 
   const handleToggle = (sizeId: string, field: "available" | "comingSoon", value: boolean) => {
-    updateSize.mutate({ fitId: selectedFitId, sizeId, data: { [field]: value } }, {
+    const other = field === "available" ? "comingSoon" : "available";
+    updateSize.mutate({ fitId: selectedFitId, sizeId, data: { [field]: value, ...(value ? { [other]: false } : {}) } }, {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetSizesQueryKey(selectedFitId) })
     });
   };
@@ -1272,8 +1275,8 @@ function SizesManager() {
               </div>
             </div>
             <div className="flex gap-6">
-              <div className="flex items-center gap-2"><Switch id="sz-form-avail" checked={form.available} onCheckedChange={v => setForm({ ...form, available: v })} /><Label htmlFor="sz-form-avail" className="text-xs uppercase tracking-widest cursor-pointer">Available</Label></div>
-              <div className="flex items-center gap-2"><Switch id="sz-form-soon" checked={form.comingSoon} onCheckedChange={v => setForm({ ...form, comingSoon: v })} /><Label htmlFor="sz-form-soon" className="text-xs uppercase tracking-widest cursor-pointer">Coming Soon</Label></div>
+              <div className="flex items-center gap-2"><Switch id="sz-form-avail" checked={form.available} onCheckedChange={v => setForm({ ...form, available: v, ...(v ? { comingSoon: false } : {}) })} /><Label htmlFor="sz-form-avail" className="text-xs uppercase tracking-widest cursor-pointer">Available</Label></div>
+              <div className="flex items-center gap-2"><Switch id="sz-form-soon" checked={form.comingSoon} onCheckedChange={v => setForm({ ...form, comingSoon: v, ...(v ? { available: false } : {}) })} /><Label htmlFor="sz-form-soon" className="text-xs uppercase tracking-widest cursor-pointer">Coming Soon</Label></div>
             </div>
             <Button type="submit" className="w-full rounded-none uppercase tracking-widest font-bold h-11" disabled={addSize.isPending || updateSize.isPending}>
               {editingSizeId ? "Save Changes" : "Add Size"}
