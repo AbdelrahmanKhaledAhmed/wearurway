@@ -272,14 +272,14 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     };
   };
 
-  const drawCursor = (clientX: number, clientY: number) => {
+  const drawCursor = (displayX: number, displayY: number) => {
     const c  = canvasRef.current;
     if (!c || !dispSize) return;
     if (toolRef.current !== "brush-erase") return;
     setCursor({
-      x: clientX,
-      y: clientY,
-      size: Math.max(2, brushRef.current * (dispSize.w / c.width) * zoomRef.current),
+      x: displayX,
+      y: displayY,
+      size: Math.max(2, brushRef.current * (dispSize.w / c.width)),
       visible: true,
     });
   };
@@ -339,7 +339,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
       lastBrushPoint.current = null;
       saveUndo();
       applyBrush(imageX, imageY);
-      drawCursor(e.clientX, e.clientY);
+      drawCursor(displayX, displayY);
     } else {
       const c = canvasRef.current; if (!c) return;
       const ctx = c.getContext("2d"); if (!ctx) return;
@@ -368,7 +368,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     }
     const point = pointFromEvent(e);
     if (!point) return;
-    drawCursor(e.clientX, e.clientY);
+    drawCursor(point.displayX, point.displayY);
     if (toolRef.current === "brush-erase" && isDrawing.current) applyBrush(point.imageX, point.imageY);
   };
 
@@ -569,25 +569,25 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
                 imageRendering: zoom >= 6 ? "pixelated" : "auto",
               }}
             />
+            {cursor.visible && tool === "brush-erase" && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: cursor.x,
+                  top: cursor.y,
+                  width: cursor.size,
+                  height: cursor.size,
+                  boxSizing: "border-box",
+                  transform: "translate(-50%, -50%)",
+                  borderRadius: "9999px",
+                  border: "2px solid rgba(255,255,255,0.98)",
+                  boxShadow: "0 0 0 1px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.45)",
+                  pointerEvents: "none",
+                  zIndex: 2,
+                }}
+              />
+            )}
           </div>
-          {cursor.visible && tool === "brush-erase" && (
-            <div
-              style={{
-                position: "fixed",
-                left: cursor.x,
-                top: cursor.y,
-                width: cursor.size,
-                height: cursor.size,
-                boxSizing: "border-box",
-                transform: "translate(-50%, -50%)",
-                borderRadius: "9999px",
-                border: "2px solid rgba(255,255,255,0.98)",
-                boxShadow: "0 0 0 1px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.45)",
-                pointerEvents: "none",
-                zIndex: 30,
-              }}
-            />
-          )}
         </div>
       </div>
     </div>
