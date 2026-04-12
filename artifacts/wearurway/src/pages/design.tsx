@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useGetMockup, useSaveMockup, getGetMockupQueryKey } from "@workspace/api-client-react";
 import { useCustomizer } from "@/hooks/use-customizer";
 import { useToast } from "@/hooks/use-toast";
-import ImageEditor from "@/components/ImageEditor";
+import ImageEditor, { type ImageEditResult } from "@/components/ImageEditor";
 
 interface BBox { x: number; y: number; width: number; height: number }
 
@@ -416,7 +416,7 @@ export default function Design() {
   }, [layers.length]);
 
   // Called when user confirms from the editor (passes edited blob)
-  const handleEditorConfirm = useCallback(async (blob: Blob) => {
+  const handleEditorConfirm = useCallback(async (blob: Blob, edit: ImageEditResult) => {
     const targetLayerId = editingLayerId;
     setEditorFile(null);
     setEditingLayerId(null);
@@ -428,8 +428,30 @@ export default function Design() {
       const data = await res.json();
 
       if (targetLayerId) {
-        // Update existing layer's image in-place
-        setLayers(prev => prev.map(l => l.id === targetLayerId ? { ...l, imageUrl: data.url } : l));
+        const natural = await new Promise<{ w: number; h: number }>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+          img.onerror = () => resolve({ w: edit.width || 1, h: edit.height || 1 });
+          img.src = data.url;
+        });
+
+        setLayers(prev => prev.map(l => {
+          if (l.id !== targetLayerId) return l;
+          const baseW = Math.max(1, edit.originalWidth || l.naturalWidth || l.width);
+          const baseH = Math.max(1, edit.originalHeight || l.naturalHeight || l.height);
+          const scaleX = l.width / baseW;
+          const scaleY = l.height / baseH;
+          return {
+            ...l,
+            imageUrl: data.url,
+            x: l.x + edit.x * scaleX,
+            y: l.y + edit.y * scaleY,
+            width: Math.max(MIN_LAYER_SIZE, edit.width * scaleX),
+            height: Math.max(MIN_LAYER_SIZE, edit.height * scaleY),
+            naturalWidth: natural.w,
+            naturalHeight: natural.h,
+          };
+        }));
         return;
       }
 

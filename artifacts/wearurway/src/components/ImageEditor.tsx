@@ -2,10 +2,33 @@ import { useState, useRef, useEffect, useCallback } from "react";
 
 type Tool = "move" | "brush-erase" | "flood-fill" | "recolor";
 
+export interface ImageEditResult {
+  originalWidth: number;
+  originalHeight: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface Props {
   file: File;
-  onConfirm: (blob: Blob) => void;
+  onConfirm: (blob: Blob, edit: ImageEditResult) => void;
   onCancel: () => void;
+}
+
+interface CanvasSnapshot {
+  width: number;
+  height: number;
+  data: ImageData;
+  trim: ImageEditResult | null;
+}
+
+interface AlphaBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 // ── Pixel helpers ───────────────────────────────────────────────────────────────
@@ -61,18 +84,26 @@ function globalRecolor(id: ImageData, sx: number, sy: number, hex: string, tol: 
   }
 }
 
-function trimTransparency(src: HTMLCanvasElement): HTMLCanvasElement {
-  const ctx=src.getContext("2d"); if (!ctx) return src;
+function getAlphaBounds(src: HTMLCanvasElement): AlphaBounds | null {
+  const ctx=src.getContext("2d"); if (!ctx) return null;
   const {width:W,height:H}=src, data=ctx.getImageData(0,0,W,H).data;
   let mx=W,Mx=0,my=H,My=0;
   for (let y=0;y<H;y++) for (let x=0;x<W;x++) {
     if (data[(y*W+x)*4+3]>0) { mx=Math.min(mx,x);Mx=Math.max(Mx,x);my=Math.min(my,y);My=Math.max(My,y); }
   }
-  if (mx>Mx||my>My) return src;
-  const tw=Mx-mx+1,th=My-my+1,out=document.createElement("canvas");
-  out.width=tw;out.height=th;
-  out.getContext("2d")?.drawImage(src,mx,my,tw,th,0,0,tw,th);
-  return out;
+  if (mx>Mx||my>My) return null;
+  return { x: mx, y: my, width: Mx - mx + 1, height: My - my + 1 };
+}
+
+function trimTransparency(src: HTMLCanvasElement): { canvas: HTMLCanvasElement; bounds: AlphaBounds } {
+  const bounds = getAlphaBounds(src) ?? { x: 0, y: 0, width: 1, height: 1 };
+  if (bounds.x === 0 && bounds.y === 0 && bounds.width === src.width && bounds.height === src.height) {
+    return { canvas: src, bounds };
+  }
+  const out=document.createElement("canvas");
+  out.width=bounds.width;out.height=bounds.height;
+  out.getContext("2d")?.drawImage(src,bounds.x,bounds.y,bounds.width,bounds.height,0,0,bounds.width,bounds.height);
+  return { canvas: out, bounds };
 }
 
 const CHECKER: React.CSSProperties = {
@@ -97,8 +128,9 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   const isMoving      = useRef(false);
   const lastBrushPoint = useRef<{ x: number; y: number } | null>(null);
   const moveStartRef  = useRef<{ pointerX: number; pointerY: number; panX: number; panY: number } | null>(null);
-  const undoRef       = useRef<ImageData[]>([]);
-  const redoRef       = useRef<ImageData[]>([]);
+  const undoRef       = useRef<CanvasSnapshot[]>([]);
+  const redoRef       = useRef<CanvasSnapshot[]>([]);
+  const trimRef       = useRef<ImageEditResult | null>(null);
 
   // ── State ────────────────────────────────────────────────────────────────────
   const [tool,       setTool]       = useState<Tool>("brush-erase");
@@ -137,6 +169,18 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   const [dispSize, setDispSize] = useState<{w:number;h:number}|null>(null);
 
   // ── Load image ───────────────────────────────────────────────────────────────
+  const updateDisplaySize = useCallback(() => {
+    const c = canvasRef.current;
+    const a = areaRef.current;
+    if (!c || !a) return;
+    const pad = 64;
+    const aw = a.clientWidth  - pad;
+    const ah = a.clientHeight - pad;
+    const scale = Math.min(1, aw / c.width, ah / c.height);
+    const ds = { w: Math.max(1, Math.round(c.width * scale)), h: Math.max(1, Math.round(c.height * scale)) };
+    setDispSize(ds);
+  }, []);
+
   useEffect(() => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -145,6 +189,14 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
       c.width  = img.naturalWidth;
       c.height = img.naturalHeight;
       c.getContext("2d")?.drawImage(img, 0, 0);
+      trimRef.current = {
+        originalWidth: img.naturalWidth,
+        originalHeight: img.naturalHeight,
+        x: 0,
+        y: 0,
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+      };
       setLoaded(true);
       URL.revokeObjectURL(url);
     };
@@ -154,46 +206,78 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   // Once canvas is loaded, compute the display size that fits the container
   useEffect(() => {
     if (!loaded) return;
-    requestAnimationFrame(() => {
-      const c = canvasRef.current;
-      const a = areaRef.current;
-      if (!c || !a) return;
-      const pad = 64;
-      const aw = a.clientWidth  - pad;
-      const ah = a.clientHeight - pad;
-      const scale = Math.min(1, aw / c.width, ah / c.height);
-      const ds = { w: Math.round(c.width * scale), h: Math.round(c.height * scale) };
-      setDispSize(ds);
-
-    });
-  }, [loaded]);
+    requestAnimationFrame(updateDisplaySize);
+  }, [loaded, updateDisplaySize]);
 
   // ── Undo / Redo ──────────────────────────────────────────────────────────────
   const saveUndo = useCallback(() => {
     const c = canvasRef.current; if (!c) return;
     const ctx = c.getContext("2d"); if (!ctx) return;
-    undoRef.current = [...undoRef.current.slice(-19), ctx.getImageData(0,0,c.width,c.height)];
+    undoRef.current = [...undoRef.current.slice(-19), { width: c.width, height: c.height, data: ctx.getImageData(0,0,c.width,c.height), trim: trimRef.current ? { ...trimRef.current } : null }];
     redoRef.current = [];
     setHistSig(s => s+1);
   }, []);
 
+  const restoreSnapshot = useCallback((snapshot: CanvasSnapshot) => {
+    const c = canvasRef.current; if (!c) return;
+    const ctx = c.getContext("2d"); if (!ctx) return;
+    c.width = snapshot.width;
+    c.height = snapshot.height;
+    ctx.putImageData(snapshot.data, 0, 0);
+    trimRef.current = snapshot.trim ? { ...snapshot.trim } : null;
+    updateDisplaySize();
+  }, [updateDisplaySize]);
+
   const doUndo = useCallback(() => {
     const c = canvasRef.current; if (!c || !undoRef.current.length) return;
     const ctx = c.getContext("2d"); if (!ctx) return;
-    redoRef.current = [...redoRef.current.slice(-19), ctx.getImageData(0,0,c.width,c.height)];
-    ctx.putImageData(undoRef.current.at(-1)!, 0, 0);
+    redoRef.current = [...redoRef.current.slice(-19), { width: c.width, height: c.height, data: ctx.getImageData(0,0,c.width,c.height), trim: trimRef.current ? { ...trimRef.current } : null }];
+    restoreSnapshot(undoRef.current.at(-1)!);
     undoRef.current = undoRef.current.slice(0,-1);
     setHistSig(s => s+1);
-  }, []);
+  }, [restoreSnapshot]);
 
   const doRedo = useCallback(() => {
     const c = canvasRef.current; if (!c || !redoRef.current.length) return;
     const ctx = c.getContext("2d"); if (!ctx) return;
-    undoRef.current = [...undoRef.current.slice(-19), ctx.getImageData(0,0,c.width,c.height)];
-    ctx.putImageData(redoRef.current.at(-1)!, 0, 0);
+    undoRef.current = [...undoRef.current.slice(-19), { width: c.width, height: c.height, data: ctx.getImageData(0,0,c.width,c.height), trim: trimRef.current ? { ...trimRef.current } : null }];
+    restoreSnapshot(redoRef.current.at(-1)!);
     redoRef.current = redoRef.current.slice(0,-1);
     setHistSig(s => s+1);
-  }, []);
+  }, [restoreSnapshot]);
+
+  const trimCanvasToVisible = useCallback(() => {
+    const c = canvasRef.current; if (!c) return false;
+    const beforeW = c.width;
+    const beforeH = c.height;
+    const result = trimTransparency(c);
+    if (result.bounds.x === 0 && result.bounds.y === 0 && result.bounds.width === beforeW && result.bounds.height === beforeH) {
+      return false;
+    }
+    const ctx = c.getContext("2d"); if (!ctx) return false;
+    c.width = result.canvas.width;
+    c.height = result.canvas.height;
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(result.canvas, 0, 0);
+    const current = trimRef.current ?? {
+      originalWidth: beforeW,
+      originalHeight: beforeH,
+      x: 0,
+      y: 0,
+      width: beforeW,
+      height: beforeH,
+    };
+    trimRef.current = {
+      ...current,
+      x: current.x + result.bounds.x,
+      y: current.y + result.bounds.y,
+      width: result.bounds.width,
+      height: result.bounds.height,
+    };
+    updateDisplaySize();
+    setHistSig(s => s+1);
+    return true;
+  }, [updateDisplaySize]);
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
@@ -207,14 +291,16 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
 
   useEffect(() => {
     const fn = () => {
+      const wasDrawing = isDrawing.current;
       isDrawing.current = false;
       isMoving.current = false;
       lastBrushPoint.current = null;
       moveStartRef.current = null;
+      if (wasDrawing) trimCanvasToVisible();
     };
     window.addEventListener("mouseup", fn);
     return () => window.removeEventListener("mouseup", fn);
-  }, []);
+  }, [trimCanvasToVisible]);
 
   const clampPan = useCallback((nextPan: { x: number; y: number }, nextZoom = zoomRef.current) => {
     const area = areaRef.current;
@@ -360,6 +446,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
         if (toolRef.current === "flood-fill") { floodFill(id,imgX,imgY,tolRef.current); erodeAlpha(id,2); }
         else { globalRecolor(id,imgX,imgY,recolorRef.current,tolRef.current); }
         ctx.putImageData(id,0,0);
+        if (toolRef.current === "flood-fill") trimCanvasToVisible();
         setProcessing(false);
       }, 0);
     }
@@ -381,28 +468,34 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   };
 
   const onMouseUp = () => {
+    const wasDrawing = isDrawing.current;
     isDrawing.current = false;
     isMoving.current = false;
     lastBrushPoint.current = null;
     moveStartRef.current = null;
+    if (wasDrawing) trimCanvasToVisible();
   };
   const onMouseLeave = () => {
+    const wasDrawing = isDrawing.current;
     isDrawing.current = false;
     isMoving.current = false;
     lastBrushPoint.current = null;
     moveStartRef.current = null;
     clearCursor();
+    if (wasDrawing) trimCanvasToVisible();
   };
 
   // ── Confirm ──────────────────────────────────────────────────────────────────
   const handleConfirm = () => {
     const c = canvasRef.current; if (!c) return;
-    trimTransparency(c).toBlob(b => { if (b) onConfirm(b); }, "image/png");
+    trimCanvasToVisible();
+    const edit = trimRef.current ?? { originalWidth: c.width, originalHeight: c.height, x: 0, y: 0, width: c.width, height: c.height };
+    trimTransparency(c).canvas.toBlob(b => { if (b) onConfirm(b, edit); }, "image/png");
   };
 
   // ── Derived ──────────────────────────────────────────────────────────────────
   const canTransform = zoom!==1||pan.x!==0||pan.y!==0
-    ? `translate(${pan.x}px,${pan.y}px) scale(${zoom})`
+    ? `matrix(${zoom},0,0,${zoom},${pan.x},${pan.y})`
     : undefined;
 
   const canUndo = undoRef.current.length > 0;
@@ -528,6 +621,20 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
                 className="flex-1 py-1.5 text-sm font-bold border border-border hover:border-foreground transition-colors">+</button>
             </div>
             <p className="text-xs text-muted-foreground mt-2">Scroll on image to zoom toward the cursor. Use Move to pan when zoomed in.</p>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Transparency</p>
+            <button
+              onClick={() => {
+                saveUndo();
+                trimCanvasToVisible();
+              }}
+              className="w-full text-xs py-2 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
+            >
+              Trim Empty Space
+            </button>
+            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">Erasing auto-shrinks transparent edges; use this anytime to fit the image bounds to visible pixels.</p>
           </div>
 
           {/* Tip */}
