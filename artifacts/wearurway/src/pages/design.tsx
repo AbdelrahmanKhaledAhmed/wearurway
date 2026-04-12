@@ -1308,12 +1308,6 @@ export default function Design() {
                 <span className="text-muted-foreground uppercase tracking-widest">Size</span>
                 <span className="font-bold uppercase">{selectedSize.name}</span>
               </div>
-              {printDim && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground uppercase tracking-widest">Image Size</span>
-                  <span className="font-mono font-bold text-foreground">{printDim.w} × {printDim.h} cm</span>
-                </div>
-              )}
             </div>
           </div>
 
