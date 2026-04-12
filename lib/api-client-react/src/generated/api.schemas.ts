@@ -132,9 +132,6 @@ export interface Mockup {
   colorId: string;
   front?: MockupSide;
   back?: MockupSide;
-  viewerWidthPct?: number;
-  viewerAspectW?: number;
-  viewerAspectH?: number;
 }
 
 export interface SaveMockupBody {
@@ -143,9 +140,6 @@ export interface SaveMockupBody {
   colorId: string;
   front?: MockupSide;
   back?: MockupSide;
-  viewerWidthPct?: number;
-  viewerAspectW?: number;
-  viewerAspectH?: number;
 }
 
 export interface ErrorResponse {

@@ -55,9 +55,6 @@ export interface Mockup {
   colorId: string;
   front?: MockupSide;
   back?: MockupSide;
-  viewerWidthPct?: number;
-  viewerAspectW?: number;
-  viewerAspectH?: number;
 }
 
 export interface Store {

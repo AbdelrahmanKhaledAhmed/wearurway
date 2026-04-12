@@ -665,15 +665,6 @@ components:
           $ref: "#/components/schemas/MockupSide"
         back:
           $ref: "#/components/schemas/MockupSide"
-        viewerWidthPct:
-          type: number
-          description: Max width of the mockup viewer in the designer as a percentage (10-100)
-        viewerAspectW:
-          type: number
-          description: Aspect ratio width component (e.g. 3 for 3:4)
-        viewerAspectH:
-          type: number
-          description: Aspect ratio height component (e.g. 4 for 3:4)
       required: [productId, fitId, colorId]
 
     SaveMockupBody:
@@ -689,12 +680,6 @@ components:
           $ref: "#/components/schemas/MockupSide"
         back:
           $ref: "#/components/schemas/MockupSide"
-        viewerWidthPct:
-          type: number
-        viewerAspectW:
-          type: number
-        viewerAspectH:
-          type: number
       required: [productId, fitId, colorId]
 
     ErrorResponse:

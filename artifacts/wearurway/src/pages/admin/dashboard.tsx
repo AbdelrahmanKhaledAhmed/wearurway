@@ -24,7 +24,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
-import { useCustomizer } from "@/hooks/use-customizer";
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -550,14 +549,10 @@ function BoundingBoxEditor({
   image,
   bbox,
   onChange,
-  aspectW = 3,
-  aspectH = 4,
 }: {
   image: string;
   bbox: BBox | null;
   onChange: (b: BBox) => void;
-  aspectW?: number;
-  aspectH?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [drawing, setDrawing] = useState(false);
@@ -610,7 +605,7 @@ function BoundingBoxEditor({
       <div
         ref={containerRef}
         className="relative w-full select-none overflow-hidden border border-border bg-muted/10"
-        style={{ cursor: "crosshair", aspectRatio: `${aspectW}/${aspectH}` }}
+        style={{ cursor: "crosshair", aspectRatio: "3/4" }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
@@ -662,8 +657,6 @@ function MockupsManager() {
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
-  const { setProduct, setFit, setColor, setSize } = useCustomizer();
 
   // Filtered fits/colors based on selection
   const filteredFits = fits?.filter(f => f.productId === selectedProductId) ?? [];
@@ -671,22 +664,6 @@ function MockupsManager() {
   const { data: filteredColors } = useGetColors(selectedFitId, {
     query: { enabled: !!selectedFitId, queryKey: getGetColorsQueryKey(selectedFitId) }
   });
-
-  const { data: fitSizes } = useGetSizes(selectedFitId, {
-    query: { enabled: !!selectedFitId, queryKey: getGetSizesQueryKey(selectedFitId) }
-  });
-
-  const handleOpenInDesigner = () => {
-    const product = products?.find(p => p.id === selectedProductId) ?? null;
-    const fit = fits?.find(f => f.id === selectedFitId) ?? null;
-    const color = filteredColors?.find(c => c.id === selectedColorId) ?? null;
-    const size = fitSizes?.[0] ?? null;
-    setProduct(product);
-    setFit(fit);
-    setColor(color);
-    setSize(size);
-    setLocation("/design");
-  };
 
   useEffect(() => {
     if (products && products.length > 0 && !selectedProductId) {
@@ -722,9 +699,6 @@ function MockupsManager() {
   const [frontBbox, setFrontBbox] = useState<BBox | null>(null);
   const [backImage, setBackImage] = useState("");
   const [backBbox, setBackBbox] = useState<BBox | null>(null);
-  const [viewerWidthPct, setViewerWidthPct] = useState(80);
-  const [viewerAspectW, setViewerAspectW] = useState(3);
-  const [viewerAspectH, setViewerAspectH] = useState(4);
 
   // Sync from fetched mockup when selection changes
   useEffect(() => {
@@ -732,9 +706,6 @@ function MockupsManager() {
     setFrontBbox(mockup?.front?.boundingBox ?? null);
     setBackImage(mockup?.back?.image ?? "");
     setBackBbox(mockup?.back?.boundingBox ?? null);
-    setViewerWidthPct(mockup?.viewerWidthPct ?? 80);
-    setViewerAspectW(mockup?.viewerAspectW ?? 3);
-    setViewerAspectH(mockup?.viewerAspectH ?? 4);
   }, [mockup]);
 
   const handleSave = () => {
@@ -750,9 +721,6 @@ function MockupsManager() {
           image: backImage || undefined,
           boundingBox: backBbox ?? undefined,
         },
-        viewerWidthPct,
-        viewerAspectW,
-        viewerAspectH,
       }
     }, {
       onSuccess: () => {
@@ -854,74 +822,17 @@ function MockupsManager() {
                   image={currentImage}
                   bbox={currentBbox}
                   onChange={setCurrentBbox}
-                  aspectW={viewerAspectW}
-                  aspectH={viewerAspectH}
                 />
               ) : (
-                <div className="border border-dashed border-border flex flex-col items-center justify-center text-muted-foreground gap-3"
-                  style={{ aspectRatio: `${viewerAspectW}/${viewerAspectH}` }}
-                >
+                <div className="border border-dashed border-border aspect-[3/4] flex flex-col items-center justify-center text-muted-foreground gap-3">
                   <span className="text-xs uppercase tracking-widest">Upload an image first</span>
                   <span className="text-xs text-muted-foreground/60">Then draw the design bounding box on it</span>
                 </div>
               )}
             </div>
 
-            {/* Right: live preview + bounding box values + size controls */}
+            {/* Right: info + current bounding box values */}
             <div className="space-y-6">
-
-              {/* ── Live Designer Preview ── */}
-              <div className="border border-border space-y-0 overflow-hidden">
-                <div className="px-4 py-3 border-b border-border">
-                  <h3 className="text-xs font-bold uppercase tracking-widest">Live Designer Preview</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Updates as you change size settings below</p>
-                </div>
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    backgroundImage: "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
-                    backgroundSize: "16px 16px",
-                    backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0px",
-                    backgroundColor: "#1a1a1a",
-                    minHeight: "200px",
-                    padding: "16px",
-                  }}
-                >
-                  {currentImage ? (
-                    <div
-                      style={{
-                        width: `${viewerWidthPct}%`,
-                        aspectRatio: `${viewerAspectW}/${viewerAspectH}`,
-                        position: "relative",
-                        transition: "width 0.15s ease, aspect-ratio 0.15s ease",
-                      }}
-                    >
-                      <img
-                        src={currentImage}
-                        alt="preview"
-                        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
-                      />
-                      {currentBbox && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            left: `${currentBbox.x}%`,
-                            top: `${currentBbox.y}%`,
-                            width: `${currentBbox.width}%`,
-                            height: `${currentBbox.height}%`,
-                            border: "2px dashed rgba(255,255,255,0.5)",
-                            background: "rgba(255,255,255,0.05)",
-                            pointerEvents: "none",
-                          }}
-                        />
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground uppercase tracking-widest">Upload a mockup image to preview</p>
-                  )}
-                </div>
-              </div>
-
               <div className="border border-border p-6 space-y-4">
                 <h3 className="text-xs font-bold uppercase tracking-widest">Bounding Box Values</h3>
                 <div className="space-y-3">
@@ -965,20 +876,6 @@ function MockupsManager() {
                     Clear Bounding Box
                   </Button>
                 )}
-              </div>
-
-              <div className="border border-border p-6 space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest">Mockup Size in Designer</h3>
-                <p className="text-xs text-muted-foreground uppercase tracking-widest">
-                  Current size: <span className="text-foreground font-mono">{viewerWidthPct}%</span> of canvas width.
-                </p>
-                <Button
-                  className="w-full rounded-none uppercase tracking-widest text-xs font-bold h-11"
-                  onClick={handleOpenInDesigner}
-                  disabled={!selectedProductId || !selectedFitId || !selectedColorId || !fitSizes?.length}
-                >
-                  Resize in Designer →
-                </Button>
               </div>
 
               <div className="border border-border p-6 space-y-3">
