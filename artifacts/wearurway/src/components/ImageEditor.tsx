@@ -85,7 +85,6 @@ const CHECKER: React.CSSProperties = {
 export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   // ── Refs ─────────────────────────────────────────────────────────────────────
   const canvasRef     = useRef<HTMLCanvasElement>(null);  // image canvas
-  const cursorRef     = useRef<HTMLCanvasElement>(null);  // cursor overlay (same coords as image canvas)
   const areaRef       = useRef<HTMLDivElement>(null);     // outer container for zoom wheel
   const wrapperRef    = useRef<HTMLDivElement>(null);     // inner div — receives CSS transform
   const isDrawing     = useRef(false);
@@ -104,6 +103,12 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   const [loaded,     setLoaded]     = useState(false);
   const [zoom,       setZoom]       = useState(1);
   const [pan,        setPan]        = useState({ x: 0, y: 0 });
+  const [cursor,     setCursor]     = useState<{ x: number; y: number; size: number; visible: boolean }>({
+    x: 0,
+    y: 0,
+    size: 0,
+    visible: false,
+  });
   const [histSig,    setHistSig]    = useState(0);
 
   // ── Stable refs for values used inside event handlers ───────────────────────
@@ -154,18 +159,8 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
       const ds = { w: Math.round(c.width * scale), h: Math.round(c.height * scale) };
       setDispSize(ds);
 
-      // Initialise cursor canvas pixel dimensions = display dimensions (1:1 CSS px)
-      const cc = cursorRef.current;
-      if (cc) { cc.width = ds.w; cc.height = ds.h; }
     });
   }, [loaded]);
-
-  // Keep cursor canvas synced when dispSize changes
-  useEffect(() => {
-    if (!dispSize) return;
-    const cc = cursorRef.current;
-    if (cc) { cc.width = dispSize.w; cc.height = dispSize.h; }
-  }, [dispSize]);
 
   // ── Undo / Redo ──────────────────────────────────────────────────────────────
   const saveUndo = useCallback(() => {
@@ -241,11 +236,13 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     if (nextZ === prevZ) return;
     const localX = (ancX - rect.left) / prevZ;
     const localY = (ancY - rect.top) / prevZ;
+    const layoutLeft = rect.left - panRef.current.x;
+    const layoutTop = rect.top - panRef.current.y;
     const nextPan = nextZ === 1
       ? { x: 0, y: 0 }
       : clampPan({
-          x: panRef.current.x + localX * (prevZ - nextZ),
-          y: panRef.current.y + localY * (prevZ - nextZ),
+          x: ancX - layoutLeft - localX * nextZ,
+          y: ancY - layoutTop - localY * nextZ,
         }, nextZ);
     setZoom(nextZ);
     setPan(nextPan);
@@ -261,10 +258,6 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     return () => el.removeEventListener("wheel", fn);
   }, [applyZoom]);
 
-  // ── Brush cursor — drawn on cursor canvas using same offsetX/Y as the erase ──
-  // Since both cursor canvas and image canvas share identical pixel dimensions AND
-  // identical CSS layout size, offsetX/offsetY from the image canvas events index
-  // into the cursor canvas at exactly the same screen position — guaranteed alignment.
   const pointFromEvent = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const c = canvasRef.current;
     const rect = c?.getBoundingClientRect();
@@ -279,25 +272,20 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     };
   };
 
-  const drawCursor = (ox: number, oy: number) => {
-    const cc = cursorRef.current;
+  const drawCursor = (clientX: number, clientY: number) => {
     const c  = canvasRef.current;
-    if (!cc || !c || !dispSize) return;
-    const ctx = cc.getContext("2d"); if (!ctx) return;
-    ctx.clearRect(0, 0, cc.width, cc.height);
+    if (!c || !dispSize) return;
     if (toolRef.current !== "brush-erase") return;
-    // Cursor radius in cursor-canvas pixels (same as display CSS pixels since 1:1)
-    const r = (brushRef.current / 2) * (dispSize.w / c.width);
-    ctx.beginPath();
-    ctx.arc(ox, oy, Math.max(1, r), 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255,255,255,0.9)";
-    ctx.lineWidth   = 1.5;
-    ctx.stroke();
+    setCursor({
+      x: clientX,
+      y: clientY,
+      size: Math.max(2, brushRef.current * (dispSize.w / c.width) * zoomRef.current),
+      visible: true,
+    });
   };
 
   const clearCursor = () => {
-    const cc = cursorRef.current; if (!cc) return;
-    cc.getContext("2d")?.clearRect(0, 0, cc.width, cc.height);
+    setCursor(prev => ({ ...prev, visible: false }));
   };
 
   // ── Brush erase — uses same offsetX/Y so guaranteed same position as cursor ──
@@ -347,7 +335,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
       lastBrushPoint.current = null;
       saveUndo();
       applyBrush(imageX, imageY);
-      drawCursor(displayX, displayY);
+      drawCursor(e.clientX, e.clientY);
     } else {
       const c = canvasRef.current; if (!c) return;
       const ctx = c.getContext("2d"); if (!ctx) return;
@@ -376,7 +364,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     }
     const point = pointFromEvent(e);
     if (!point) return;
-    drawCursor(point.displayX, point.displayY);
+    drawCursor(e.clientX, e.clientY);
     if (toolRef.current === "brush-erase" && isDrawing.current) applyBrush(point.imageX, point.imageY);
   };
 
@@ -538,7 +526,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
         </div>
 
         {/* ── Canvas area ── */}
-        <div ref={areaRef} className="flex-1 overflow-hidden flex items-center justify-center" style={CHECKER}>
+        <div ref={areaRef} className="flex-1 overflow-hidden flex items-center justify-center relative" style={CHECKER}>
 
           {!loaded && <p className="text-xs uppercase tracking-widest text-muted-foreground animate-pulse">Loading image…</p>}
           {processing && (
@@ -558,7 +546,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
               height:          dispSize ? `${dispSize.h}px` : 0,
               transformOrigin: "0 0",
               transform:       canTransform,
-              transition:       isMoving.current || isDrawing.current ? "none" : "transform 120ms ease-out",
+              transition:       zoom === 1 && !isMoving.current && !isDrawing.current ? "transform 140ms ease-out" : "none",
               boxShadow:       "0 0 0 1px rgba(255,255,255,0.08)",
             }}
           >
@@ -577,21 +565,24 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
                 imageRendering: zoom >= 6 ? "pixelated" : "auto",
               }}
             />
-            {/* Cursor canvas — absolute overlay, IDENTICAL pixel dimensions to image canvas.
-                Drawing at (offsetX, offsetY) on this canvas lands at the EXACT same screen
-                pixel as drawing at the equivalent image coord on the image canvas. */}
-            <canvas
-              ref={cursorRef}
+          </div>
+          {cursor.visible && tool === "brush-erase" && (
+            <div
               style={{
-                position:      "absolute",
-                top:           0,
-                left:          0,
-                width:         "100%",
-                height:        "100%",
+                position: "fixed",
+                left: cursor.x,
+                top: cursor.y,
+                width: cursor.size,
+                height: cursor.size,
+                transform: "translate(-50%, -50%)",
+                borderRadius: "9999px",
+                border: "2px solid rgba(255,255,255,0.98)",
+                boxShadow: "0 0 0 1px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.45)",
                 pointerEvents: "none",
+                zIndex: 30,
               }}
             />
-          </div>
+          )}
         </div>
       </div>
     </div>
