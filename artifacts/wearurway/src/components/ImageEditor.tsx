@@ -296,12 +296,28 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey||e.metaKey)) return;
-      if (e.key==="z") { e.preventDefault(); doUndo(); }
-      if (e.key==="y") { e.preventDefault(); doRedo(); }
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const key = e.key.toLowerCase();
+      if (key === "z" && e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        doRedo();
+      } else if (key === "z") {
+        e.preventDefault();
+        e.stopPropagation();
+        doUndo();
+      } else if (key === "y") {
+        e.preventDefault();
+        e.stopPropagation();
+        doRedo();
+      }
     };
-    window.addEventListener("keydown", fn);
-    return () => window.removeEventListener("keydown", fn);
+    window.addEventListener("keydown", fn, true);
+    document.addEventListener("keydown", fn, true);
+    return () => {
+      window.removeEventListener("keydown", fn, true);
+      document.removeEventListener("keydown", fn, true);
+    };
   }, [doUndo, doRedo]);
 
   useEffect(() => {
