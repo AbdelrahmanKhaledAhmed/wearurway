@@ -1350,14 +1350,9 @@ export default function Design() {
               className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span className="text-lg leading-none">↗</span>
-              <div className="text-left">
-                <p className="text-xs font-bold uppercase tracking-widest">
-                  {sharing ? "Preparing…" : "Share Design"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Export front + back as one image
-                </p>
-              </div>
+              <p className="text-xs font-bold uppercase tracking-widest">
+                {sharing ? "Preparing…" : "Share Design"}
+              </p>
             </button>
           </div>
 
