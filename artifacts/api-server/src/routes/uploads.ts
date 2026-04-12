@@ -54,7 +54,7 @@ router.post("/uploads", upload.single("file"), async (req, res) => {
   });
 });
 
-router.delete("/uploads/:filename", (req, res) => {
+router.delete("/uploads/mockups/:filename", (req, res) => {
   const filename = path.basename(req.params.filename);
   const filePath = path.join(MOCKUPS_DIR, filename);
   if (!fs.existsSync(filePath)) {
