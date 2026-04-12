@@ -553,6 +553,12 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
         </div>
       </div>
 
+      <div className="border-b border-yellow-500/30 bg-yellow-500/10 px-6 py-3">
+        <p className="text-xs font-bold uppercase tracking-widest text-yellow-100">
+          Important: If the image has a transparent background, please click on the transparent area so the image can be trimmed.
+        </p>
+      </div>
+
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left toolbar ── */}
