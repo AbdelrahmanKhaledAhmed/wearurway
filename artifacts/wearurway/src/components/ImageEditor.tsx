@@ -317,19 +317,6 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     return () => window.removeEventListener("mouseup", fn);
   }, [trimCanvasToVisible]);
 
-  const clampPan = useCallback((nextPan: { x: number; y: number }, nextZoom = zoomRef.current) => {
-    const area = areaRef.current;
-    if (!area || !dispSize) return nextPan;
-    const scaledW = dispSize.w * nextZoom;
-    const scaledH = dispSize.h * nextZoom;
-    const maxX = Math.max(0, (scaledW - area.clientWidth) / 2 + 48);
-    const maxY = Math.max(0, (scaledH - area.clientHeight) / 2 + 48);
-    return {
-      x: Math.min(maxX, Math.max(-maxX, nextPan.x)),
-      y: Math.min(maxY, Math.max(-maxY, nextPan.y)),
-    };
-  }, [dispSize]);
-
   // ── Zoom (CSS transform on wrapper div) ──────────────────────────────────────
   // Keeps the exact image point under the cursor stationary while zooming.
   const applyZoom = useCallback((factor: number, cx?: number, cy?: number) => {
@@ -364,6 +351,19 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     el.addEventListener("wheel", fn, { passive: false });
     return () => el.removeEventListener("wheel", fn);
   }, [applyZoom]);
+
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (toolRef.current !== "move" || !isMoving.current || !moveStartRef.current) return;
+      const start = moveStartRef.current;
+      setPan({
+        x: start.panX + e.clientX - start.pointerX,
+        y: start.panY + e.clientY - start.pointerY,
+      });
+    };
+    window.addEventListener("mousemove", fn);
+    return () => window.removeEventListener("mousemove", fn);
+  }, []);
 
   const pointFromEvent = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const c = canvasRef.current;
@@ -470,10 +470,10 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (toolRef.current === "move" && isMoving.current && moveStartRef.current) {
       const start = moveStartRef.current;
-      setPan(clampPan({
+      setPan({
         x: start.panX + e.clientX - start.pointerX,
         y: start.panY + e.clientY - start.pointerY,
-      }));
+      });
       return;
     }
     const point = pointFromEvent(e);
@@ -492,10 +492,10 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   };
   const onMouseLeave = () => {
     const wasDrawing = isDrawing.current;
-    isDrawing.current = false;
-    isMoving.current = false;
+    if (!isMoving.current) {
+      isDrawing.current = false;
+    }
     lastBrushPoint.current = null;
-    moveStartRef.current = null;
     clearCursor();
     if (wasDrawing) trimCanvasToVisible();
   };
