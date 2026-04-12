@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useGetMockup, getGetMockupQueryKey } from "@workspace/api-client-react";
+import { useGetMockup, useSaveMockup, getGetMockupQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCustomizer } from "@/hooks/use-customizer";
 import ImageEditor from "@/components/ImageEditor";
 
@@ -47,6 +48,11 @@ export default function Design() {
   const [clipSize, setClipSize] = useState<{ w: number; h: number } | null>(null);
   const [editorFile, setEditorFile] = useState<File | null>(null);
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
+
+  const isAdmin = !!localStorage.getItem("wearurway_admin_token");
+  const queryClient = useQueryClient();
+  const saveMockupMutation = useSaveMockup();
+  const [adminWidthOverride, setAdminWidthOverride] = useState<number | null>(null);
 
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -632,6 +638,28 @@ export default function Design() {
 
   if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return null;
 
+  const effectiveWidth = adminWidthOverride ?? mockup?.viewerWidthPct ?? 80;
+
+  const handleAdminResize = (direction: "bigger" | "smaller") => {
+    const next = Math.min(100, Math.max(20, effectiveWidth + (direction === "bigger" ? 5 : -5)));
+    setAdminWidthOverride(next);
+    saveMockupMutation.mutate({
+      data: {
+        productId: selectedProduct.id,
+        fitId: selectedFit.id,
+        colorId: selectedColor.id,
+        viewerWidthPct: next,
+        viewerAspectW: mockup?.viewerAspectW ?? 3,
+        viewerAspectH: mockup?.viewerAspectH ?? 4,
+      },
+    }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetMockupQueryKey({ productId: selectedProduct.id, fitId: selectedFit.id, colorId: selectedColor.id }) });
+        setAdminWidthOverride(null);
+      },
+    });
+  };
+
   return (
     <>
     {editorFile && (
@@ -831,9 +859,10 @@ export default function Design() {
           <div
             className="relative"
             style={{
-              width: `${mockup?.viewerWidthPct ?? 80}%`,
+              width: `${effectiveWidth}%`,
               maxWidth: "100%",
               aspectRatio: `${mockup?.viewerAspectW ?? 3}/${mockup?.viewerAspectH ?? 4}`,
+              transition: "width 0.15s ease",
             }}
           >
             <AnimatePresence mode="wait">
@@ -973,6 +1002,70 @@ export default function Design() {
                     </p>
                   </>
                 )}
+              </div>
+            )}
+
+            {/* ── Admin resize controls ── */}
+            {isAdmin && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "-44px",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  zIndex: 20,
+                  background: "rgba(0,0,0,0.75)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  backdropFilter: "blur(8px)",
+                  padding: "4px 10px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "monospace" }}>
+                  Admin
+                </span>
+                <button
+                  onClick={() => handleAdminResize("smaller")}
+                  disabled={effectiveWidth <= 20 || saveMockupMutation.isPending}
+                  style={{
+                    background: "transparent",
+                    border: "1px solid rgba(255,255,255,0.3)",
+                    color: "#fff",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    padding: "2px 10px",
+                    cursor: "pointer",
+                    opacity: effectiveWidth <= 20 ? 0.3 : 1,
+                    fontFamily: "monospace",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  − Smaller
+                </button>
+                <span style={{ fontSize: "11px", color: "#fff", fontFamily: "monospace", fontWeight: 700, minWidth: "36px", textAlign: "center" }}>
+                  {effectiveWidth}%
+                </span>
+                <button
+                  onClick={() => handleAdminResize("bigger")}
+                  disabled={effectiveWidth >= 100 || saveMockupMutation.isPending}
+                  style={{
+                    background: "transparent",
+                    border: "1px solid rgba(255,255,255,0.3)",
+                    color: "#fff",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    padding: "2px 10px",
+                    cursor: "pointer",
+                    opacity: effectiveWidth >= 100 ? 0.3 : 1,
+                    fontFamily: "monospace",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  + Bigger
+                </button>
               </div>
             )}
           </div>

@@ -949,51 +949,29 @@ function MockupsManager() {
               </div>
 
               <div className="border border-border p-6 space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest">Viewer Size in Designer</h3>
+                <h3 className="text-xs font-bold uppercase tracking-widest">Mockup Size in Designer</h3>
                 <p className="text-xs text-muted-foreground uppercase tracking-widest">
-                  Controls how large the mockup appears in the designer canvas.
+                  Current size: <span className="text-foreground font-mono">{viewerWidthPct}%</span> of canvas width.
+                  You can also resize live from the designer page while logged in as admin.
                 </p>
-                <div className="space-y-1">
-                  <Label className="text-xs uppercase tracking-widest">Width — {viewerWidthPct}% of canvas</Label>
-                  <input
-                    type="range"
-                    min={20}
-                    max={100}
-                    step={1}
-                    value={viewerWidthPct}
-                    onChange={e => setViewerWidthPct(Number(e.target.value))}
-                    className="w-full accent-foreground"
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground font-mono">
-                    <span>20%</span><span>100%</span>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs uppercase tracking-widest">Aspect Ratio (W : H)</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min={1}
-                      max={20}
-                      step={0.1}
-                      value={viewerAspectW}
-                      onChange={e => setViewerAspectW(Math.max(0.1, parseFloat(e.target.value) || 1))}
-                      className="rounded-none h-9 font-mono text-xs w-20"
-                    />
-                    <span className="text-muted-foreground font-bold">:</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={20}
-                      step={0.1}
-                      value={viewerAspectH}
-                      onChange={e => setViewerAspectH(Math.max(0.1, parseFloat(e.target.value) || 1))}
-                      className="rounded-none h-9 font-mono text-xs w-20"
-                    />
-                    <span className="text-xs text-muted-foreground font-mono ml-1">
-                      ({viewerAspectW}:{viewerAspectH})
-                    </span>
-                  </div>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    className="rounded-none flex-1 uppercase tracking-widest text-xs font-bold h-10"
+                    onClick={() => setViewerWidthPct(w => Math.max(20, w - 5))}
+                    disabled={viewerWidthPct <= 20}
+                  >
+                    − Smaller
+                  </Button>
+                  <span className="text-sm font-mono font-bold min-w-[3rem] text-center">{viewerWidthPct}%</span>
+                  <Button
+                    variant="outline"
+                    className="rounded-none flex-1 uppercase tracking-widest text-xs font-bold h-10"
+                    onClick={() => setViewerWidthPct(w => Math.min(100, w + 5))}
+                    disabled={viewerWidthPct >= 100}
+                  >
+                    + Bigger
+                  </Button>
                 </div>
               </div>
 
