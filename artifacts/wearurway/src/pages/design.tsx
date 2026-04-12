@@ -908,7 +908,6 @@ export default function Design() {
                   {[...layers].reverse().map((layer, reversedIdx) => {
                     const trueIdx = layers.length - 1 - reversedIdx;
                     const isSelected = selectedLayerId === layer.id;
-                    const dim = layerPrintDim(layer);
                     return (
                       <motion.div
                         key={layer.id}
@@ -932,15 +931,9 @@ export default function Design() {
                           </div>
 
                           <div className="flex-1 min-w-0">
-                            {dim ? (
-                              <p className="text-xs font-bold font-mono tracking-widest truncate">
-                                {dim.w} × {dim.h} cm
-                              </p>
-                            ) : (
-                              <p className="text-xs font-bold uppercase tracking-widest truncate">
-                                {layer.name}
-                              </p>
-                            )}
+                            <p className="text-xs font-bold uppercase tracking-widest truncate">
+                              Layer {reversedIdx + 1}
+                            </p>
                             {layer.rotation !== 0 && (
                               <p className="text-xs text-muted-foreground font-mono">{layer.rotation}°</p>
                             )}
