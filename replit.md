@@ -77,6 +77,14 @@ A premium streetwear customization website with a multi-step product configurato
 - Logo: `artifacts/wearurway/public/logo.png` (1024x1024) — if absent, a styled text wordmark is shown
 - Size images: `artifacts/wearurway/public/size-images/` — naming format: `Boxy-Fit-Small.png`, `Regular-Fit-Medium.png`, etc.
 
+### Text Tool & Custom Fonts
+
+- **Font files**: `artifacts/wearurway/public/fonts/` — drop `.woff2` files here
+- **Font config**: `artifacts/wearurway/src/config/fonts.ts` — single file to add/remove/rename fonts in the UI
+- To add a font: copy `.woff2` to `public/fonts/` and add an entry to `CUSTOM_FONTS` in `fonts.ts`
+- Text layers are rendered to PNG via Canvas API and added as standard DesignLayers
+- Supports: font selection, text color, outline (color + thickness), arc/curve (-300° to +300°)
+
 ### Admin Panel
 
 - URL: `/admin`

@@ -5,6 +5,7 @@ import { useGetMockup, useSaveMockup, getGetMockupQueryKey } from "@workspace/ap
 import { useCustomizer } from "@/hooks/use-customizer";
 import { useToast } from "@/hooks/use-toast";
 import ImageEditor, { type ImageEditResult } from "@/components/ImageEditor";
+import TextLayerModal from "@/components/TextLayerModal";
 
 interface BBox { x: number; y: number; width: number; height: number }
 
@@ -70,6 +71,7 @@ export default function Design() {
   const [editorFile, setEditorFile] = useState<File | null>(null);
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [newUploadLayerId, setNewUploadLayerId] = useState<string | null>(null);
+  const [showTextModal, setShowTextModal] = useState(false);
 
   const [showPlaceholder, setShowPlaceholder] = useState(() => localStorage.getItem("wearurway_show_placeholder") !== "false");
   const [showDimLabel, setShowDimLabel] = useState(() => localStorage.getItem("wearurway_show_dim_label") !== "false");
@@ -525,6 +527,49 @@ export default function Design() {
     }
   }, []);
 
+  // Add text layer from TextLayerModal blob
+  const handleAddTextBlob = useCallback(async (blob: Blob) => {
+    setShowTextModal(false);
+    const objectUrl = URL.createObjectURL(blob);
+    const clipEl = clipAreaRef.current;
+    const clipW = clipEl?.offsetWidth ?? 200;
+    const clipH = clipEl?.offsetHeight ?? 200;
+    const natural = await new Promise<{ w: number; h: number }>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+      img.onerror = () => resolve({ w: 1, h: 1 });
+      img.src = objectUrl;
+    });
+    const maxW = clipW * 0.6;
+    const maxH = clipH * 0.4;
+    const ratio = natural.w / natural.h;
+    let defaultW: number, defaultH: number;
+    if (ratio > maxW / maxH) {
+      defaultW = maxW;
+      defaultH = maxW / ratio;
+    } else {
+      defaultH = maxH;
+      defaultW = maxH * ratio;
+    }
+    defaultW = Math.round(defaultW);
+    defaultH = Math.round(defaultH);
+    const newLayer: DesignLayer = {
+      id: crypto.randomUUID(),
+      name: `Text ${layers.length + 1}`,
+      imageUrl: objectUrl,
+      x: Math.round((clipW - defaultW) / 2),
+      y: Math.round((clipH - defaultH) / 2),
+      width: defaultW,
+      height: defaultH,
+      rotation: 0,
+      visible: true,
+      naturalWidth: natural.w,
+      naturalHeight: natural.h,
+    };
+    setLayers(prev => [...prev, newLayer]);
+    setSelectedLayerId(newLayer.id);
+  }, [layers.length]);
+
   const removeLayer = (id: string) => {
     setLayers(prev => {
       const layer = prev.find(l => l.id === id);
@@ -912,6 +957,12 @@ export default function Design() {
           setEditorFile(null);
           setEditingLayerId(null);
         }}
+      />
+    )}
+    {showTextModal && (
+      <TextLayerModal
+        onConfirm={handleAddTextBlob}
+        onCancel={() => setShowTextModal(false)}
       />
     )}
     <div className="h-screen overflow-hidden pt-20 flex flex-col bg-background">
@@ -1352,6 +1403,22 @@ export default function Design() {
                 )}
               </div>
             </button>
+
+            {/* Add Text */}
+            <button
+              onClick={() => setShowTextModal(true)}
+              disabled={!bbox}
+              className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span className="text-lg leading-none">T</span>
+              <div className="text-left">
+                <p className="text-xs font-bold uppercase tracking-widest">Add Text</p>
+                {!bbox && (
+                  <p className="text-xs text-muted-foreground mt-0.5">Set bbox in admin first</p>
+                )}
+              </div>
+            </button>
+
             <button
               onClick={handleShareDesign}
               disabled={sharing || uploading || (!mockup?.front?.image && !mockup?.back?.image)}
