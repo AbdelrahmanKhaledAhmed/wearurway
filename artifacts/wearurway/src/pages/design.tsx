@@ -1242,7 +1242,7 @@ export default function Design() {
                     − Smaller
                   </button>
                   <button
-                    onClick={() => setMockupSize(prev => Math.min(700, prev + 40))}
+                    onClick={() => setMockupSize(prev => Math.min(1400, prev + 40))}
                     className="flex-1 py-2.5 text-sm font-bold uppercase tracking-widest border border-border bg-background hover:border-foreground hover:bg-muted/20 transition-colors"
                   >
                     + Bigger
