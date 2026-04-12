@@ -65,6 +65,7 @@ export default function Design() {
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [clipSize, setClipSize] = useState<{ w: number; h: number } | null>(null);
   const [editorFile, setEditorFile] = useState<File | null>(null);
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
@@ -541,6 +542,176 @@ export default function Design() {
       return next.map((l, i) => ({ ...l, name: `Layer ${i + 1}` }));
     });
   };
+
+  const loadCanvasImage = async (src?: string): Promise<HTMLImageElement | null> => {
+    if (!src) return null;
+    try {
+      const res = await fetch(src);
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      return await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(blobUrl);
+          resolve(img);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(blobUrl);
+          reject(new Error("image load failed"));
+        };
+        img.src = blobUrl;
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  const drawImageContain = (
+    ctx: CanvasRenderingContext2D,
+    img: HTMLImageElement,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+  ) => {
+    const ratio = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+    const drawW = img.naturalWidth * ratio;
+    const drawH = img.naturalHeight * ratio;
+    ctx.drawImage(img, x + (w - drawW) / 2, y + (h - drawH) / 2, drawW, drawH);
+  };
+
+  const handleShareDesign = useCallback(async () => {
+    const frontBbox = localFrontBbox;
+    const backBbox = localBackBbox;
+    const frontImage = mockup?.front?.image;
+    const backImage = mockup?.back?.image;
+
+    if (!frontImage && !backImage) {
+      toast({ title: "No mockup available" });
+      return;
+    }
+
+    setSharing(true);
+    try {
+      const sideW = 900;
+      const sideH = 1200;
+      const gap = 80;
+      const padding = 80;
+      const labelH = 64;
+      const canvas = document.createElement("canvas");
+      canvas.width = padding * 2 + sideW * 2 + gap;
+      canvas.height = padding * 2 + labelH + sideH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.fillStyle = "#0b0b0b";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const renderSide = async (
+        label: "FRONT" | "BACK",
+        x: number,
+        mockupImage: string | undefined,
+        bbox: BBox | null,
+        sideLayers: DesignLayer[],
+      ) => {
+        const y = padding + labelH;
+        const base = await loadCanvasImage(mockupImage);
+
+        ctx.fillStyle = "#151515";
+        ctx.fillRect(x, y, sideW, sideH);
+
+        if (base) {
+          drawImageContain(ctx, base, x, y, sideW, sideH);
+        } else {
+          ctx.strokeStyle = "rgba(255,255,255,0.18)";
+          ctx.strokeRect(x, y, sideW, sideH);
+        }
+
+        if (bbox) {
+          const clipX = x + sideW * bbox.x / 100;
+          const clipY = y + sideH * bbox.y / 100;
+          const clipW = sideW * bbox.width / 100;
+          const clipH = sideH * bbox.height / 100;
+          const sourceClipW = mockupSize * bbox.width / 100;
+          const sourceClipH = mockupSize * (4 / 3) * bbox.height / 100;
+          const scaleX = clipW / sourceClipW;
+          const scaleY = clipH / sourceClipH;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(clipX, clipY, clipW, clipH);
+          ctx.clip();
+
+          for (const layer of sideLayers.filter(l => l.visible)) {
+            const img = await loadCanvasImage(layer.imageUrl);
+            if (!img) continue;
+            const cx = clipX + (layer.x + layer.width / 2) * scaleX;
+            const cy = clipY + (layer.y + layer.height / 2) * scaleY;
+            const angle = (layer.rotation * Math.PI) / 180;
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(angle);
+            ctx.drawImage(
+              img,
+              -layer.width * scaleX / 2,
+              -layer.height * scaleY / 2,
+              layer.width * scaleX,
+              layer.height * scaleY,
+            );
+            ctx.restore();
+          }
+
+          ctx.restore();
+        }
+
+        ctx.fillStyle = "#f5f1e8";
+        ctx.font = "700 26px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, x + sideW / 2, padding + labelH / 2);
+      };
+
+      await renderSide("FRONT", padding, frontImage, frontBbox, frontLayers);
+      await renderSide("BACK", padding + sideW + gap, backImage, backBbox, backLayers);
+
+      await new Promise<void>(resolve => {
+        canvas.toBlob(async blob => {
+          if (!blob) {
+            resolve();
+            return;
+          }
+
+          const file = new File([blob], "wearurway-design.png", { type: "image/png" });
+          if (navigator.canShare?.({ files: [file] })) {
+            try {
+              await navigator.share({
+                title: "My WearUrWay Design",
+                text: "Check out my custom design.",
+                files: [file],
+              });
+              resolve();
+              return;
+            } catch {
+              // Fall through to download if sharing is cancelled or unavailable.
+            }
+          }
+
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "wearurway-front-back-design.png";
+          a.click();
+          URL.revokeObjectURL(url);
+          resolve();
+        }, "image/png");
+      });
+    } finally {
+      setSharing(false);
+    }
+  }, [backLayers, localBackBbox, frontLayers, localFrontBbox, mockup, mockupSize, toast]);
 
   // ── Export ─────────────────────────────────────────────────────────────────
 
@@ -1171,6 +1342,21 @@ export default function Design() {
                 {!bbox && (
                   <p className="text-xs text-muted-foreground mt-0.5">Set bbox in admin first</p>
                 )}
+              </div>
+            </button>
+            <button
+              onClick={handleShareDesign}
+              disabled={sharing || uploading || (!mockup?.front?.image && !mockup?.back?.image)}
+              className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span className="text-lg leading-none">↗</span>
+              <div className="text-left">
+                <p className="text-xs font-bold uppercase tracking-widest">
+                  {sharing ? "Preparing…" : "Share Design"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Export front + back as one image
+                </p>
               </div>
             </button>
           </div>
