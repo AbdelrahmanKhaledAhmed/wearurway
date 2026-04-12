@@ -1308,12 +1308,6 @@ export default function Design() {
                 <span className="text-muted-foreground uppercase tracking-widest">Size</span>
                 <span className="font-bold uppercase">{selectedSize.name}</span>
               </div>
-              {realWidth > 0 && (
-                <div className="flex justify-between pt-1 border-t border-border mt-2">
-                  <span className="text-muted-foreground uppercase tracking-widest">Print Area</span>
-                  <span className="font-mono font-bold">{realWidth} × {realHeight} cm</span>
-                </div>
-              )}
               {printDim && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground uppercase tracking-widest">Image Size</span>
