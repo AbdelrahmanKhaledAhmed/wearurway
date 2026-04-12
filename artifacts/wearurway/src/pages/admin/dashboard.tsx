@@ -121,14 +121,29 @@ function ImageUploader({ value, onChange, label = "Image" }: {
   return (
     <div className="space-y-2">
       <Label className="uppercase tracking-widest text-xs">{label}</Label>
-      <div className="flex gap-2 items-center">
-        <Input value={value} onChange={e => onChange(e.target.value)} placeholder="/api/uploads/image.png" className="rounded-none h-10 flex-1" />
-        <Button type="button" variant="outline" className="rounded-none h-10 whitespace-nowrap" onClick={() => inputRef.current?.click()} disabled={uploading}>
-          <Upload className="w-4 h-4 mr-2" />{uploading ? "Uploading..." : "Upload"}
-        </Button>
-        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
-      </div>
-      {value && <div className="w-16 h-16 border border-border overflow-hidden bg-muted/10"><img src={value} alt="preview" className="w-full h-full object-contain" /></div>}
+      {value ? (
+        <div className="relative w-fit">
+          <div className="w-32 h-32 border border-border overflow-hidden bg-muted/10">
+            <img src={value} alt="preview" className="w-full h-full object-contain" />
+          </div>
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs leading-none hover:opacity-80 transition-opacity"
+            title="Remove image"
+          >
+            ×
+          </button>
+        </div>
+      ) : (
+        <div className="flex gap-2 items-center">
+          <Input value={value} onChange={e => onChange(e.target.value)} placeholder="/api/uploads/image.png" className="rounded-none h-10 flex-1" />
+          <Button type="button" variant="outline" className="rounded-none h-10 whitespace-nowrap" onClick={() => inputRef.current?.click()} disabled={uploading}>
+            <Upload className="w-4 h-4 mr-2" />{uploading ? "Uploading..." : "Upload"}
+          </Button>
+        </div>
+      )}
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
     </div>
   );
 }
