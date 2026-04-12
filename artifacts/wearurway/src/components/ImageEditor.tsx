@@ -269,6 +269,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
       displayY,
       imageX: displayX * (c.width / dispSize.w),
       imageY: displayY * (c.height / dispSize.h),
+      imageRadius: Math.max(0.5, (brushRef.current / 2) - (2 * c.width / rect.width)),
     };
   };
 
@@ -290,10 +291,9 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   };
 
   // ── Brush erase — uses same offsetX/Y so guaranteed same position as cursor ──
-  const applyBrush = (imgX: number, imgY: number) => {
+  const applyBrush = (imgX: number, imgY: number, radius: number) => {
     const c = canvasRef.current; if (!c || !dispSize) return;
     const ctx = c.getContext("2d"); if (!ctx) return;
-    const radius = brushRef.current / 2;
     const last = lastBrushPoint.current;
     ctx.save();
     ctx.globalCompositeOperation = "destination-out";
@@ -339,7 +339,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
       isDrawing.current = true;
       lastBrushPoint.current = null;
       saveUndo();
-      applyBrush(imageX, imageY);
+      applyBrush(imageX, imageY, point.imageRadius);
       drawCursor(e.clientX, e.clientY);
     } else {
       const c = canvasRef.current; if (!c) return;
@@ -370,7 +370,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     const point = pointFromEvent(e);
     if (!point) return;
     drawCursor(e.clientX, e.clientY);
-    if (toolRef.current === "brush-erase" && isDrawing.current) applyBrush(point.imageX, point.imageY);
+    if (toolRef.current === "brush-erase" && isDrawing.current) applyBrush(point.imageX, point.imageY, point.imageRadius);
   };
 
   const onMouseUp = () => {
