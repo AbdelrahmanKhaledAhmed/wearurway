@@ -546,6 +546,25 @@ function ColorsManager() {
 
 interface BBox { x: number; y: number; width: number; height: number }
 
+type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
+
+interface ResizingState {
+  handle: ResizeHandle;
+  startBbox: BBox;
+  startMouse: { x: number; y: number };
+}
+
+const RESIZE_HANDLES: { id: ResizeHandle; cursor: string; style: React.CSSProperties }[] = [
+  { id: "nw", cursor: "nw-resize", style: { top: -5, left: -5 } },
+  { id: "n", cursor: "n-resize", style: { top: -5, left: "50%", transform: "translateX(-50%)" } },
+  { id: "ne", cursor: "ne-resize", style: { top: -5, right: -5 } },
+  { id: "e", cursor: "e-resize", style: { top: "50%", right: -5, transform: "translateY(-50%)" } },
+  { id: "se", cursor: "se-resize", style: { bottom: -5, right: -5 } },
+  { id: "s", cursor: "s-resize", style: { bottom: -5, left: "50%", transform: "translateX(-50%)" } },
+  { id: "sw", cursor: "sw-resize", style: { bottom: -5, left: -5 } },
+  { id: "w", cursor: "w-resize", style: { top: "50%", left: -5, transform: "translateY(-50%)" } },
+];
+
 function BoundingBoxEditor({
   image,
   bbox,
@@ -559,55 +578,87 @@ function BoundingBoxEditor({
   const [drawing, setDrawing] = useState(false);
   const [startPt, setStartPt] = useState({ x: 0, y: 0 });
   const [liveBbox, setLiveBbox] = useState<BBox | null>(bbox);
+  const [resizing, setResizing] = useState<ResizingState | null>(null);
 
-  const getPct = (e: React.MouseEvent) => {
+  const getPct = (clientX: number, clientY: number) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
     return {
-      x: Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)),
-      y: Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)),
+      x: Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100)),
+      y: Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100)),
     };
   };
 
   const onMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).dataset.handle) return;
     e.preventDefault();
-    const pt = getPct(e);
+    const pt = getPct(e.clientX, e.clientY);
     setStartPt(pt);
     setDrawing(true);
     setLiveBbox({ x: pt.x, y: pt.y, width: 0, height: 0 });
   };
 
   const onMouseMove = (e: React.MouseEvent) => {
-    if (!drawing) return;
-    const pt = getPct(e);
-    setLiveBbox({
-      x: Math.min(startPt.x, pt.x),
-      y: Math.min(startPt.y, pt.y),
-      width: Math.abs(pt.x - startPt.x),
-      height: Math.abs(pt.y - startPt.y),
-    });
-  };
-
-  const onMouseUp = (e: React.MouseEvent) => {
-    if (!drawing) return;
-    setDrawing(false);
-    if (liveBbox && liveBbox.width > 1 && liveBbox.height > 1) {
-      onChange(liveBbox);
+    if (drawing) {
+      const pt = getPct(e.clientX, e.clientY);
+      setLiveBbox({
+        x: Math.min(startPt.x, pt.x),
+        y: Math.min(startPt.y, pt.y),
+        width: Math.abs(pt.x - startPt.x),
+        height: Math.abs(pt.y - startPt.y),
+      });
+    } else if (resizing && liveBbox) {
+      const pt = getPct(e.clientX, e.clientY);
+      const dx = pt.x - resizing.startMouse.x;
+      const dy = pt.y - resizing.startMouse.y;
+      const sb = resizing.startBbox;
+      let { x, y, width, height } = sb;
+      switch (resizing.handle) {
+        case "nw": x = sb.x + dx; y = sb.y + dy; width = sb.width - dx; height = sb.height - dy; break;
+        case "n": y = sb.y + dy; height = sb.height - dy; break;
+        case "ne": y = sb.y + dy; width = sb.width + dx; height = sb.height - dy; break;
+        case "e": width = sb.width + dx; break;
+        case "se": width = sb.width + dx; height = sb.height + dy; break;
+        case "s": height = sb.height + dy; break;
+        case "sw": x = sb.x + dx; width = sb.width - dx; height = sb.height + dy; break;
+        case "w": x = sb.x + dx; width = sb.width - dx; break;
+      }
+      if (width < 2) { if (resizing.handle.includes("w")) x = sb.x + sb.width - 2; width = 2; }
+      if (height < 2) { if (resizing.handle.includes("n")) y = sb.y + sb.height - 2; height = 2; }
+      setLiveBbox({ x: Math.max(0, x), y: Math.max(0, y), width, height });
     }
   };
 
+  const onMouseUp = () => {
+    if (drawing) {
+      setDrawing(false);
+    } else if (resizing) {
+      setResizing(null);
+      if (liveBbox) onChange(liveBbox);
+    }
+  };
+
+  const startResize = (e: React.MouseEvent, handle: ResizeHandle) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!liveBbox) return;
+    const pt = getPct(e.clientX, e.clientY);
+    setResizing({ handle, startBbox: { ...liveBbox }, startMouse: pt });
+  };
+
   const displayBbox = liveBbox;
+  const isInteracting = drawing || !!resizing;
 
   return (
     <div className="space-y-2">
       <p className="text-xs uppercase tracking-widest text-muted-foreground">
-        Click and drag on the image to draw the design bounding box
+        Draw a box, then drag the handles on the edges to resize it
       </p>
       <div
         ref={containerRef}
         className="relative w-full select-none overflow-hidden border border-border"
         style={{
-          cursor: "crosshair",
+          cursor: isInteracting ? "crosshair" : displayBbox ? "default" : "crosshair",
           aspectRatio: "3/4",
           backgroundImage:
             "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
@@ -618,7 +669,10 @@ function BoundingBoxEditor({
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
-        onMouseLeave={() => { if (drawing) { setDrawing(false); } }}
+        onMouseLeave={() => {
+          if (drawing) { setDrawing(false); }
+          if (resizing) { setResizing(null); if (liveBbox) onChange(liveBbox); }
+        }}
       >
         <img src={image} alt="mockup" className="w-full h-full object-contain pointer-events-none" draggable={false} />
         {displayBbox && displayBbox.width > 0 && displayBbox.height > 0 && (
@@ -629,16 +683,33 @@ function BoundingBoxEditor({
               top: `${displayBbox.y}%`,
               width: `${displayBbox.width}%`,
               height: `${displayBbox.height}%`,
-              border: "2px solid rgba(255,255,255,0.8)",
-              background: "rgba(255,255,255,0.08)",
-              pointerEvents: "none",
+              border: "2px solid rgba(34,197,94,0.9)",
+              background: "rgba(34,197,94,0.1)",
+              pointerEvents: drawing ? "none" : "all",
             }}
           >
-            <div className="absolute top-0 left-0 right-0 bottom-0 flex items-center justify-center">
-              <span className="text-white/60 text-xs uppercase tracking-widest font-mono pointer-events-none">
+            <div className="absolute top-0 left-0 right-0 bottom-0 flex items-center justify-center pointer-events-none">
+              <span className="text-white/70 text-xs uppercase tracking-widest font-mono">
                 {displayBbox.width.toFixed(1)}% × {displayBbox.height.toFixed(1)}%
               </span>
             </div>
+            {!drawing && RESIZE_HANDLES.map(h => (
+              <div
+                key={h.id}
+                data-handle={h.id}
+                onMouseDown={e => startResize(e, h.id)}
+                style={{
+                  position: "absolute",
+                  width: 10,
+                  height: 10,
+                  background: "rgba(34,197,94,1)",
+                  border: "1.5px solid rgba(255,255,255,0.9)",
+                  cursor: h.cursor,
+                  pointerEvents: "all",
+                  ...h.style,
+                }}
+              />
+            ))}
           </div>
         )}
       </div>

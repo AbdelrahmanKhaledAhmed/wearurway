@@ -13,4 +13,6 @@ export interface SaveMockupBody {
   colorId: string;
   front?: MockupSide;
   back?: MockupSide;
+  mockupSize?: number;
+  mockupOffsetY?: number;
 }

@@ -30,7 +30,7 @@ router.get("/mockups", (req, res) => {
 });
 
 router.put("/mockups", (req, res) => {
-  const { productId, fitId, colorId, front, back } = req.body as Partial<Mockup>;
+  const { productId, fitId, colorId, front, back, mockupSize, mockupOffsetY } = req.body as Partial<Mockup>;
 
   if (!productId || !fitId || !colorId) {
     res.status(400).json({ error: "productId, fitId, colorId are required" });
@@ -50,6 +50,8 @@ router.put("/mockups", (req, res) => {
     };
     if (front !== undefined) updated.front = front;
     if (back !== undefined) updated.back = back;
+    if (mockupSize !== undefined) updated.mockupSize = mockupSize;
+    if (mockupOffsetY !== undefined) updated.mockupOffsetY = mockupOffsetY;
     store.mockups[key] = updated;
     saved = updated;
   });

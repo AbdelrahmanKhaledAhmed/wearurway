@@ -665,6 +665,12 @@ components:
           $ref: "#/components/schemas/MockupSide"
         back:
           $ref: "#/components/schemas/MockupSide"
+        mockupSize:
+          type: number
+          description: Display size of the mockup in pixels
+        mockupOffsetY:
+          type: number
+          description: Vertical offset of the mockup in pixels
       required: [productId, fitId, colorId]
 
     SaveMockupBody:
@@ -680,6 +686,12 @@ components:
           $ref: "#/components/schemas/MockupSide"
         back:
           $ref: "#/components/schemas/MockupSide"
+        mockupSize:
+          type: number
+          description: Display size of the mockup in pixels
+        mockupOffsetY:
+          type: number
+          description: Vertical offset of the mockup in pixels
       required: [productId, fitId, colorId]
 
     ErrorResponse:

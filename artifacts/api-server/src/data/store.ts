@@ -55,6 +55,8 @@ export interface Mockup {
   colorId: string;
   front?: MockupSide;
   back?: MockupSide;
+  mockupSize?: number;
+  mockupOffsetY?: number;
 }
 
 export interface Store {

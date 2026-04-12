@@ -132,6 +132,8 @@ export interface Mockup {
   colorId: string;
   front?: MockupSide;
   back?: MockupSide;
+  mockupSize?: number;
+  mockupOffsetY?: number;
 }
 
 export interface SaveMockupBody {
@@ -140,6 +142,8 @@ export interface SaveMockupBody {
   colorId: string;
   front?: MockupSide;
   back?: MockupSide;
+  mockupSize?: number;
+  mockupOffsetY?: number;
 }
 
 export interface ErrorResponse {

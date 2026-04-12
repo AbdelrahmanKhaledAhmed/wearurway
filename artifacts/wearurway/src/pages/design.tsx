@@ -93,10 +93,12 @@ export default function Design() {
   const realWidth = selectedSize?.realWidth ?? 0;
   const realHeight = selectedSize?.realHeight ?? 0;
 
-  // Sync local bboxes when mockup loads
+  // Sync local bboxes and display settings when mockup loads
   useEffect(() => {
     if (mockup?.front?.boundingBox) setLocalFrontBbox(mockup.front.boundingBox as BBox);
     if (mockup?.back?.boundingBox) setLocalBackBbox(mockup.back.boundingBox as BBox);
+    if (mockup?.mockupSize) setMockupSize(mockup.mockupSize);
+    if (mockup?.mockupOffsetY !== undefined) setMockupOffsetY(mockup.mockupOffsetY);
   }, [mockup]);
 
   const bbox: BBox | null | undefined = side === "front" ? localFrontBbox : localBackBbox;
@@ -110,6 +112,8 @@ export default function Design() {
         colorId: selectedColor.id,
         front: { image: mockup?.front?.image, boundingBox: localFrontBbox ?? undefined },
         back: { image: mockup?.back?.image, boundingBox: localBackBbox ?? undefined },
+        mockupSize,
+        mockupOffsetY,
       },
     }, {
       onSuccess: () => toast({ title: "Mockup saved" }),
