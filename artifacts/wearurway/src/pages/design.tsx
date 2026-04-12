@@ -641,9 +641,9 @@ export default function Design() {
         onCancel={() => { setEditorFile(null); setEditingLayerId(null); }}
       />
     )}
-    <div className="flex-1 flex flex-col bg-background overflow-hidden pt-20">
+    <div className="h-screen overflow-hidden pt-20 flex flex-col bg-background">
 
-      <div className="flex flex-1 overflow-hidden min-h-0">
+      <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left sidebar — Layers ── */}
         <div className="w-56 border-r border-border flex flex-col shrink-0 overflow-hidden">
@@ -804,7 +804,7 @@ export default function Design() {
 
         {/* ── Main canvas — checkerboard fills entire center ── */}
         <div
-          className="flex-1 self-stretch flex flex-col items-center justify-center px-4"
+          className="flex-1 flex flex-col items-center justify-center px-4"
           style={{
             backgroundImage:
               "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",

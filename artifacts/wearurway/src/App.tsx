@@ -24,9 +24,9 @@ setAuthTokenGetter(() => localStorage.getItem("wearurway_admin_token"));
 
 function Router() {
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col min-h-screen">
       <Navbar />
-      <main className="flex-1 overflow-y-auto flex flex-col">
+      <main className="flex-grow">
         <Switch>
           <Route path="/" component={Landing} />
           <Route path="/products" component={Products} />
