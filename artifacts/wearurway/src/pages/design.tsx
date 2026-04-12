@@ -641,7 +641,7 @@ export default function Design() {
         onCancel={() => { setEditorFile(null); setEditingLayerId(null); }}
       />
     )}
-    <div className="h-screen overflow-hidden pt-20 flex flex-col bg-background">
+    <div className="flex-1 flex flex-col bg-background overflow-hidden pt-20">
 
       <div className="flex flex-1 overflow-hidden min-h-0">
 
