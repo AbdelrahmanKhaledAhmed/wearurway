@@ -48,6 +48,7 @@ export default function Design() {
   const [side, setSide] = useState<"front" | "back">("front");
   const [localFrontBbox, setLocalFrontBbox] = useState<BBox | null>(null);
   const [localBackBbox, setLocalBackBbox] = useState<BBox | null>(null);
+  const [mockupSize, setMockupSize] = useState(100);
 
   const [layers, setLayers] = useState<DesignLayer[]>([]);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
@@ -98,18 +99,6 @@ export default function Design() {
   }, [mockup]);
 
   const bbox: BBox | null | undefined = side === "front" ? localFrontBbox : localBackBbox;
-
-  const adjustBbox = (direction: "bigger" | "smaller") => {
-    const delta = direction === "bigger" ? 1 : -1;
-    const adjust = (b: BBox): BBox => ({
-      x: Math.max(0, b.x - delta),
-      y: Math.max(0, b.y - delta),
-      width: Math.min(100 - Math.max(0, b.x - delta), b.width + delta * 2),
-      height: Math.min(100 - Math.max(0, b.y - delta), b.height + delta * 2),
-    });
-    if (side === "front") setLocalFrontBbox(prev => prev ? adjust(prev) : prev);
-    else setLocalBackBbox(prev => prev ? adjust(prev) : prev);
-  };
 
   const handleAdminSave = () => {
     if (!selectedProduct || !selectedFit || !selectedColor) return;
@@ -872,8 +861,8 @@ export default function Design() {
 
           {/* Mockup viewer — transparent so center checkerboard shows through */}
           <div
-            className="relative w-full max-w-md"
-            style={{ aspectRatio: "3/4" }}
+            className="relative"
+            style={{ width: `${mockupSize}%`, maxWidth: "28rem", aspectRatio: "3/4" }}
           >
             <AnimatePresence mode="wait">
               <motion.div
@@ -1021,24 +1010,6 @@ export default function Design() {
               No bounding box set — configure it in the Admin Panel
             </p>
           )}
-
-          {/* ── Admin bbox resize controls ── */}
-          {isAdminPreview && bbox && (
-            <div className="flex gap-3 mt-5">
-              <button
-                onClick={() => adjustBbox("smaller")}
-                className="flex-1 py-3 text-sm font-bold uppercase tracking-widest border border-border bg-background/80 hover:border-foreground hover:bg-muted/20 transition-colors"
-              >
-                − Smaller
-              </button>
-              <button
-                onClick={() => adjustBbox("bigger")}
-                className="flex-1 py-3 text-sm font-bold uppercase tracking-widest border border-border bg-background/80 hover:border-foreground hover:bg-muted/20 transition-colors"
-              >
-                + Bigger
-              </button>
-            </div>
-          )}
         </div>
 
         {/* ── Right sidebar ── */}
@@ -1046,8 +1017,28 @@ export default function Design() {
 
           {/* Admin controls */}
           {isAdminPreview && (
-            <div className="p-4 border-b border-border space-y-2 bg-muted/10">
+            <div className="p-4 border-b border-border space-y-3 bg-muted/10">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Admin Preview</p>
+
+              {/* Mockup size controls */}
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-widest">Mockup Size ({mockupSize}%)</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setMockupSize(prev => Math.max(30, prev - 5))}
+                    className="flex-1 py-3 text-sm font-bold uppercase tracking-widest border border-border bg-background hover:border-foreground hover:bg-muted/20 transition-colors"
+                  >
+                    − Smaller
+                  </button>
+                  <button
+                    onClick={() => setMockupSize(prev => Math.min(150, prev + 5))}
+                    className="flex-1 py-3 text-sm font-bold uppercase tracking-widest border border-border bg-background hover:border-foreground hover:bg-muted/20 transition-colors"
+                  >
+                    + Bigger
+                  </button>
+                </div>
+              </div>
+
               <button
                 onClick={handleAdminSave}
                 disabled={saveMockup.isPending}
