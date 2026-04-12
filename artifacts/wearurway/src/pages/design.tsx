@@ -70,6 +70,18 @@ export default function Design() {
   const [editorFile, setEditorFile] = useState<File | null>(null);
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
 
+  const [showPlaceholder, setShowPlaceholder] = useState(() => localStorage.getItem("wearurway_show_placeholder") !== "false");
+  const [showDimLabel, setShowDimLabel] = useState(() => localStorage.getItem("wearurway_show_dim_label") !== "false");
+
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === "wearurway_show_placeholder") setShowPlaceholder(e.newValue !== "false");
+      if (e.key === "wearurway_show_dim_label") setShowDimLabel(e.newValue !== "false");
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
+
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const pinchRef = useRef<{ dist: number } | null>(null);
@@ -1144,7 +1156,7 @@ export default function Design() {
                 )}
 
                 {/* ── Print dimension label for selected layer ── */}
-                {selectedLayer && selectedLayer.visible && printDim && clipSize && (
+                {selectedLayer && selectedLayer.visible && printDim && clipSize && showDimLabel && (
                   <div
                     style={{
                       position: "absolute",
@@ -1189,7 +1201,7 @@ export default function Design() {
                   top: `${bbox.y}%`,
                   width: `${bbox.width}%`,
                   height: `${bbox.height}%`,
-                  border: layers.length === 0 ? "1px dashed rgba(255,255,255,0.18)" : "none",
+                  border: (layers.length === 0 && showPlaceholder) ? "1px dashed rgba(255,255,255,0.18)" : "none",
                   zIndex: 6,
                   pointerEvents: "none",
                   display: "flex",
@@ -1199,7 +1211,7 @@ export default function Design() {
                   gap: 2,
                 }}
               >
-                {layers.length === 0 && realWidth > 0 && (
+                {layers.length === 0 && realWidth > 0 && showPlaceholder && (
                   <>
                     <p style={{ fontSize: "clamp(10px, 2vw, 18px)", fontWeight: 900, fontFamily: "monospace", color: "rgba(255,255,255,0.4)", lineHeight: 1 }}>
                       {realWidth} × {realHeight}

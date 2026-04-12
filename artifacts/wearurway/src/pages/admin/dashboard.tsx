@@ -800,6 +800,8 @@ function MockupsManager() {
   const [selectedFitId, setSelectedFitId] = useState<string>("");
   const [selectedColorId, setSelectedColorId] = useState<string>("");
   const [activeSide, setActiveSide] = useState<"front" | "back">("front");
+  const [showPlaceholder, setShowPlaceholder] = useState(() => localStorage.getItem("wearurway_show_placeholder") !== "false");
+  const [showDimLabel, setShowDimLabel] = useState(() => localStorage.getItem("wearurway_show_dim_label") !== "false");
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -1065,6 +1067,32 @@ function MockupsManager() {
                     <span className="text-muted-foreground uppercase tracking-widest">Back bbox</span>
                     <span className={backBbox ? "text-foreground" : "text-muted-foreground"}>{backBbox ? "Defined" : "Missing"}</span>
                   </div>
+                </div>
+              </div>
+
+              <div className="border border-border p-4 space-y-3">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground">Designer Display</p>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="toggle-placeholder" className="text-xs uppercase tracking-widest cursor-pointer">Show Placeholder Box</Label>
+                  <Switch
+                    id="toggle-placeholder"
+                    checked={showPlaceholder}
+                    onCheckedChange={v => {
+                      setShowPlaceholder(v);
+                      localStorage.setItem("wearurway_show_placeholder", v ? "true" : "false");
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="toggle-dim-label" className="text-xs uppercase tracking-widest cursor-pointer">Show Dimension Indicator</Label>
+                  <Switch
+                    id="toggle-dim-label"
+                    checked={showDimLabel}
+                    onCheckedChange={v => {
+                      setShowDimLabel(v);
+                      localStorage.setItem("wearurway_show_dim_label", v ? "true" : "false");
+                    }}
+                  />
                 </div>
               </div>
 
