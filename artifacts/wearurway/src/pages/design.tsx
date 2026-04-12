@@ -504,176 +504,165 @@ export default function Design() {
   // ── Export ─────────────────────────────────────────────────────────────────
 
   const handleExport = useCallback(async () => {
-    const clipEl = clipAreaRef.current;
-    if (!clipEl || !realWidth || !realHeight || !bbox) return;
+    if (!realWidth || !realHeight) return;
 
-    const visibleLayers = layers.filter(l => l.visible);
-    if (visibleLayers.length === 0) return;
+    const frontVisible = frontLayers.filter(l => l.visible);
+    const backVisible  = backLayers.filter(l => l.visible);
+    if (frontVisible.length === 0 && backVisible.length === 0) return;
 
     setExporting(true);
     try {
-      // ── Load every image fresh via fetch() → blob URL ────────────────────────
       type Loaded = { layer: DesignLayer; img: HTMLImageElement; blobUrl: string };
-      const loaded: Loaded[] = [];
-      for (const layer of visibleLayers) {
-        try {
-          const res = await fetch(layer.imageUrl);
-          if (!res.ok) continue;
-          const blob = await res.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const i = new Image();
-            i.onload = () => resolve(i);
-            i.onerror = () => reject(new Error("load failed"));
-            i.src = blobUrl;
-          });
-          loaded.push({ layer, img, blobUrl });
-        } catch { /* skip */ }
-      }
-      if (loaded.length === 0) return;
 
-      // ── Read clip dimensions right before drawing ─────────────────────────────
-      // Use offsetWidth/offsetHeight (integer, no sub-pixel rounding) to avoid
-      // fractional getBoundingClientRect values that can shift the scale factor.
-      const clipW = clipEl.offsetWidth;
-      const clipH = clipEl.offsetHeight;
-      if (!clipW || !clipH) return;
+      // ── Helper: render one side and trigger download ─────────────────────────
+      const renderSide = async (
+        visibleLayers: DesignLayer[],
+        sideBbox: BBox | null,
+        label: "front" | "back",
+      ) => {
+        if (visibleLayers.length === 0 || !sideBbox) return;
 
-      // ── Determine export scale ────────────────────────────────────────────────
-      // Take the highest native resolution available from any loaded image.
-      let maxNaturalScale = 1;
-      for (const { layer, img } of loaded) {
-        if (layer.width > 0)  maxNaturalScale = Math.max(maxNaturalScale, img.naturalWidth  / layer.width);
-        if (layer.height > 0) maxNaturalScale = Math.max(maxNaturalScale, img.naturalHeight / layer.height);
-      }
-      // 300 DPI target for the real-world bounding box size.
-      const printScale = Math.max(
-        (realWidth  / 2.54 * 300) / clipW,
-        (realHeight / 2.54 * 300) / clipH,
-      );
-      // Cap at 8 192 px on the long edge to stay within browser limits.
-      const MAX_SIDE    = 8192;
-      const rawScale    = Math.max(maxNaturalScale, printScale);
-      const exportScale = Math.min(Math.max(rawScale, 1), MAX_SIDE / clipW, MAX_SIDE / clipH);
+        // Derive clip dimensions from mockupSize (same formula the DOM uses).
+        // mockup container: width = mockupSize, height = mockupSize * 4/3 (aspect 3:4)
+        const mockupContainerW = mockupSize;
+        const mockupContainerH = mockupSize * (4 / 3);
+        const clipW = Math.round(mockupContainerW * sideBbox.width  / 100);
+        const clipH = Math.round(mockupContainerH * sideBbox.height / 100);
+        if (!clipW || !clipH) return;
 
-      const exportW = Math.round(clipW * exportScale);
-      const exportH = Math.round(clipH * exportScale);
+        // ── Load images ────────────────────────────────────────────────────────
+        const loaded: Loaded[] = [];
+        for (const layer of visibleLayers) {
+          try {
+            const res = await fetch(layer.imageUrl);
+            if (!res.ok) continue;
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+              const i = new Image();
+              i.onload = () => resolve(i);
+              i.onerror = () => reject(new Error("load failed"));
+              i.src = blobUrl;
+            });
+            loaded.push({ layer, img, blobUrl });
+          } catch { /* skip */ }
+        }
+        if (loaded.length === 0) return;
 
-      // ── Build export canvas ───────────────────────────────────────────────────
-      // Scale the context so we can work entirely in CSS-pixel coordinates (the
-      // same coordinate space as layer.x / layer.y / layer.width / layer.height).
-      // This eliminates any per-axis rounding drift.
-      const canvas = document.createElement("canvas");
-      canvas.width  = exportW;
-      canvas.height = exportH;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+        // ── Determine export scale ─────────────────────────────────────────────
+        let maxNaturalScale = 1;
+        for (const { layer, img } of loaded) {
+          if (layer.width  > 0) maxNaturalScale = Math.max(maxNaturalScale, img.naturalWidth  / layer.width);
+          if (layer.height > 0) maxNaturalScale = Math.max(maxNaturalScale, img.naturalHeight / layer.height);
+        }
+        const printScale = Math.max(
+          (realWidth  / 2.54 * 300) / clipW,
+          (realHeight / 2.54 * 300) / clipH,
+        );
+        const MAX_SIDE    = 8192;
+        const rawScale    = Math.max(maxNaturalScale, printScale);
+        const exportScale = Math.min(Math.max(rawScale, 1), MAX_SIDE / clipW, MAX_SIDE / clipH);
+        const exportW = Math.round(clipW * exportScale);
+        const exportH = Math.round(clipH * exportScale);
 
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
+        // ── Build canvas ───────────────────────────────────────────────────────
+        const canvas = document.createElement("canvas");
+        canvas.width  = exportW;
+        canvas.height = exportH;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
 
-      // Scale context: 1 CSS pixel → exportScale canvas pixels.
-      const sx = exportW / clipW;
-      const sy = exportH / clipH;
-      ctx.scale(sx, sy);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.scale(exportW / clipW, exportH / clipH);
+        ctx.beginPath();
+        ctx.rect(0, 0, clipW, clipH);
+        ctx.clip();
 
-      // Enforce the bounding-box boundary in CSS-pixel space.
-      // Anything outside (0,0)-(clipW,clipH) is invisible in the DOM too.
-      ctx.beginPath();
-      ctx.rect(0, 0, clipW, clipH);
-      ctx.clip();
+        for (const { layer, img } of loaded) {
+          const cx    = layer.x + layer.width  / 2;
+          const cy    = layer.y + layer.height / 2;
+          const angle = (layer.rotation * Math.PI) / 180;
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(angle);
+          ctx.drawImage(img, -layer.width / 2, -layer.height / 2, layer.width, layer.height);
+          ctx.restore();
+        }
 
-      // Draw each layer at its exact CSS-pixel position — mirrors the DOM exactly.
-      for (const { layer, img } of loaded) {
-        const cx    = layer.x + layer.width  / 2;
-        const cy    = layer.y + layer.height / 2;
-        const angle = (layer.rotation * Math.PI) / 180;
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(angle);
-        ctx.drawImage(img, -layer.width / 2, -layer.height / 2, layer.width, layer.height);
-        ctx.restore();
-      }
+        for (const { blobUrl } of loaded) URL.revokeObjectURL(blobUrl);
 
-      // Clean up blob URLs
-      for (const { blobUrl } of loaded) URL.revokeObjectURL(blobUrl);
-
-      // ── DTF edge sharpening ───────────────────────────────────────────────────
-      // Sharpen kernel + hard alpha threshold so edges are crisp for DTF printing.
-      {
-        const id = ctx.getImageData(0, 0, exportW, exportH);
-        const src = id.data;
-        const dst = new Uint8ClampedArray(src);
-        const w = exportW, h = exportH;
-        // Strong unsharp kernel: centre=9, neighbours=−1 (8-connected)
-        for (let y = 1; y < h - 1; y++) {
-          for (let x = 1; x < w - 1; x++) {
-            const i = (y * w + x) * 4;
-            if (src[i + 3] === 0) continue;          // skip fully transparent
-            for (let c = 0; c < 3; c++) {
-              const v =
-                9  * src[i + c]
-                - src[((y-1)*w + (x-1))*4 + c]
-                - src[((y-1)*w +  x   )*4 + c]
-                - src[((y-1)*w + (x+1))*4 + c]
-                - src[( y   *w + (x-1))*4 + c]
-                - src[( y   *w + (x+1))*4 + c]
-                - src[((y+1)*w + (x-1))*4 + c]
-                - src[((y+1)*w +  x   )*4 + c]
-                - src[((y+1)*w + (x+1))*4 + c];
-              dst[i + c] = Math.max(0, Math.min(255, v));
+        // ── DTF edge sharpening ────────────────────────────────────────────────
+        {
+          const id  = ctx.getImageData(0, 0, exportW, exportH);
+          const src = id.data;
+          const dst = new Uint8ClampedArray(src);
+          const w = exportW, h = exportH;
+          for (let y = 1; y < h - 1; y++) {
+            for (let x = 1; x < w - 1; x++) {
+              const i = (y * w + x) * 4;
+              if (src[i + 3] === 0) continue;
+              for (let c = 0; c < 3; c++) {
+                const v =
+                  9  * src[i + c]
+                  - src[((y-1)*w + (x-1))*4 + c]
+                  - src[((y-1)*w +  x   )*4 + c]
+                  - src[((y-1)*w + (x+1))*4 + c]
+                  - src[( y   *w + (x-1))*4 + c]
+                  - src[( y   *w + (x+1))*4 + c]
+                  - src[((y+1)*w + (x-1))*4 + c]
+                  - src[((y+1)*w +  x   )*4 + c]
+                  - src[((y+1)*w + (x+1))*4 + c];
+                dst[i + c] = Math.max(0, Math.min(255, v));
+              }
             }
           }
+          for (let i = 3; i < dst.length; i += 4) {
+            dst[i] = Math.max(0, Math.min(255, Math.round(8 * (src[i] - 128) + 128)));
+          }
+          ctx.putImageData(new ImageData(dst, w, h), 0, 0);
         }
-        // High-contrast alpha S-curve — preserves smooth curves while eliminating
-        // faint semi-transparent fringes for DTF. 8x boost around the midpoint:
-        // alpha < ~112 → 0,  alpha > ~144 → 255,  curve boundary stays smooth.
-        for (let i = 3; i < dst.length; i += 4) {
-          dst[i] = Math.max(0, Math.min(255, Math.round(8 * (src[i] - 128) + 128)));
+
+        // ── Compute real-world size for filename ───────────────────────────────
+        let visMinX = clipW, visMaxX = 0, visMinY = clipH, visMaxY = 0;
+        for (const { layer } of loaded) {
+          const lx = Math.max(0, layer.x);
+          const ly = Math.max(0, layer.y);
+          const rx = Math.min(clipW, layer.x + layer.width);
+          const ry = Math.min(clipH, layer.y + layer.height);
+          if (rx > lx && ry > ly) {
+            visMinX = Math.min(visMinX, lx); visMaxX = Math.max(visMaxX, rx);
+            visMinY = Math.min(visMinY, ly); visMaxY = Math.max(visMaxY, ry);
+          }
         }
-        ctx.putImageData(new ImageData(dst, w, h), 0, 0);
-      }
+        const visCmW = visMaxX > visMinX
+          ? Math.round((visMaxX - visMinX) / clipW * realWidth  * 10) / 10
+          : Math.round(realWidth  * 10) / 10;
+        const visCmH = visMaxY > visMinY
+          ? Math.round((visMaxY - visMinY) / clipH * realHeight * 10) / 10
+          : Math.round(realHeight * 10) / 10;
 
-      // ── Compute filename from the actual visible design size ─────────────────
-      // Union of all visible layer rects, clamped to the clip area, converted
-      // to real-world cm so the name reflects what the user currently sees.
-      let visMinX = clipW, visMaxX = 0;
-      let visMinY = clipH, visMaxY = 0;
-      for (const { layer } of loaded) {
-        const lx = Math.max(0, layer.x);
-        const ly = Math.max(0, layer.y);
-        const rx = Math.min(clipW, layer.x + layer.width);
-        const ry = Math.min(clipH, layer.y + layer.height);
-        if (rx > lx && ry > ly) {
-          visMinX = Math.min(visMinX, lx);
-          visMaxX = Math.max(visMaxX, rx);
-          visMinY = Math.min(visMinY, ly);
-          visMaxY = Math.max(visMaxY, ry);
-        }
-      }
-      const visCmW = visMaxX > visMinX
-        ? Math.round((visMaxX - visMinX) / clipW * realWidth * 10) / 10
-        : Math.round(realWidth * 10) / 10;
-      const visCmH = visMaxY > visMinY
-        ? Math.round((visMaxY - visMinY) / clipH * realHeight * 10) / 10
-        : Math.round(realHeight * 10) / 10;
+        // ── Download ───────────────────────────────────────────────────────────
+        await new Promise<void>(resolve => {
+          canvas.toBlob(blob => {
+            if (!blob) { resolve(); return; }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${visCmW}x${visCmH}cm-${label}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+            resolve();
+          }, "image/png");
+        });
+      };
 
-      // ── Download ─────────────────────────────────────────────────────────────
-      const filename = `${visCmW}x${visCmH}cm.png`;
-
-      canvas.toBlob(blob => {
-        if (!blob) { alert("Export failed — could not generate image."); return; }
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-      }, "image/png");
+      await renderSide(frontVisible, localFrontBbox, "front");
+      await renderSide(backVisible,  localBackBbox,  "back");
     } finally {
       setExporting(false);
     }
-  }, [layers, realWidth, realHeight, bbox]);
+  }, [frontLayers, backLayers, localFrontBbox, localBackBbox, realWidth, realHeight, mockupSize]);
 
   if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return null;
 
