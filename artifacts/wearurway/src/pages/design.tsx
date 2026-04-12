@@ -350,7 +350,7 @@ export default function Design() {
     holdActionRef.current = null;
   }, []);
 
-  // ── Add Image — place first, then auto-open editor ────────────────────────
+  // ── Add Image — use a local object URL (never touches the server) ──────────
 
   const handleAddImage = useCallback(() => {
     const input = document.createElement("input");
@@ -362,10 +362,7 @@ export default function Design() {
       if (!file) return;
       setUploading(true);
       try {
-        const formData = new FormData();
-        formData.append("file", file, file.name);
-        const res = await fetch("/api/uploads", { method: "POST", body: formData });
-        const data = await res.json();
+        const objectUrl = URL.createObjectURL(file);
 
         const clipEl2 = clipAreaRef.current;
         const clipW = clipEl2?.offsetWidth ?? 200;
@@ -375,7 +372,7 @@ export default function Design() {
           const img = new Image();
           img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
           img.onerror = () => resolve({ w: 1, h: 1 });
-          img.src = data.url;
+          img.src = objectUrl;
         });
 
         const maxW = clipW * 0.6;
@@ -395,7 +392,7 @@ export default function Design() {
         const newLayer: DesignLayer = {
           id: crypto.randomUUID(),
           name: `Layer ${layers.length + 1}`,
-          imageUrl: data.url,
+          imageUrl: objectUrl,
           x: Math.round((clipW - defaultW) / 2),
           y: Math.round((clipH - defaultH) / 2),
           width: defaultW,
@@ -423,28 +420,27 @@ export default function Design() {
     setEditingLayerId(null);
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", blob, "design.png");
-      const res = await fetch("/api/uploads", { method: "POST", body: formData });
-      const data = await res.json();
+      const objectUrl = URL.createObjectURL(blob);
 
       if (targetLayerId) {
         const natural = await new Promise<{ w: number; h: number }>((resolve) => {
           const img = new Image();
           img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
           img.onerror = () => resolve({ w: edit.width || 1, h: edit.height || 1 });
-          img.src = data.url;
+          img.src = objectUrl;
         });
 
         setLayers(prev => prev.map(l => {
           if (l.id !== targetLayerId) return l;
+          // Revoke the old object URL to free browser memory
+          if (l.imageUrl.startsWith("blob:")) URL.revokeObjectURL(l.imageUrl);
           const baseW = Math.max(1, edit.originalWidth || l.naturalWidth || l.width);
           const baseH = Math.max(1, edit.originalHeight || l.naturalHeight || l.height);
           const scaleX = l.width / baseW;
           const scaleY = l.height / baseH;
           return {
             ...l,
-            imageUrl: data.url,
+            imageUrl: objectUrl,
             x: l.x + edit.x * scaleX,
             y: l.y + edit.y * scaleY,
             width: Math.max(MIN_LAYER_SIZE, edit.width * scaleX),
@@ -464,7 +460,7 @@ export default function Design() {
         const img = new Image();
         img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
         img.onerror = () => resolve({ w: 1, h: 1 });
-        img.src = data.url;
+        img.src = objectUrl;
       });
 
       const maxW = clipW * 0.6;
@@ -484,7 +480,7 @@ export default function Design() {
       const newLayer: DesignLayer = {
         id: crypto.randomUUID(),
         name: `Layer ${layers.length + 1}`,
-        imageUrl: data.url,
+        imageUrl: objectUrl,
         x: Math.round((clipW - defaultW) / 2),
         y: Math.round((clipH - defaultH) / 2),
         width: defaultW,
@@ -515,7 +511,11 @@ export default function Design() {
   }, []);
 
   const removeLayer = (id: string) => {
-    setLayers(prev => prev.filter(l => l.id !== id));
+    setLayers(prev => {
+      const layer = prev.find(l => l.id === id);
+      if (layer?.imageUrl.startsWith("blob:")) URL.revokeObjectURL(layer.imageUrl);
+      return prev.filter(l => l.id !== id);
+    });
     if (selectedLayerId === id) setSelectedLayerId(null);
   };
 
