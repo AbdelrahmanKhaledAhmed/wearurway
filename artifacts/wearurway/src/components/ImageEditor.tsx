@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 
-type Tool = "remove" | "recolor";
+type Tool = "brush-erase" | "flood-fill" | "recolor";
 
 interface Props {
   file: File;
@@ -8,7 +8,7 @@ interface Props {
   onCancel: () => void;
 }
 
-// ── Pixel helpers ──────────────────────────────────────────────────────────────
+// ── Pixel helpers ───────────────────────────────────────────────────────────────
 
 function getColorAt(data: Uint8ClampedArray, x: number, y: number, w: number): [number, number, number, number] {
   const i = (y * w + x) * 4;
@@ -27,7 +27,6 @@ function hexToRgb(hex: string): [number, number, number] {
   ];
 }
 
-// Iterative flood fill — makes clicked connected region transparent
 function floodFill(imageData: ImageData, startX: number, startY: number, tol: number) {
   const { data, width, height } = imageData;
   const target = getColorAt(data, startX, startY, width);
@@ -48,31 +47,26 @@ function floodFill(imageData: ImageData, startX: number, startY: number, tol: nu
 
     data[idx * 4 + 3] = 0;
 
-    if (x + 1 < width) stack.push(idx + 1);
-    if (x - 1 >= 0) stack.push(idx - 1);
+    if (x + 1 < width)  stack.push(idx + 1);
+    if (x - 1 >= 0)     stack.push(idx - 1);
     if (y + 1 < height) stack.push(idx + width);
-    if (y - 1 >= 0) stack.push(idx - width);
+    if (y - 1 >= 0)     stack.push(idx - width);
   }
 }
 
-// Erode the alpha channel by `radius` pixels — removes anti-aliased fringe
-// left behind after a flood fill by making any opaque pixel that borders a
-// transparent pixel also transparent.
 function erodeAlpha(imageData: ImageData, radius = 1) {
   const { data, width, height } = imageData;
-  const orig = new Uint8ClampedArray(data); // snapshot before erosion
+  const orig = new Uint8ClampedArray(data);
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
-      if (orig[i + 3] === 0) continue; // already transparent — skip
+      if (orig[i + 3] === 0) continue;
 
-      // If any neighbour within radius is transparent, erase this pixel too
       let kill = false;
       outer: for (let dy = -radius; dy <= radius && !kill; dy++) {
         for (let dx = -radius; dx <= radius && !kill; dx++) {
-          const nx = x + dx;
-          const ny = y + dy;
+          const nx = x + dx, ny = y + dy;
           if (nx < 0 || nx >= width || ny < 0 || ny >= height) { kill = true; break outer; }
           if (orig[(ny * width + nx) * 4 + 3] === 0) { kill = true; break outer; }
         }
@@ -82,7 +76,6 @@ function erodeAlpha(imageData: ImageData, radius = 1) {
   }
 }
 
-// Replace all pixels similar to clicked pixel with new color
 function globalRecolor(imageData: ImageData, startX: number, startY: number, newHex: string, tol: number) {
   const { data, width } = imageData;
   const target = getColorAt(data, startX, startY, width);
@@ -92,14 +85,11 @@ function globalRecolor(imageData: ImageData, startX: number, startY: number, new
     if (data[i + 3] === 0) continue;
     const c: [number, number, number, number] = [data[i], data[i + 1], data[i + 2], data[i + 3]];
     if (colorDist(c, target) <= tol) {
-      data[i] = nr;
-      data[i + 1] = ng;
-      data[i + 2] = nb;
+      data[i] = nr; data[i + 1] = ng; data[i + 2] = nb;
     }
   }
 }
 
-// Auto-crop canvas to bounding box of non-transparent pixels
 function trimTransparency(src: HTMLCanvasElement): HTMLCanvasElement {
   const ctx = src.getContext("2d");
   if (!ctx) return src;
@@ -109,48 +99,59 @@ function trimTransparency(src: HTMLCanvasElement): HTMLCanvasElement {
   let minX = width, maxX = 0, minY = height, maxY = 0;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const a = data[(y * width + x) * 4 + 3];
-      if (a > 0) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
+      if (data[(y * width + x) * 4 + 3] > 0) {
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
       }
     }
   }
 
   if (minX > maxX || minY > maxY) return src;
-
-  const trimW = maxX - minX + 1;
-  const trimH = maxY - minY + 1;
+  const trimW = maxX - minX + 1, trimH = maxY - minY + 1;
   const out = document.createElement("canvas");
-  out.width = trimW;
-  out.height = trimH;
+  out.width = trimW; out.height = trimH;
   const outCtx = out.getContext("2d");
   if (!outCtx) return src;
   outCtx.drawImage(src, minX, minY, trimW, trimH, 0, 0, trimW, trimH);
   return out;
 }
 
-// ── Component ──────────────────────────────────────────────────────────────────
+// ── Component ───────────────────────────────────────────────────────────────────
+
+const CHECKERBOARD: React.CSSProperties = {
+  backgroundImage:
+    "linear-gradient(45deg,#2a2a2a 25%,transparent 25%),linear-gradient(-45deg,#2a2a2a 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#2a2a2a 75%),linear-gradient(-45deg,transparent 75%,#2a2a2a 75%)",
+  backgroundSize: "24px 24px",
+  backgroundPosition: "0 0,0 12px,12px -12px,-12px 0px",
+  backgroundColor: "#1a1a1a",
+};
 
 export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [tool, setTool] = useState<Tool>("remove");
+  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDrawingRef = useRef(false);
+  const lastUndoSavedRef = useRef(false);
+
+  const [tool, setTool]           = useState<Tool>("brush-erase");
+  const [brushSize, setBrushSize] = useState(20);
   const [tolerance, setTolerance] = useState(35);
-  const [recolor, setRecolor] = useState("#ff0000");
+  const [recolor, setRecolor]     = useState("#ff0000");
   const [undoStack, setUndoStack] = useState<ImageData[]>([]);
   const [processing, setProcessing] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded]         = useState(false);
+  const [zoom, setZoom]             = useState(1);
+  const [baseDisplay, setBaseDisplay] = useState<{ w: number; h: number } | null>(null);
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+  const [brushDisplayR, setBrushDisplayR] = useState(0);
 
-  // Load image onto canvas
+  // ── Load image ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      canvas.width = img.naturalWidth;
+      canvas.width  = img.naturalWidth;
       canvas.height = img.naturalHeight;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
@@ -161,6 +162,41 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     img.src = url;
   }, [file]);
 
+  // Capture base display size once loaded (used for zoom scaling)
+  useEffect(() => {
+    if (!loaded) return;
+    requestAnimationFrame(() => {
+      const canvas = canvasRef.current;
+      if (canvas) setBaseDisplay({ w: canvas.offsetWidth, h: canvas.offsetHeight });
+    });
+  }, [loaded]);
+
+  // ── Zoom via scroll ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+      setZoom(prev => {
+        const next = Math.max(1, Math.min(10, prev * factor));
+        // Keep cursor point stable in the scroll container
+        const rect = el.getBoundingClientRect();
+        const mouseX = el.scrollLeft + (e.clientX - rect.left);
+        const mouseY = el.scrollTop  + (e.clientY - rect.top);
+        const ratio  = next / prev;
+        requestAnimationFrame(() => {
+          el.scrollLeft = mouseX * ratio - (e.clientX - rect.left);
+          el.scrollTop  = mouseY * ratio - (e.clientY - rect.top);
+        });
+        return next;
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [loaded]);
+
+  // ── Undo ───────────────────────────────────────────────────────────────────
   const saveUndo = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -182,62 +218,145 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
-        e.preventDefault();
-        handleUndo();
-      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") { e.preventDefault(); handleUndo(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [handleUndo]);
 
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Stop drawing if mouse leaves window
+  useEffect(() => {
+    const stop = () => { isDrawingRef.current = false; };
+    window.addEventListener("mouseup", stop);
+    return () => window.removeEventListener("mouseup", stop);
+  }, []);
+
+  // ── Coordinate helper ───────────────────────────────────────────────────────
+  const getImgCoords = useCallback((clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(canvas.width  - 1, (clientX - rect.left) * (canvas.width  / rect.width))),
+      y: Math.max(0, Math.min(canvas.height - 1, (clientY - rect.top)  * (canvas.height / rect.height))),
+    };
+  }, []);
+
+  // ── Brush erase ─────────────────────────────────────────────────────────────
+  const applyBrush = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     if (!canvas || !loaded) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    const coords = getImgCoords(clientX, clientY);
+    if (!coords) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = Math.max(0, Math.min(canvas.width - 1, Math.floor((e.clientX - rect.left) * scaleX)));
-    const y = Math.max(0, Math.min(canvas.height - 1, Math.floor((e.clientY - rect.top) * scaleY)));
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.beginPath();
+    ctx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }, [loaded, brushSize, getImgCoords]);
 
-    saveUndo();
-    setProcessing(true);
+  // ── Canvas events ───────────────────────────────────────────────────────────
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!loaded) return;
+    if (tool === "brush-erase") {
+      isDrawingRef.current = true;
+      lastUndoSavedRef.current = false;
+      saveUndo();
+      lastUndoSavedRef.current = true;
+      applyBrush(e.clientX, e.clientY);
+    } else {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const coords = getImgCoords(e.clientX, e.clientY);
+      if (!coords) return;
+      saveUndo();
+      setProcessing(true);
+      setTimeout(() => {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        if (tool === "flood-fill") {
+          floodFill(imageData, Math.floor(coords.x), Math.floor(coords.y), tolerance);
+          erodeAlpha(imageData, 2);
+        } else {
+          globalRecolor(imageData, Math.floor(coords.x), Math.floor(coords.y), recolor, tolerance);
+        }
+        ctx.putImageData(imageData, 0, 0);
+        setProcessing(false);
+      }, 0);
+    }
+  }, [loaded, tool, saveUndo, applyBrush, getImgCoords, tolerance, recolor]);
 
-    // Run in next tick so the UI can update first
-    setTimeout(() => {
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      if (tool === "remove") {
-        floodFill(imageData, x, y, tolerance);
-        erodeAlpha(imageData, 2);
-      } else {
-        globalRecolor(imageData, x, y, recolor, tolerance);
-      }
-      ctx.putImageData(imageData, 0, 0);
-      setProcessing(false);
-    }, 0);
-  };
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    setCursorPos({ x: e.clientX, y: e.clientY });
+    // Update brush display radius
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      setBrushDisplayR(brushSize * (rect.width / canvas.width));
+    }
+    if (tool === "brush-erase" && isDrawingRef.current) {
+      applyBrush(e.clientX, e.clientY);
+    }
+  }, [tool, brushSize, applyBrush]);
 
+  const handleMouseUp = useCallback(() => {
+    isDrawingRef.current = false;
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setCursorPos(null);
+    isDrawingRef.current = false;
+  }, []);
+
+  // ── Confirm ─────────────────────────────────────────────────────────────────
   const handleConfirm = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const trimmed = trimTransparency(canvas);
-    trimmed.toBlob(blob => {
-      if (blob) onConfirm(blob);
-    }, "image/png");
+    trimmed.toBlob(blob => { if (blob) onConfirm(blob); }, "image/png");
+  };
+
+  // ── Canvas display size ─────────────────────────────────────────────────────
+  const canvasStyle = useMemo((): React.CSSProperties => {
+    if (!loaded) return { display: "none" };
+    if (baseDisplay && zoom > 1) {
+      return {
+        display: "block",
+        width:  `${baseDisplay.w * zoom}px`,
+        height: `${baseDisplay.h * zoom}px`,
+        cursor: tool === "brush-erase" ? "none" : processing ? "wait" : "crosshair",
+        boxShadow: "0 0 0 1px rgba(255,255,255,0.08)",
+      };
+    }
+    return {
+      display: "block",
+      maxWidth: "100%",
+      maxHeight: "100%",
+      cursor: tool === "brush-erase" ? "none" : processing ? "wait" : "crosshair",
+      boxShadow: "0 0 0 1px rgba(255,255,255,0.08)",
+    };
+  }, [loaded, baseDisplay, zoom, tool, processing]);
+
+  const toolHint: Record<Tool, string> = {
+    "brush-erase": "Paint over areas to erase. Hold mouse and drag for smooth strokes.",
+    "flood-fill":  "Click on a color area to erase all connected similar pixels.",
+    "recolor":     "Click on any color to replace all similar colors with the chosen new color.",
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col" style={{ backdropFilter: "blur(8px)" }}>
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col">
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-border shrink-0">
         <div className="flex items-center gap-6">
           <h2 className="text-sm font-bold uppercase tracking-widest">Edit Image</h2>
-          <span className="text-xs text-muted-foreground uppercase tracking-widest">
-            {tool === "remove" ? "Click on a color area to erase it" : "Click on a color area to recolor it"}
+          <span className="text-xs text-muted-foreground uppercase tracking-widest hidden md:block">
+            {toolHint[tool]}
           </span>
         </div>
         <div className="flex items-center gap-4">
@@ -272,44 +391,71 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Tool</p>
             <div className="flex flex-col gap-2">
-              <button
-                onClick={() => setTool("remove")}
-                className={`text-xs px-3 py-2.5 border uppercase tracking-widest font-bold transition-colors text-left ${
-                  tool === "remove" ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground"
-                }`}
-              >
-                ✂ Remove BG
-              </button>
-              <button
-                onClick={() => setTool("recolor")}
-                className={`text-xs px-3 py-2.5 border uppercase tracking-widest font-bold transition-colors text-left ${
-                  tool === "recolor" ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground"
-                }`}
-              >
-                🎨 Change Color
-              </button>
+              {(
+                [
+                  { id: "brush-erase", label: "✏ Brush Erase" },
+                  { id: "flood-fill",  label: "✂ Fill Remove" },
+                  { id: "recolor",     label: "🎨 Change Color" },
+                ] as const
+              ).map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setTool(t.id)}
+                  className={`text-xs px-3 py-2.5 border uppercase tracking-widest font-bold transition-colors text-left ${
+                    tool === t.id
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border hover:border-foreground"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Tolerance */}
-          <div>
-            <div className="flex justify-between mb-2">
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Tolerance</p>
-              <span className="text-xs font-mono font-bold">{tolerance}</span>
+          {/* Brush size — brush-erase only */}
+          {tool === "brush-erase" && (
+            <div>
+              <div className="flex justify-between mb-2">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Brush Size</p>
+                <span className="text-xs font-mono font-bold">{brushSize}px</span>
+              </div>
+              <input
+                type="range"
+                min={2}
+                max={150}
+                value={brushSize}
+                onChange={e => setBrushSize(Number(e.target.value))}
+                className="w-full accent-foreground"
+              />
+              <div className="flex justify-between mt-1">
+                <span className="text-xs text-muted-foreground">Fine</span>
+                <span className="text-xs text-muted-foreground">Large</span>
+              </div>
             </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={tolerance}
-              onChange={e => setTolerance(Number(e.target.value))}
-              className="w-full accent-foreground"
-            />
-            <div className="flex justify-between mt-1">
-              <span className="text-xs text-muted-foreground">Precise</span>
-              <span className="text-xs text-muted-foreground">Broad</span>
+          )}
+
+          {/* Tolerance — flood-fill and recolor */}
+          {(tool === "flood-fill" || tool === "recolor") && (
+            <div>
+              <div className="flex justify-between mb-2">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Tolerance</p>
+                <span className="text-xs font-mono font-bold">{tolerance}</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={tolerance}
+                onChange={e => setTolerance(Number(e.target.value))}
+                className="w-full accent-foreground"
+              />
+              <div className="flex justify-between mt-1">
+                <span className="text-xs text-muted-foreground">Precise</span>
+                <span className="text-xs text-muted-foreground">Broad</span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Color picker — recolor only */}
           {tool === "recolor" && (
@@ -327,48 +473,87 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
             </div>
           )}
 
-          {/* Tip box */}
+          {/* Zoom controls */}
+          <div>
+            <div className="flex justify-between mb-2">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Zoom</p>
+              <span className="text-xs font-mono font-bold">{Math.round(zoom * 100)}%</span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setZoom(prev => Math.max(1, prev / 1.2))}
+                className="flex-1 py-1.5 text-sm font-bold border border-border hover:border-foreground transition-colors"
+              >
+                −
+              </button>
+              <button
+                onClick={() => setZoom(1)}
+                className="text-xs px-2 py-1.5 border border-border hover:border-foreground transition-colors uppercase tracking-widest"
+              >
+                Fit
+              </button>
+              <button
+                onClick={() => setZoom(prev => Math.min(10, prev * 1.2))}
+                className="flex-1 py-1.5 text-sm font-bold border border-border hover:border-foreground transition-colors"
+              >
+                +
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">Scroll on image to zoom</p>
+          </div>
+
+          {/* Tip */}
           <div className="mt-auto p-3 border border-border/50">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              {tool === "remove"
-                ? "Click on the background or any area to erase similar connected colors. Raise tolerance to remove more."
-                : "Click on any color in the image to replace all similar colors with the chosen new color."}
+              {toolHint[tool]}
             </p>
           </div>
         </div>
 
         {/* ── Canvas area ── */}
         <div
-          className="flex-1 overflow-auto flex items-center justify-center p-8"
-          style={{
-            backgroundImage:
-              "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
-            backgroundSize: "24px 24px",
-            backgroundPosition: "0 0, 0 12px, 12px -12px, -12px 0px",
-            backgroundColor: "#1a1a1a",
-          }}
+          ref={containerRef}
+          className="flex-1 overflow-auto"
+          style={CHECKERBOARD}
         >
-          {!loaded && (
-            <p className="text-xs uppercase tracking-widest text-muted-foreground animate-pulse">Loading image…</p>
-          )}
-          {processing && (
-            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-              <p className="text-xs uppercase tracking-widest text-foreground bg-background/80 px-4 py-2 border border-border">Processing…</p>
-            </div>
-          )}
-          <canvas
-            ref={canvasRef}
-            onClick={handleCanvasClick}
-            style={{
-              maxWidth: "100%",
-              maxHeight: "100%",
-              cursor: processing ? "wait" : tool === "remove" ? "crosshair" : "cell",
-              display: loaded ? "block" : "none",
-              boxShadow: "0 0 0 1px rgba(255,255,255,0.08)",
-            }}
-          />
+          <div
+            className="flex items-center justify-center p-8"
+            style={{ minWidth: "100%", minHeight: "100%" }}
+          >
+            {!loaded && (
+              <p className="text-xs uppercase tracking-widest text-muted-foreground animate-pulse">Loading image…</p>
+            )}
+            {processing && (
+              <div className="fixed inset-0 flex items-center justify-center z-10 pointer-events-none">
+                <p className="text-xs uppercase tracking-widest text-foreground bg-background/80 px-4 py-2 border border-border">Processing…</p>
+              </div>
+            )}
+            <canvas
+              ref={canvasRef}
+              style={canvasStyle}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseLeave}
+            />
+          </div>
         </div>
       </div>
+
+      {/* ── Brush cursor overlay ── */}
+      {tool === "brush-erase" && cursorPos && brushDisplayR > 0 && (
+        <div
+          className="fixed pointer-events-none rounded-full border-2 border-white"
+          style={{
+            left:  cursorPos.x - brushDisplayR,
+            top:   cursorPos.y - brushDisplayR,
+            width:  brushDisplayR * 2,
+            height: brushDisplayR * 2,
+            zIndex: 200,
+            mixBlendMode: "difference",
+          }}
+        />
+      )}
     </div>
   );
 }
