@@ -333,27 +333,27 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   // ── Zoom (CSS transform on wrapper div) ──────────────────────────────────────
   // Keeps the exact image point under the cursor stationary while zooming.
   const applyZoom = useCallback((factor: number, cx?: number, cy?: number) => {
-    const wrapper = wrapperRef.current;
-    if (!wrapper) return;
-    const rect = wrapper.getBoundingClientRect();
-    const ancX = cx ?? rect.left + rect.width / 2;
-    const ancY = cy ?? rect.top + rect.height / 2;
+    const area = areaRef.current;
+    if (!area || !dispSize) return;
+    const areaRect = area.getBoundingClientRect();
+    const ancX = cx !== undefined ? cx - areaRect.left : area.clientWidth / 2;
+    const ancY = cy !== undefined ? cy - areaRect.top : area.clientHeight / 2;
+    const layoutLeft = (area.clientWidth - dispSize.w) / 2;
+    const layoutTop = (area.clientHeight - dispSize.h) / 2;
     const prevZ = zoomRef.current;
     const nextZ = Math.max(1, Math.min(40, prevZ * factor));
     if (nextZ === prevZ) return;
-    const localX = (ancX - rect.left) / prevZ;
-    const localY = (ancY - rect.top) / prevZ;
-    const layoutLeft = rect.left - panRef.current.x;
-    const layoutTop = rect.top - panRef.current.y;
+    const localX = (ancX - layoutLeft - panRef.current.x) / prevZ;
+    const localY = (ancY - layoutTop - panRef.current.y) / prevZ;
     const nextPan = nextZ === 1
       ? { x: 0, y: 0 }
-      : clampPan({
+      : {
           x: ancX - layoutLeft - localX * nextZ,
           y: ancY - layoutTop - localY * nextZ,
-        }, nextZ);
+        };
     setZoom(nextZ);
     setPan(nextPan);
-  }, [clampPan]);
+  }, [dispSize]);
 
   useEffect(() => {
     const el = areaRef.current; if (!el) return;
