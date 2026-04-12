@@ -642,9 +642,8 @@ export default function Design() {
       />
     )}
     <div
-      className="overflow-hidden pt-20 flex flex-col"
+      className="h-screen overflow-hidden pt-20 flex flex-col"
       style={{
-        height: "100dvh",
         backgroundImage:
           "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
         backgroundSize: "24px 24px",
@@ -812,17 +811,8 @@ export default function Design() {
           </div>
         </div>
 
-        {/* ── Main canvas — checkerboard fills entire center ── */}
-        <div
-          className="flex-1 flex flex-col items-center justify-center px-4"
-          style={{
-            backgroundImage:
-              "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
-            backgroundSize: "24px 24px",
-            backgroundPosition: "0 0, 0 12px, 12px -12px, -12px 0px",
-            backgroundColor: "#1a1a1a",
-          }}
-        >
+        {/* ── Main canvas ── */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4">
 
           {/* Front / Back toggle */}
           <div className="flex gap-0 mb-4 border border-border/60">
