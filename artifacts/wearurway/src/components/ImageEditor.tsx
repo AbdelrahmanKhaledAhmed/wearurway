@@ -189,13 +189,28 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
       c.width  = img.naturalWidth;
       c.height = img.naturalHeight;
       c.getContext("2d")?.drawImage(img, 0, 0);
+      const trimmed = trimTransparency(c);
+      if (
+        trimmed.bounds.x !== 0 ||
+        trimmed.bounds.y !== 0 ||
+        trimmed.bounds.width !== img.naturalWidth ||
+        trimmed.bounds.height !== img.naturalHeight
+      ) {
+        const ctx = c.getContext("2d");
+        if (ctx) {
+          c.width = trimmed.canvas.width;
+          c.height = trimmed.canvas.height;
+          ctx.clearRect(0, 0, c.width, c.height);
+          ctx.drawImage(trimmed.canvas, 0, 0);
+        }
+      }
       trimRef.current = {
         originalWidth: img.naturalWidth,
         originalHeight: img.naturalHeight,
-        x: 0,
-        y: 0,
-        width: img.naturalWidth,
-        height: img.naturalHeight,
+        x: trimmed.bounds.x,
+        y: trimmed.bounds.y,
+        width: trimmed.bounds.width,
+        height: trimmed.bounds.height,
       };
       setLoaded(true);
       URL.revokeObjectURL(url);
@@ -621,20 +636,6 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
                 className="flex-1 py-1.5 text-sm font-bold border border-border hover:border-foreground transition-colors">+</button>
             </div>
             <p className="text-xs text-muted-foreground mt-2">Scroll on image to zoom toward the cursor. Use Move to pan when zoomed in.</p>
-          </div>
-
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Transparency</p>
-            <button
-              onClick={() => {
-                saveUndo();
-                trimCanvasToVisible();
-              }}
-              className="w-full text-xs py-2 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
-            >
-              Trim Empty Space
-            </button>
-            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">Erasing auto-shrinks transparent edges; use this anytime to fit the image bounds to visible pixels.</p>
           </div>
 
           {/* Tip */}
