@@ -60,4 +60,15 @@ router.get("/uploads/:filename", (req, res) => {
   res.sendFile(filePath);
 });
 
+router.delete("/uploads/:filename", (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(UPLOADS_DIR, filename);
+  if (!fs.existsSync(filePath)) {
+    res.status(404).json({ error: "File not found" });
+    return;
+  }
+  fs.unlinkSync(filePath);
+  res.status(200).json({ success: true });
+});
+
 export default router;

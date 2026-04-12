@@ -128,7 +128,17 @@ function ImageUploader({ value, onChange, label = "Image" }: {
           </div>
           <button
             type="button"
-            onClick={() => onChange("")}
+            onClick={async () => {
+              const filename = value.split("/").pop();
+              if (filename) {
+                const token = localStorage.getItem("wearurway_admin_token");
+                await fetch(`/api/uploads/${filename}`, {
+                  method: "DELETE",
+                  headers: token ? { Authorization: `Bearer ${token}` } : {},
+                }).catch(() => {});
+              }
+              onChange("");
+            }}
             className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs leading-none hover:opacity-80 transition-opacity"
             title="Remove image"
           >
