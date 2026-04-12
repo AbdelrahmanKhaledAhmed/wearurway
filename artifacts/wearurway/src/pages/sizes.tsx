@@ -27,6 +27,7 @@ export default function Sizes() {
   }, [fitId, colorId, setLocation]);
 
   const handleSelect = (size: any) => {
+    if (!size.available) return;
     setSize(size);
     setShowConfirmation(true);
   };
@@ -88,32 +89,46 @@ export default function Sizes() {
         <p className="text-muted-foreground text-lg mb-12">Perfect your fit.</p>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-80 w-full rounded-none" />
+              <Skeleton key={i} className="h-32 w-full rounded-none" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {sizes?.map((size) => (
               <motion.div
                 key={size.id}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={size.available ? { scale: 1.02 } : {}}
+                whileTap={size.available ? { scale: 0.98 } : {}}
                 onClick={() => handleSelect(size)}
-                className="group cursor-pointer border border-border bg-card p-6 flex flex-col items-center hover:border-foreground transition-colors"
+                className={`p-6 border border-border flex flex-col justify-center items-center text-center transition-colors ${
+                  size.available
+                    ? "hover:border-foreground bg-card min-h-48 cursor-pointer"
+                    : "opacity-50 cursor-not-allowed bg-muted/20 min-h-48"
+                }`}
               >
-                <div className="h-40 w-full mb-6 bg-muted/30 flex items-center justify-center relative overflow-hidden">
-                  {size.image ? (
-                    <img src={size.image} alt={size.name} className="object-contain h-full w-full" />
-                  ) : (
-                    <span className="text-muted-foreground uppercase text-xs tracking-widest">No Image</span>
-                  )}
-                </div>
-                <h3 className="text-3xl font-bold uppercase tracking-tight mb-2">{size.name}</h3>
-                <p className="text-sm text-muted-foreground font-mono">
+                <h3 className="text-2xl font-bold uppercase tracking-tight mb-3">{size.name}</h3>
+
+                <p className="text-sm font-mono text-foreground mb-3">
                   {size.realWidth} x {size.realHeight} CM
                 </p>
+
+                <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                  <span>{size.heightMin} ~ {size.heightMax} cm tall</span>
+                  <span>{size.weightMin} ~ {size.weightMax} kg</span>
+                </div>
+
+                {size.comingSoon && (
+                  <span className="mt-4 inline-block px-3 py-1 bg-muted text-muted-foreground text-xs font-medium tracking-widest uppercase">
+                    Coming Soon
+                  </span>
+                )}
+                {size.available && !size.comingSoon && (
+                  <span className="mt-4 inline-block px-3 py-1 bg-foreground text-background text-xs font-medium tracking-widest uppercase">
+                    Available
+                  </span>
+                )}
               </motion.div>
             ))}
           </div>

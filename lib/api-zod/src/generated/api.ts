@@ -150,8 +150,13 @@ export const GetSizesResponseItem = zod.object({
   name: zod.string(),
   realWidth: zod.number(),
   realHeight: zod.number(),
-  image: zod.string().optional(),
   fitId: zod.string(),
+  available: zod.boolean().optional(),
+  comingSoon: zod.boolean().optional(),
+  heightMin: zod.number().optional(),
+  heightMax: zod.number().optional(),
+  weightMin: zod.number().optional(),
+  weightMax: zod.number().optional(),
 });
 export const GetSizesResponse = zod.array(GetSizesResponseItem);
 

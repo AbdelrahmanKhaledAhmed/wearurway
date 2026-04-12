@@ -11,6 +11,11 @@ export interface Size {
   name: string;
   realWidth: number;
   realHeight: number;
-  image?: string;
   fitId: string;
+  available?: boolean;
+  comingSoon?: boolean;
+  heightMin?: number;
+  heightMax?: number;
+  weightMin?: number;
+  weightMax?: number;
 }

@@ -33,8 +33,13 @@ export interface Size {
   name: string;
   realWidth: number;
   realHeight: number;
-  image?: string;
   fitId: string;
+  available?: boolean;
+  comingSoon?: boolean;
+  heightMin?: number;
+  heightMax?: number;
+  weightMin?: number;
+  weightMax?: number;
 }
 
 export interface BoundingBox {
@@ -90,14 +95,14 @@ const DEFAULT_STORE: Store = {
     { id: "reg-olive", name: "Olive", hex: "#5B5B3A", fitId: "regular" },
   ],
   sizes: [
-    { id: "boxy-s", name: "Small", realWidth: 48, realHeight: 66, fitId: "boxy" },
-    { id: "boxy-m", name: "Medium", realWidth: 52, realHeight: 68, fitId: "boxy" },
-    { id: "boxy-l", name: "Large", realWidth: 56, realHeight: 70, fitId: "boxy" },
-    { id: "boxy-xl", name: "XL", realWidth: 60, realHeight: 72, fitId: "boxy" },
-    { id: "reg-s", name: "Small", realWidth: 44, realHeight: 68, fitId: "regular" },
-    { id: "reg-m", name: "Medium", realWidth: 48, realHeight: 70, fitId: "regular" },
-    { id: "reg-l", name: "Large", realWidth: 52, realHeight: 72, fitId: "regular" },
-    { id: "reg-xl", name: "XL", realWidth: 56, realHeight: 74, fitId: "regular" },
+    { id: "boxy-s", name: "Small", realWidth: 48, realHeight: 66, fitId: "boxy", available: true, comingSoon: false, heightMin: 160, heightMax: 170, weightMin: 55, weightMax: 65 },
+    { id: "boxy-m", name: "Medium", realWidth: 52, realHeight: 68, fitId: "boxy", available: true, comingSoon: false, heightMin: 170, heightMax: 175, weightMin: 65, weightMax: 75 },
+    { id: "boxy-l", name: "Large", realWidth: 56, realHeight: 70, fitId: "boxy", available: true, comingSoon: false, heightMin: 175, heightMax: 180, weightMin: 75, weightMax: 80 },
+    { id: "boxy-xl", name: "XL", realWidth: 60, realHeight: 72, fitId: "boxy", available: true, comingSoon: false, heightMin: 180, heightMax: 185, weightMin: 80, weightMax: 85 },
+    { id: "reg-s", name: "Small", realWidth: 44, realHeight: 68, fitId: "regular", available: true, comingSoon: false, heightMin: 160, heightMax: 170, weightMin: 55, weightMax: 65 },
+    { id: "reg-m", name: "Medium", realWidth: 48, realHeight: 70, fitId: "regular", available: true, comingSoon: false, heightMin: 170, heightMax: 175, weightMin: 65, weightMax: 75 },
+    { id: "reg-l", name: "Large", realWidth: 52, realHeight: 72, fitId: "regular", available: true, comingSoon: false, heightMin: 175, heightMax: 180, weightMin: 75, weightMax: 80 },
+    { id: "reg-xl", name: "XL", realWidth: 56, realHeight: 74, fitId: "regular", available: true, comingSoon: false, heightMin: 180, heightMax: 185, weightMin: 80, weightMax: 85 },
   ],
 };
 
