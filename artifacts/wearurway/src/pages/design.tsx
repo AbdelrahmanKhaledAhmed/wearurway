@@ -641,12 +641,21 @@ export default function Design() {
         onCancel={() => { setEditorFile(null); setEditingLayerId(null); }}
       />
     )}
-    <div className="h-screen overflow-hidden pt-20 flex flex-col bg-background">
+    <div
+      className="h-screen overflow-hidden pt-20 flex flex-col"
+      style={{
+        backgroundImage:
+          "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
+        backgroundSize: "24px 24px",
+        backgroundPosition: "0 0, 0 12px, 12px -12px, -12px 0px",
+        backgroundColor: "#1a1a1a",
+      }}
+    >
 
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left sidebar — Layers ── */}
-        <div className="w-56 border-r border-border flex flex-col shrink-0 overflow-hidden">
+        <div className="w-56 border-r border-border flex flex-col shrink-0 overflow-hidden bg-background">
           <div className="flex-1 overflow-y-auto no-scrollbar">
             <div className="p-5">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">
@@ -802,17 +811,8 @@ export default function Design() {
           </div>
         </div>
 
-        {/* ── Main canvas — checkerboard fills entire center ── */}
-        <div
-          className="flex-1 flex flex-col items-center justify-center px-4"
-          style={{
-            backgroundImage:
-              "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
-            backgroundSize: "24px 24px",
-            backgroundPosition: "0 0, 0 12px, 12px -12px, -12px 0px",
-            backgroundColor: "#1a1a1a",
-          }}
-        >
+        {/* ── Main canvas ── */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4">
 
           {/* Front / Back toggle */}
           <div className="flex gap-0 mb-4 border border-border/60">
@@ -820,7 +820,7 @@ export default function Design() {
               <button
                 key={s}
                 onClick={() => setSide(s)}
-                className={`px-6 py-2 text-xs uppercase tracking-widest font-medium transition-colors ${side === s ? "bg-foreground text-background" : "bg-background/20 text-foreground hover:bg-muted/20"}`}
+                className={`px-6 py-2 text-xs uppercase tracking-widest font-medium transition-colors ${side === s ? "bg-foreground text-background" : "bg-background text-foreground hover:bg-muted/20"}`}
               >
                 {s}
               </button>
@@ -981,7 +981,7 @@ export default function Design() {
         </div>
 
         {/* ── Right sidebar ── */}
-        <div className="w-72 border-l border-border flex flex-col shrink-0 overflow-hidden">
+        <div className="w-72 border-l border-border flex flex-col shrink-0 overflow-hidden bg-background">
 
           {/* Config summary */}
           <div className="p-6 border-b border-border">

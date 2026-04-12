@@ -604,8 +604,16 @@ function BoundingBoxEditor({
       </p>
       <div
         ref={containerRef}
-        className="relative w-full select-none overflow-hidden border border-border bg-muted/10"
-        style={{ cursor: "crosshair", aspectRatio: "3/4" }}
+        className="relative w-full select-none overflow-hidden border border-border"
+        style={{
+          cursor: "crosshair",
+          aspectRatio: "3/4",
+          backgroundImage:
+            "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
+          backgroundSize: "16px 16px",
+          backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0px",
+          backgroundColor: "#1a1a1a",
+        }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
