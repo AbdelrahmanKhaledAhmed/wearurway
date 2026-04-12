@@ -81,9 +81,6 @@ export default function AdminLogin() {
           </Button>
         </form>
 
-        <p className="text-center text-xs text-muted-foreground mt-6 uppercase tracking-widest">
-          Default password: admin123
-        </p>
       </motion.div>
     </div>
   );
