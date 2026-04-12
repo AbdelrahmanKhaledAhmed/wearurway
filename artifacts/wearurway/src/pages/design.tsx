@@ -150,7 +150,7 @@ export default function Design() {
     if (!el) return;
     el.addEventListener("wheel", onClipWheel, { passive: false });
     return () => el.removeEventListener("wheel", onClipWheel);
-  }, [onClipWheel]);
+  }, [onClipWheel, bbox]);
 
   // ── Pinch-to-zoom on mobile ────────────────────────────────────────────────
 
@@ -207,7 +207,7 @@ export default function Design() {
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
     };
-  }, [onTouchStart, onTouchMove, onTouchEnd]);
+  }, [onTouchStart, onTouchMove, onTouchEnd, bbox]);
 
   // ── Track clip area pixel size via ResizeObserver ───────────────────────────
   // Use offsetWidth/offsetHeight (integer CSS pixels) so the boundary values
