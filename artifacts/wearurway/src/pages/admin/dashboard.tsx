@@ -848,8 +848,61 @@ function MockupsManager() {
               )}
             </div>
 
-            {/* Right: info + current bounding box values */}
+            {/* Right: live preview + bounding box values + size controls */}
             <div className="space-y-6">
+
+              {/* ── Live Designer Preview ── */}
+              <div className="border border-border space-y-0 overflow-hidden">
+                <div className="px-4 py-3 border-b border-border">
+                  <h3 className="text-xs font-bold uppercase tracking-widest">Live Designer Preview</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Updates as you change size settings below</p>
+                </div>
+                <div
+                  className="flex items-center justify-center"
+                  style={{
+                    backgroundImage: "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
+                    backgroundSize: "16px 16px",
+                    backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0px",
+                    backgroundColor: "#1a1a1a",
+                    minHeight: "200px",
+                    padding: "16px",
+                  }}
+                >
+                  {currentImage ? (
+                    <div
+                      style={{
+                        width: `${viewerWidthPct}%`,
+                        aspectRatio: `${viewerAspectW}/${viewerAspectH}`,
+                        position: "relative",
+                        transition: "width 0.15s ease, aspect-ratio 0.15s ease",
+                      }}
+                    >
+                      <img
+                        src={currentImage}
+                        alt="preview"
+                        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+                      />
+                      {currentBbox && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: `${currentBbox.x}%`,
+                            top: `${currentBbox.y}%`,
+                            width: `${currentBbox.width}%`,
+                            height: `${currentBbox.height}%`,
+                            border: "2px dashed rgba(255,255,255,0.5)",
+                            background: "rgba(255,255,255,0.05)",
+                            pointerEvents: "none",
+                          }}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground uppercase tracking-widest">Upload a mockup image to preview</p>
+                  )}
+                </div>
+              </div>
+
               <div className="border border-border p-6 space-y-4">
                 <h3 className="text-xs font-bold uppercase tracking-widest">Bounding Box Values</h3>
                 <div className="space-y-3">
