@@ -80,6 +80,12 @@ const CHECKER: React.CSSProperties = {
   backgroundSize:"24px 24px",backgroundPosition:"0 0,0 12px,12px -12px,-12px 0px",backgroundColor:"#1a1a1a",
 };
 
+function getPageZoom() {
+  const raw = getComputedStyle(document.documentElement).zoom;
+  const zoom = Number(raw);
+  return Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+}
+
 // ── Component ───────────────────────────────────────────────────────────────────
 
 export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
@@ -278,9 +284,10 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     const rect = c?.getBoundingClientRect();
     if (!c || !rect) return;
     if (toolRef.current !== "brush-erase") return;
+    const pageZoom = getPageZoom();
     setCursor({
-      x: clientX,
-      y: clientY,
+      x: clientX / pageZoom,
+      y: clientY / pageZoom,
       size: Math.max(2, brushRef.current * (rect.width / c.width)),
       visible: true,
     });
