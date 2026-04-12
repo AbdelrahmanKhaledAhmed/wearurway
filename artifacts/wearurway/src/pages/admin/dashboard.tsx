@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
+import { useCustomizer } from "@/hooks/use-customizer";
 import {
   useGetAdminMe,
   useGetProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, getGetProductsQueryKey,
@@ -665,6 +666,8 @@ function MockupsManager() {
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const { setProduct, setFit, setColor, setSize } = useCustomizer();
 
   // Filtered fits/colors based on selection
   const filteredFits = fits?.filter(f => f.productId === selectedProductId) ?? [];
@@ -672,6 +675,26 @@ function MockupsManager() {
   const { data: filteredColors } = useGetColors(selectedFitId, {
     query: { enabled: !!selectedFitId, queryKey: getGetColorsQueryKey(selectedFitId) }
   });
+
+  const { data: fitSizes } = useGetSizes(selectedFitId, {
+    query: { enabled: !!selectedFitId, queryKey: getGetSizesQueryKey(selectedFitId) }
+  });
+
+  const handlePreviewInDesigner = () => {
+    const product = products?.find(p => p.id === selectedProductId);
+    const fit = fits?.find(f => f.id === selectedFitId);
+    const color = filteredColors?.find(c => c.id === selectedColorId);
+    const size = fitSizes?.[0];
+    if (!product || !fit || !color || !size) {
+      toast({ title: "Select a full combination first", description: "Product, fit, color, and at least one size must exist." });
+      return;
+    }
+    setProduct(product);
+    setFit(fit);
+    setColor(color);
+    setSize(size);
+    setLocation("/design?admin=1");
+  };
 
   useEffect(() => {
     if (products && products.length > 0 && !selectedProductId) {
@@ -907,6 +930,15 @@ function MockupsManager() {
                   </div>
                 </div>
               </div>
+
+              <Button
+                variant="outline"
+                className="w-full rounded-none uppercase tracking-widest font-bold h-12"
+                onClick={handlePreviewInDesigner}
+                disabled={!mockupParams}
+              >
+                Preview in Designer →
+              </Button>
 
               <Button
                 className="w-full rounded-none uppercase tracking-widest font-bold h-12"

@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useGetMockup, getGetMockupQueryKey } from "@workspace/api-client-react";
+import { useGetMockup, useSaveMockup, getGetMockupQueryKey } from "@workspace/api-client-react";
 import { useCustomizer } from "@/hooks/use-customizer";
+import { useToast } from "@/hooks/use-toast";
 import ImageEditor from "@/components/ImageEditor";
+
+interface BBox { x: number; y: number; width: number; height: number }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,8 +40,14 @@ const ROTATE_STEP = 1;
 
 export default function Design() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
+  const isAdminPreview = new URLSearchParams(search).get("admin") === "1";
   const { selectedProduct, selectedFit, selectedColor, selectedSize, reset } = useCustomizer();
+  const { toast } = useToast();
+  const saveMockup = useSaveMockup();
   const [side, setSide] = useState<"front" | "back">("front");
+  const [localFrontBbox, setLocalFrontBbox] = useState<BBox | null>(null);
+  const [localBackBbox, setLocalBackBbox] = useState<BBox | null>(null);
 
   const [layers, setLayers] = useState<DesignLayer[]>([]);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
@@ -79,9 +88,43 @@ export default function Design() {
   );
 
   const currentSide = side === "front" ? mockup?.front : mockup?.back;
-  const bbox = currentSide?.boundingBox;
   const realWidth = selectedSize?.realWidth ?? 0;
   const realHeight = selectedSize?.realHeight ?? 0;
+
+  // Sync local bboxes when mockup loads
+  useEffect(() => {
+    if (mockup?.front?.boundingBox) setLocalFrontBbox(mockup.front.boundingBox as BBox);
+    if (mockup?.back?.boundingBox) setLocalBackBbox(mockup.back.boundingBox as BBox);
+  }, [mockup]);
+
+  const bbox: BBox | null | undefined = side === "front" ? localFrontBbox : localBackBbox;
+
+  const adjustBbox = (direction: "bigger" | "smaller") => {
+    const delta = direction === "bigger" ? 1 : -1;
+    const adjust = (b: BBox): BBox => ({
+      x: Math.max(0, b.x - delta),
+      y: Math.max(0, b.y - delta),
+      width: Math.min(100 - Math.max(0, b.x - delta), b.width + delta * 2),
+      height: Math.min(100 - Math.max(0, b.y - delta), b.height + delta * 2),
+    });
+    if (side === "front") setLocalFrontBbox(prev => prev ? adjust(prev) : prev);
+    else setLocalBackBbox(prev => prev ? adjust(prev) : prev);
+  };
+
+  const handleAdminSave = () => {
+    if (!selectedProduct || !selectedFit || !selectedColor) return;
+    saveMockup.mutate({
+      data: {
+        productId: selectedProduct.id,
+        fitId: selectedFit.id,
+        colorId: selectedColor.id,
+        front: { image: mockup?.front?.image, boundingBox: localFrontBbox ?? undefined },
+        back: { image: mockup?.back?.image, boundingBox: localBackBbox ?? undefined },
+      },
+    }, {
+      onSuccess: () => toast({ title: "Mockup saved" }),
+    });
+  };
 
   // ── Drag handlers ──────────────────────────────────────────────────────────
 
@@ -973,15 +1016,53 @@ export default function Design() {
             )}
           </div>
 
-          {!bbox && currentSide?.image && (
+          {!bbox && currentSide?.image && !isAdminPreview && (
             <p className="text-xs text-muted-foreground uppercase tracking-widest mt-6">
               No bounding box set — configure it in the Admin Panel
             </p>
+          )}
+
+          {/* ── Admin bbox resize controls ── */}
+          {isAdminPreview && bbox && (
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => adjustBbox("smaller")}
+                className="flex-1 py-3 text-sm font-bold uppercase tracking-widest border border-border bg-background/80 hover:border-foreground hover:bg-muted/20 transition-colors"
+              >
+                − Smaller
+              </button>
+              <button
+                onClick={() => adjustBbox("bigger")}
+                className="flex-1 py-3 text-sm font-bold uppercase tracking-widest border border-border bg-background/80 hover:border-foreground hover:bg-muted/20 transition-colors"
+              >
+                + Bigger
+              </button>
+            </div>
           )}
         </div>
 
         {/* ── Right sidebar ── */}
         <div className="w-72 border-l border-border flex flex-col shrink-0 overflow-hidden">
+
+          {/* Admin controls */}
+          {isAdminPreview && (
+            <div className="p-4 border-b border-border space-y-2 bg-muted/10">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Admin Preview</p>
+              <button
+                onClick={handleAdminSave}
+                disabled={saveMockup.isPending}
+                className="w-full py-3 text-xs font-bold uppercase tracking-widest bg-foreground text-background hover:opacity-80 transition-opacity disabled:opacity-40"
+              >
+                {saveMockup.isPending ? "Saving..." : "Save Mockup"}
+              </button>
+              <button
+                onClick={() => setLocation("/admin/dashboard")}
+                className="w-full py-2 text-xs uppercase tracking-widest border border-border hover:border-foreground transition-colors"
+              >
+                ← Back to Admin
+              </button>
+            </div>
+          )}
 
           {/* Config summary */}
           <div className="p-6 border-b border-border">
