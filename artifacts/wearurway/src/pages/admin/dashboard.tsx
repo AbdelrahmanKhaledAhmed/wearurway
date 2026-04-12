@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
+import { CUSTOM_FONTS } from "@/config/fonts";
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -89,7 +90,7 @@ export default function AdminDashboard() {
 
         <Tabs defaultValue="products" className="w-full">
           <TabsList className="mb-12 rounded-none border-b border-border bg-transparent h-auto p-0 flex space-x-8 overflow-x-auto justify-start w-full">
-            {["products", "fits", "colors", "sizes", "mockups"].map(tab => (
+            {["products", "fits", "colors", "sizes", "mockups", "fonts"].map(tab => (
               <TabsTrigger
                 key={tab}
                 value={tab}
@@ -104,6 +105,7 @@ export default function AdminDashboard() {
           <TabsContent value="colors"><ColorsManager /></TabsContent>
           <TabsContent value="sizes"><SizesManager /></TabsContent>
           <TabsContent value="mockups"><MockupsManager /></TabsContent>
+          <TabsContent value="fonts"><FontsManager /></TabsContent>
         </Tabs>
       </motion.div>
     </div>
@@ -1383,6 +1385,64 @@ function SizesManager() {
           </form>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ─── Fonts Manager ───────────────────────────────────────────────────────────
+function FontsManager() {
+  return (
+    <div className="space-y-10 max-w-2xl">
+      <div>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6">Font Files</h2>
+
+        <div className="border border-border p-6 space-y-5">
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">Fonts folder path</p>
+            <p className="font-mono text-sm bg-muted/20 px-4 py-3 border border-border break-all select-all">
+              artifacts/wearurway/public/fonts/
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">Config file</p>
+            <p className="font-mono text-sm bg-muted/20 px-4 py-3 border border-border break-all select-all">
+              artifacts/wearurway/src/config/fonts.ts
+            </p>
+          </div>
+
+          <div className="border-t border-border pt-5 space-y-3">
+            <p className="text-xs font-bold uppercase tracking-widest">How to add a font</p>
+            <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+              <li>Copy your <span className="font-mono font-bold text-foreground">.woff2</span> file into the fonts folder above</li>
+              <li>Open <span className="font-mono text-foreground">config/fonts.ts</span> and add a new entry to the <span className="font-mono text-foreground">CUSTOM_FONTS</span> array</li>
+            </ol>
+            <p className="text-xs font-bold uppercase tracking-widest mt-4">How to remove a font</p>
+            <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+              <li>Delete the file from the fonts folder</li>
+              <li>Remove its entry from <span className="font-mono text-foreground">config/fonts.ts</span></li>
+            </ol>
+          </div>
+
+          <div className="border border-amber-400/40 bg-amber-400/5 px-4 py-3 text-xs text-amber-600 dark:text-amber-400 uppercase tracking-widest font-medium">
+            Font files must use the <span className="font-mono font-bold">.woff2</span> extension — other formats will not work
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6">
+          Active Fonts ({CUSTOM_FONTS.length})
+        </h2>
+        <div className="border border-border divide-y divide-border">
+          {CUSTOM_FONTS.map(font => (
+            <div key={font.family} className="flex items-center justify-between px-5 py-3 gap-4">
+              <span className="text-sm font-medium truncate">{font.name}</span>
+              <span className="font-mono text-xs text-muted-foreground shrink-0">{font.filename}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
