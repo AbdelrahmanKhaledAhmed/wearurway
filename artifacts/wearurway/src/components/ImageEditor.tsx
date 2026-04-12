@@ -133,7 +133,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   const trimRef       = useRef<ImageEditResult | null>(null);
 
   // ── State ────────────────────────────────────────────────────────────────────
-  const [tool,       setTool]       = useState<Tool>("brush-erase");
+  const [tool,       setTool]       = useState<Tool>("flood-fill");
   const [brushSize,  setBrushSize]  = useState(20);
   const [tolerance,  setTolerance]  = useState(35);
   const [recolor,    setRecolor]    = useState("#ff0000");
@@ -153,7 +153,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   const brushRef    = useRef(brushSize);
   const tolRef      = useRef(tolerance);
   const recolorRef  = useRef(recolor);
-  const toolRef     = useRef<Tool>("brush-erase");
+  const toolRef     = useRef<Tool>("flood-fill");
   const zoomRef     = useRef(1);
   const panRef      = useRef({ x: 0, y: 0 });
   useEffect(() => { brushRef.current   = brushSize;  }, [brushSize]);
@@ -614,22 +614,6 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
             </div>
           )}
 
-          {/* Tolerance */}
-          {(tool==="flood-fill"||tool==="recolor") && (
-            <div>
-              <div className="flex justify-between mb-2">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Tolerance</p>
-                <span className="text-xs font-mono font-bold">{tolerance}</span>
-              </div>
-              <input type="range" min={0} max={100} value={tolerance}
-                onChange={e => setTolerance(Number(e.target.value))}
-                className="w-full accent-foreground" />
-              <div className="flex justify-between mt-1">
-                <span className="text-xs text-muted-foreground">Precise</span>
-                <span className="text-xs text-muted-foreground">Broad</span>
-              </div>
-            </div>
-          )}
 
           {/* Color */}
           {tool==="recolor" && (
