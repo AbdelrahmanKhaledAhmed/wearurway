@@ -897,7 +897,7 @@ export default function Design() {
                         userSelect: "none",
                         background: "none",
                         flexShrink: 0,
-                        imageRendering: "crisp-edges",
+                        imageRendering: "high-quality" as React.CSSProperties["imageRendering"],
                       }}
                     />
                   ) : null
