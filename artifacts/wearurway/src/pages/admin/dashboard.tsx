@@ -549,10 +549,14 @@ function BoundingBoxEditor({
   image,
   bbox,
   onChange,
+  aspectW = 3,
+  aspectH = 4,
 }: {
   image: string;
   bbox: BBox | null;
   onChange: (b: BBox) => void;
+  aspectW?: number;
+  aspectH?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [drawing, setDrawing] = useState(false);
@@ -605,7 +609,7 @@ function BoundingBoxEditor({
       <div
         ref={containerRef}
         className="relative w-full select-none overflow-hidden border border-border bg-muted/10"
-        style={{ cursor: "crosshair", aspectRatio: "3/4" }}
+        style={{ cursor: "crosshair", aspectRatio: `${aspectW}/${aspectH}` }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
@@ -699,6 +703,9 @@ function MockupsManager() {
   const [frontBbox, setFrontBbox] = useState<BBox | null>(null);
   const [backImage, setBackImage] = useState("");
   const [backBbox, setBackBbox] = useState<BBox | null>(null);
+  const [viewerWidthPct, setViewerWidthPct] = useState(80);
+  const [viewerAspectW, setViewerAspectW] = useState(3);
+  const [viewerAspectH, setViewerAspectH] = useState(4);
 
   // Sync from fetched mockup when selection changes
   useEffect(() => {
@@ -706,6 +713,9 @@ function MockupsManager() {
     setFrontBbox(mockup?.front?.boundingBox ?? null);
     setBackImage(mockup?.back?.image ?? "");
     setBackBbox(mockup?.back?.boundingBox ?? null);
+    setViewerWidthPct(mockup?.viewerWidthPct ?? 80);
+    setViewerAspectW(mockup?.viewerAspectW ?? 3);
+    setViewerAspectH(mockup?.viewerAspectH ?? 4);
   }, [mockup]);
 
   const handleSave = () => {
@@ -721,6 +731,9 @@ function MockupsManager() {
           image: backImage || undefined,
           boundingBox: backBbox ?? undefined,
         },
+        viewerWidthPct,
+        viewerAspectW,
+        viewerAspectH,
       }
     }, {
       onSuccess: () => {
@@ -822,9 +835,13 @@ function MockupsManager() {
                   image={currentImage}
                   bbox={currentBbox}
                   onChange={setCurrentBbox}
+                  aspectW={viewerAspectW}
+                  aspectH={viewerAspectH}
                 />
               ) : (
-                <div className="border border-dashed border-border aspect-[3/4] flex flex-col items-center justify-center text-muted-foreground gap-3">
+                <div className="border border-dashed border-border flex flex-col items-center justify-center text-muted-foreground gap-3"
+                  style={{ aspectRatio: `${viewerAspectW}/${viewerAspectH}` }}
+                >
                   <span className="text-xs uppercase tracking-widest">Upload an image first</span>
                   <span className="text-xs text-muted-foreground/60">Then draw the design bounding box on it</span>
                 </div>
@@ -876,6 +893,55 @@ function MockupsManager() {
                     Clear Bounding Box
                   </Button>
                 )}
+              </div>
+
+              <div className="border border-border p-6 space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-widest">Viewer Size in Designer</h3>
+                <p className="text-xs text-muted-foreground uppercase tracking-widest">
+                  Controls how large the mockup appears in the designer canvas.
+                </p>
+                <div className="space-y-1">
+                  <Label className="text-xs uppercase tracking-widest">Width — {viewerWidthPct}% of canvas</Label>
+                  <input
+                    type="range"
+                    min={20}
+                    max={100}
+                    step={1}
+                    value={viewerWidthPct}
+                    onChange={e => setViewerWidthPct(Number(e.target.value))}
+                    className="w-full accent-foreground"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground font-mono">
+                    <span>20%</span><span>100%</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs uppercase tracking-widest">Aspect Ratio (W : H)</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={20}
+                      step={0.1}
+                      value={viewerAspectW}
+                      onChange={e => setViewerAspectW(Math.max(0.1, parseFloat(e.target.value) || 1))}
+                      className="rounded-none h-9 font-mono text-xs w-20"
+                    />
+                    <span className="text-muted-foreground font-bold">:</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={20}
+                      step={0.1}
+                      value={viewerAspectH}
+                      onChange={e => setViewerAspectH(Math.max(0.1, parseFloat(e.target.value) || 1))}
+                      className="rounded-none h-9 font-mono text-xs w-20"
+                    />
+                    <span className="text-xs text-muted-foreground font-mono ml-1">
+                      ({viewerAspectW}:{viewerAspectH})
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="border border-border p-6 space-y-3">

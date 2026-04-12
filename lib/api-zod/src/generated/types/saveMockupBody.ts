@@ -13,4 +13,7 @@ export interface SaveMockupBody {
   colorId: string;
   front?: MockupSide;
   back?: MockupSide;
+  viewerWidthPct?: number;
+  viewerAspectW?: number;
+  viewerAspectH?: number;
 }

@@ -829,8 +829,12 @@ export default function Design() {
 
           {/* Mockup viewer — transparent so center checkerboard shows through */}
           <div
-            className="relative w-full max-w-md"
-            style={{ aspectRatio: "3/4" }}
+            className="relative"
+            style={{
+              width: `${mockup?.viewerWidthPct ?? 80}%`,
+              maxWidth: "100%",
+              aspectRatio: `${mockup?.viewerAspectW ?? 3}/${mockup?.viewerAspectH ?? 4}`,
+            }}
           >
             <AnimatePresence mode="wait">
               <motion.div
