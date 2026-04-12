@@ -979,25 +979,6 @@ function MockupsManager() {
                 >
                   Resize in Designer →
                 </Button>
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    className="rounded-none flex-1 uppercase tracking-widest text-xs font-bold h-10"
-                    onClick={() => setViewerWidthPct(w => Math.max(20, w - 5))}
-                    disabled={viewerWidthPct <= 20}
-                  >
-                    − Smaller
-                  </Button>
-                  <span className="text-sm font-mono font-bold min-w-[3rem] text-center">{viewerWidthPct}%</span>
-                  <Button
-                    variant="outline"
-                    className="rounded-none flex-1 uppercase tracking-widest text-xs font-bold h-10"
-                    onClick={() => setViewerWidthPct(w => Math.min(100, w + 5))}
-                    disabled={viewerWidthPct >= 100}
-                  >
-                    + Bigger
-                  </Button>
-                </div>
               </div>
 
               <div className="border border-border p-6 space-y-3">

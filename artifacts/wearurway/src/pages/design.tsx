@@ -832,7 +832,7 @@ export default function Design() {
 
         {/* ── Main canvas — checkerboard fills entire center ── */}
         <div
-          className="flex-1 flex flex-col items-center justify-center px-4"
+          className="flex-1 flex flex-col items-center overflow-hidden"
           style={{
             backgroundImage:
               "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
@@ -843,7 +843,7 @@ export default function Design() {
         >
 
           {/* Front / Back toggle */}
-          <div className="flex gap-0 mb-4 border border-border/60">
+          <div className="shrink-0 flex gap-0 mt-4 mb-3 border border-border/60">
             {(["front", "back"] as const).map(s => (
               <button
                 key={s}
@@ -855,13 +855,12 @@ export default function Design() {
             ))}
           </div>
 
-          {/* Mockup viewer — transparent so center checkerboard shows through */}
+          {/* Mockup viewer — fills remaining height, no bottom gap */}
           <div
-            className="relative"
+            className="flex-1 min-h-0 relative"
             style={{
               width: `${effectiveWidth}%`,
               maxWidth: "100%",
-              aspectRatio: `${mockup?.viewerAspectW ?? 3}/${mockup?.viewerAspectH ?? 4}`,
               transition: "width 0.15s ease",
             }}
           >
@@ -1005,13 +1004,14 @@ export default function Design() {
               </div>
             )}
 
+            {!bbox && currentSide?.image && (
+              <div className="absolute inset-x-0 bottom-4 flex justify-center pointer-events-none" style={{ zIndex: 5 }}>
+                <p className="text-xs text-muted-foreground/60 uppercase tracking-widest">
+                  No bounding box set — configure it in the Admin Panel
+                </p>
+              </div>
+            )}
           </div>
-
-          {!bbox && currentSide?.image && (
-            <p className="text-xs text-muted-foreground uppercase tracking-widest mt-6">
-              No bounding box set — configure it in the Admin Panel
-            </p>
-          )}
         </div>
 
         {/* ── Right sidebar ── */}
