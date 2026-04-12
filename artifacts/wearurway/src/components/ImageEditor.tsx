@@ -297,18 +297,22 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     ctx.save();
     ctx.globalCompositeOperation = "destination-out";
     ctx.imageSmoothingEnabled = false;
-    if (last) {
-      ctx.lineWidth = brushRef.current;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
+    const stamp = (x: number, y: number) => {
       ctx.beginPath();
-      ctx.moveTo(last.x, last.y);
-      ctx.lineTo(imgX, imgY);
-      ctx.stroke();
-    } else {
-      ctx.beginPath();
-      ctx.arc(imgX, imgY, radius, 0, Math.PI * 2);
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.fill();
+    };
+    if (last) {
+      const dx = imgX - last.x;
+      const dy = imgY - last.y;
+      const distance = Math.hypot(dx, dy);
+      const steps = Math.max(1, Math.ceil(distance / Math.max(1, radius / 2)));
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        stamp(last.x + dx * t, last.y + dy * t);
+      }
+    } else {
+      stamp(imgX, imgY);
     }
     ctx.restore();
     lastBrushPoint.current = { x: imgX, y: imgY };
@@ -574,6 +578,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
                 top: cursor.y,
                 width: cursor.size,
                 height: cursor.size,
+                boxSizing: "border-box",
                 transform: "translate(-50%, -50%)",
                 borderRadius: "9999px",
                 border: "2px solid rgba(255,255,255,0.98)",
