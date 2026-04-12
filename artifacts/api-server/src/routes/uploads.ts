@@ -2,14 +2,9 @@ import { Router, type IRouter } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { fileURLToPath } from "url";
+import { UPLOADS_DIR, ensureDir } from "../lib/paths.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOADS_DIR = path.join(__dirname, "..", "..", "uploads");
-
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
+ensureDir(UPLOADS_DIR);
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -26,7 +21,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"];
     const ext = path.extname(file.originalname).toLowerCase();
@@ -49,15 +44,6 @@ router.post("/uploads", upload.single("file"), (req, res) => {
     url: `/api/uploads/${req.file.filename}`,
     filename: req.file.filename,
   });
-});
-
-router.get("/uploads/:filename", (req, res) => {
-  const filePath = path.join(UPLOADS_DIR, req.params.filename);
-  if (!fs.existsSync(filePath)) {
-    res.status(404).json({ error: "File not found" });
-    return;
-  }
-  res.sendFile(filePath);
 });
 
 router.delete("/uploads/:filename", (req, res) => {
