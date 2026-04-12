@@ -641,7 +641,17 @@ export default function Design() {
         onCancel={() => { setEditorFile(null); setEditingLayerId(null); }}
       />
     )}
-    <div className="overflow-hidden pt-20 flex flex-col bg-background" style={{ height: "100dvh" }}>
+    <div
+      className="overflow-hidden pt-20 flex flex-col"
+      style={{
+        height: "100dvh",
+        backgroundImage:
+          "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
+        backgroundSize: "24px 24px",
+        backgroundPosition: "0 0, 0 12px, 12px -12px, -12px 0px",
+        backgroundColor: "#1a1a1a",
+      }}
+    >
 
       <div className="flex flex-1 overflow-hidden">
 
