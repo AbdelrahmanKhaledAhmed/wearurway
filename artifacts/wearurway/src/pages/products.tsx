@@ -31,34 +31,31 @@ export default function Products() {
         <p className="text-muted-foreground text-lg mb-12">Choose your canvas.</p>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-[400px] w-full rounded-none" />
+              <Skeleton key={i} className="h-32 w-full rounded-none" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {products?.map((product) => (
               <motion.div
                 key={product.id}
                 whileHover={product.available ? { scale: 1.02 } : {}}
                 whileTap={product.available ? { scale: 0.98 } : {}}
                 onClick={() => handleSelect(product)}
-                className={`group relative h-[400px] border border-border p-6 flex flex-col justify-end overflow-hidden cursor-pointer transition-colors ${
-                  product.available 
-                    ? "hover:border-foreground bg-card" 
-                    : "opacity-50 cursor-not-allowed bg-muted/20"
+                className={`p-6 border border-border flex flex-col justify-center items-center text-center cursor-pointer transition-colors ${
+                  product.available
+                    ? "hover:border-foreground bg-card min-h-48"
+                    : "opacity-50 cursor-not-allowed bg-muted/20 min-h-48"
                 }`}
               >
-                <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent z-10" />
-                <div className="relative z-20">
-                  <h3 className="text-2xl font-bold uppercase tracking-tight mb-2">{product.name}</h3>
-                  {!product.available && (
-                    <span className="inline-block px-3 py-1 bg-muted text-muted-foreground text-sm font-medium tracking-widest uppercase">
-                      Coming Soon
-                    </span>
-                  )}
-                </div>
+                <h3 className="text-2xl font-bold uppercase tracking-tight mb-4">{product.name}</h3>
+                {!product.available && (
+                  <span className="inline-block px-3 py-1 bg-muted text-muted-foreground text-xs font-medium tracking-widest uppercase">
+                    Coming Soon
+                  </span>
+                )}
               </motion.div>
             ))}
           </div>
