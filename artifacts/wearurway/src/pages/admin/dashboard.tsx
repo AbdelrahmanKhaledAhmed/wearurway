@@ -94,17 +94,33 @@ export default function AdminDashboard() {
 
 // ─── Image Upload Helper ────────────────────────────────────────────────────
 
+function toSafeFilename(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9_-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 function ImageUploader({ value, onChange, label = "Image", uploadPath = "/api/uploads" }: {
   value: string; onChange: (url: string) => void; label?: string; uploadPath?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [pendingName, setPendingName] = useState("");
+
+  const safeName = toSafeFilename(pendingName);
+  const previewFilename = safeName ? `${safeName}.png` : "";
 
   const handleFile = async (file: File) => {
+    if (!safeName) return;
     setUploading(true);
     try {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("name", safeName);
       const token = localStorage.getItem("wearurway_admin_token");
       const res = await fetch(uploadPath, {
         method: "POST",
@@ -114,6 +130,7 @@ function ImageUploader({ value, onChange, label = "Image", uploadPath = "/api/up
       if (!res.ok) throw new Error("Upload failed");
       const data = await res.json() as { url: string };
       onChange(data.url);
+      setPendingName("");
     } catch { /* silent */ }
     finally { setUploading(false); }
   };
@@ -121,7 +138,7 @@ function ImageUploader({ value, onChange, label = "Image", uploadPath = "/api/up
   const handleRemove = async () => {
     if (value) {
       const token = localStorage.getItem("wearurway_admin_token");
-      const match = value.match(/^(\/api\/[^/]+)\/([^/]+)$/);
+      const match = value.match(/^(\/api(?:\/[^/]+)+)\/([^/]+)$/);
       if (match) {
         await fetch(`${match[1]}/${match[2]}`, {
           method: "DELETE",
@@ -150,11 +167,29 @@ function ImageUploader({ value, onChange, label = "Image", uploadPath = "/api/up
           </button>
         </div>
       ) : (
-        <div className="flex gap-2 items-center">
-          <Input value={value} onChange={e => onChange(e.target.value)} placeholder={`${uploadPath}/image.png`} className="rounded-none h-10 flex-1" />
-          <Button type="button" variant="outline" className="rounded-none h-10 whitespace-nowrap" onClick={() => inputRef.current?.click()} disabled={uploading}>
-            <Upload className="w-4 h-4 mr-2" />{uploading ? "Uploading..." : "Upload"}
-          </Button>
+        <div className="space-y-2">
+          <div className="flex gap-2 items-center">
+            <Input
+              value={pendingName}
+              onChange={e => setPendingName(e.target.value)}
+              placeholder="File name (e.g. black_front)"
+              className="rounded-none h-10 flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-none h-10 whitespace-nowrap"
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading || !safeName}
+            >
+              <Upload className="w-4 h-4 mr-2" />{uploading ? "Uploading..." : "Upload"}
+            </Button>
+          </div>
+          {previewFilename && (
+            <p className="text-xs font-mono text-muted-foreground">
+              Will be saved as: <span className="text-foreground">{previewFilename}</span>
+            </p>
+          )}
         </div>
       )}
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
