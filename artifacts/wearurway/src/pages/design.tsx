@@ -35,7 +35,7 @@ interface DragState {
 const ZOOM_STEP_SCROLL = 0.05;
 const ZOOM_STEP_BUTTON = 0.01;
 const MIN_LAYER_SIZE = 10;
-const MAX_LAYER_SCALE = 30;
+const MAX_LAYER_SCALE = 200;
 const ROTATE_STEP = 1;
 
 // ─── Main Component ───────────────────────────────────────────────────────────
