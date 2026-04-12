@@ -31,8 +31,6 @@ interface AlphaBounds {
   height: number;
 }
 
-const VISIBLE_ALPHA_THRESHOLD = 12;
-
 // ── Pixel helpers ───────────────────────────────────────────────────────────────
 
 function getColorAt(d: Uint8ClampedArray, x: number, y: number, w: number): [number,number,number,number] {
@@ -91,7 +89,7 @@ function getAlphaBounds(src: HTMLCanvasElement): AlphaBounds | null {
   const {width:W,height:H}=src, data=ctx.getImageData(0,0,W,H).data;
   let mx=W,Mx=0,my=H,My=0;
   for (let y=0;y<H;y++) for (let x=0;x<W;x++) {
-    if (data[(y*W+x)*4+3]>VISIBLE_ALPHA_THRESHOLD) { mx=Math.min(mx,x);Mx=Math.max(Mx,x);my=Math.min(my,y);My=Math.max(My,y); }
+    if (data[(y*W+x)*4+3]>0) { mx=Math.min(mx,x);Mx=Math.max(Mx,x);my=Math.min(my,y);My=Math.max(My,y); }
   }
   if (mx>Mx||my>My) return null;
   return { x: mx, y: my, width: Mx - mx + 1, height: My - my + 1 };

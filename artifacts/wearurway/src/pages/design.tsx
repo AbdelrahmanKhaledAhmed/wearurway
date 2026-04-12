@@ -32,90 +32,11 @@ interface DragState {
   startLayerY: number;
 }
 
-interface AlphaBounds {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
 const ZOOM_STEP_SCROLL = 0.05;
 const ZOOM_STEP_BUTTON = 0.01;
 const MIN_LAYER_SIZE = 10;
 const MAX_LAYER_SCALE = 30;
 const ROTATE_STEP = 1;
-const VISIBLE_ALPHA_THRESHOLD = 12;
-
-const getImageAlphaBounds = (canvas: HTMLCanvasElement): AlphaBounds | null => {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-  const { width, height } = canvas;
-  const data = ctx.getImageData(0, 0, width, height).data;
-  let minX = width;
-  let maxX = 0;
-  let minY = height;
-  let maxY = 0;
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (data[(y * width + x) * 4 + 3] > VISIBLE_ALPHA_THRESHOLD) {
-        minX = Math.min(minX, x);
-        maxX = Math.max(maxX, x);
-        minY = Math.min(minY, y);
-        maxY = Math.max(maxY, y);
-      }
-    }
-  }
-
-  if (minX > maxX || minY > maxY) return null;
-  return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
-};
-
-const trimTransparentUpload = async (file: File): Promise<{ file: File; natural: { w: number; h: number } }> => {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error("Image load failed"));
-      image.src = url;
-    });
-
-    const source = document.createElement("canvas");
-    source.width = img.naturalWidth;
-    source.height = img.naturalHeight;
-    source.getContext("2d")?.drawImage(img, 0, 0);
-    const bounds = getImageAlphaBounds(source);
-
-    if (
-      !bounds ||
-      (bounds.x === 0 &&
-        bounds.y === 0 &&
-        bounds.width === source.width &&
-        bounds.height === source.height)
-    ) {
-      return { file, natural: { w: img.naturalWidth, h: img.naturalHeight } };
-    }
-
-    const trimmed = document.createElement("canvas");
-    trimmed.width = bounds.width;
-    trimmed.height = bounds.height;
-    trimmed
-      .getContext("2d")
-      ?.drawImage(source, bounds.x, bounds.y, bounds.width, bounds.height, 0, 0, bounds.width, bounds.height);
-
-    const blob = await new Promise<Blob | null>((resolve) => trimmed.toBlob(resolve, "image/png"));
-    if (!blob) return { file, natural: { w: img.naturalWidth, h: img.naturalHeight } };
-
-    const baseName = file.name.replace(/\.[^.]+$/, "") || "design";
-    return {
-      file: new File([blob], `${baseName}-trimmed.png`, { type: "image/png" }),
-      natural: { w: bounds.width, h: bounds.height },
-    };
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-};
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -440,9 +361,8 @@ export default function Design() {
       if (!file) return;
       setUploading(true);
       try {
-        const prepared = await trimTransparentUpload(file);
         const formData = new FormData();
-        formData.append("file", prepared.file, prepared.file.name);
+        formData.append("file", file, file.name);
         const res = await fetch("/api/uploads", { method: "POST", body: formData });
         const data = await res.json();
 
@@ -450,7 +370,12 @@ export default function Design() {
         const clipW = clipEl2?.offsetWidth ?? 200;
         const clipH = clipEl2?.offsetHeight ?? 200;
 
-        const natural = prepared.natural;
+        const natural = await new Promise<{ w: number; h: number }>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+          img.onerror = () => resolve({ w: 1, h: 1 });
+          img.src = data.url;
+        });
 
         const maxW = clipW * 0.6;
         const maxH = clipH * 0.6;
@@ -483,7 +408,7 @@ export default function Design() {
         setSelectedLayerId(newLayer.id);
         // Auto-open editor so user can immediately refine (remove bg, crop, etc.)
         setEditingLayerId(newLayer.id);
-        setEditorFile(prepared.file);
+        setEditorFile(file);
       } finally {
         setUploading(false);
       }
