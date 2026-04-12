@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Wearurway"
+version = "1.0.0"
+id = "artifacts/wearurway-preview"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18948
+
+[services.development]
+run = "pnpm --filter @workspace/wearurway-preview run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/wearurway-preview", "run", "build" ]
+publicDir = "artifacts/wearurway-preview/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18948"
+BASE_PATH = "/"
