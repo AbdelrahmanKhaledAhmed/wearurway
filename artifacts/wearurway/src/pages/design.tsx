@@ -65,7 +65,8 @@ export default function Design() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const isAdminPreview = new URLSearchParams(search).get("admin") === "1";
-  const { selectedProduct, selectedFit, selectedColor, selectedSize, reset } = useCustomizer();
+  const shareId = new URLSearchParams(search).get("share");
+  const { selectedProduct, selectedFit, selectedColor, selectedSize, setProduct, setFit, setColor, setSize, reset } = useCustomizer();
   const { toast } = useToast();
   const saveMockup = useSaveMockup();
   const [side, setSide] = useState<"front" | "back">("front");
@@ -89,6 +90,7 @@ export default function Design() {
   const [sharing, setSharing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [shareLoading, setShareLoading] = useState(() => !!shareId);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [clipSize, setClipSize] = useState<{ w: number; h: number } | null>(null);
   const [editorFile, setEditorFile] = useState<File | null>(null);
@@ -117,10 +119,35 @@ export default function Design() {
   const holdTimerRef = useRef<{ timeout: ReturnType<typeof setTimeout> | null; interval: ReturnType<typeof setInterval> | null }>({ timeout: null, interval: null });
 
   useEffect(() => {
+    if (shareLoading) return;
     if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) {
       setLocation("/products");
     }
-  }, [selectedProduct, selectedFit, selectedColor, selectedSize, setLocation]);
+  }, [shareLoading, selectedProduct, selectedFit, selectedColor, selectedSize, setLocation]);
+
+  const savedDesignLoaded = useRef(false);
+  const shareLoadedRef = useRef(false);
+  useEffect(() => {
+    if (!shareId || shareLoadedRef.current) return;
+    shareLoadedRef.current = true;
+    fetch(`/api/shared-designs/${shareId}`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then((design: { product: Parameters<typeof setProduct>[0]; fit: Parameters<typeof setFit>[0]; color: Parameters<typeof setColor>[0]; size: Parameters<typeof setSize>[0]; frontLayers: DesignLayer[]; backLayers: DesignLayer[] }) => {
+        setProduct(design.product);
+        setFit(design.fit);
+        setColor(design.color);
+        setSize(design.size);
+        if (design.frontLayers?.length) setFrontLayers(design.frontLayers);
+        if (design.backLayers?.length) setBackLayers(design.backLayers);
+        savedDesignLoaded.current = true;
+      })
+      .catch(() => {
+        toast({ title: "Share link not found", description: "This design link may have expired." });
+        setLocation("/products");
+      })
+      .finally(() => setShareLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shareId]);
 
   const { data: mockup } = useGetMockup(
     {
@@ -152,7 +179,6 @@ export default function Design() {
     if (mockup?.mockupOffsetY !== undefined) setMockupOffsetY(mockup.mockupOffsetY);
   }, [mockup]);
 
-  const savedDesignLoaded = useRef(false);
   useEffect(() => {
     if (!selectedProduct || !selectedFit || !selectedColor) return;
     if (savedDesignLoaded.current) return;
@@ -703,136 +729,42 @@ export default function Design() {
   };
 
   const handleShareDesign = useCallback(async () => {
-    const frontBbox = localFrontBbox;
-    const backBbox = localBackBbox;
-    const frontImage = mockup?.front?.image;
-    const backImage = mockup?.back?.image;
-
-    if (!frontImage && !backImage) {
-      toast({ title: "No mockup available" });
-      return;
-    }
-
+    if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return;
     setSharing(true);
     try {
-      const sideW = 900;
-      const sideH = 1200;
-      const gap = 80;
-      const padding = 80;
-      const labelH = 64;
-      const canvas = document.createElement("canvas");
-      canvas.width = padding * 2 + sideW * 2 + gap;
-      canvas.height = padding * 2 + labelH + sideH;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.fillStyle = "#0b0b0b";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const renderSide = async (
-        label: "FRONT" | "BACK",
-        x: number,
-        mockupImage: string | undefined,
-        bbox: BBox | null,
-        sideLayers: DesignLayer[],
-      ) => {
-        const y = padding + labelH;
-        const base = await loadCanvasImage(mockupImage);
-
-        ctx.fillStyle = "#151515";
-        ctx.fillRect(x, y, sideW, sideH);
-
-        if (base) {
-          drawImageContain(ctx, base, x, y, sideW, sideH);
-        } else {
-          ctx.strokeStyle = "rgba(255,255,255,0.18)";
-          ctx.strokeRect(x, y, sideW, sideH);
-        }
-
-        if (bbox) {
-          const clipX = x + sideW * bbox.x / 100;
-          const clipY = y + sideH * bbox.y / 100;
-          const clipW = sideW * bbox.width / 100;
-          const clipH = sideH * bbox.height / 100;
-          const sourceClipW = mockupSize * bbox.width / 100;
-          const sourceClipH = mockupSize * (4 / 3) * bbox.height / 100;
-          const scaleX = clipW / sourceClipW;
-          const scaleY = clipH / sourceClipH;
-
-          ctx.save();
-          ctx.beginPath();
-          ctx.rect(clipX, clipY, clipW, clipH);
-          ctx.clip();
-
-          for (const layer of sideLayers.filter(l => l.visible)) {
-            const img = await loadCanvasImage(layer.imageUrl);
-            if (!img) continue;
-            const cx = clipX + (layer.x + layer.width / 2) * scaleX;
-            const cy = clipY + (layer.y + layer.height / 2) * scaleY;
-            const angle = (layer.rotation * Math.PI) / 180;
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.rotate(angle);
-            ctx.drawImage(
-              img,
-              -layer.width * scaleX / 2,
-              -layer.height * scaleY / 2,
-              layer.width * scaleX,
-              layer.height * scaleY,
-            );
-            ctx.restore();
-          }
-
-          ctx.restore();
-        }
-
-        ctx.fillStyle = "#f5f1e8";
-        ctx.font = "700 26px monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(label, x + sideW / 2, padding + labelH / 2);
-      };
-
-      await renderSide("FRONT", padding, frontImage, frontBbox, frontLayers);
-      await renderSide("BACK", padding + sideW + gap, backImage, backBbox, backLayers);
-
-      await new Promise<void>(resolve => {
-        canvas.toBlob(async blob => {
-          if (!blob) {
-            resolve();
-            return;
-          }
-
-          const file = new File([blob], "wearurway-design.png", { type: "image/png" });
-          if (navigator.canShare?.({ files: [file] })) {
-            try {
-              await navigator.share({
-                title: "My WearUrWay Design",
-                text: "Check out my custom design.",
-                files: [file],
-              });
-              resolve();
-              return;
-            } catch {
-              // Fall through to download if sharing is cancelled or unavailable.
-            }
-          }
-
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "wearurway-front-back-design.png";
-          a.click();
-          URL.revokeObjectURL(url);
-          resolve();
-        }, "image/png");
+      const serializeLayers = async (ls: DesignLayer[]) =>
+        Promise.all(ls.map(async l => ({ ...l, imageUrl: await blobUrlToDataUrl(l.imageUrl) })));
+      const [serializedFront, serializedBack] = await Promise.all([
+        serializeLayers(frontLayers),
+        serializeLayers(backLayers),
+      ]);
+      const res = await fetch("/api/shared-designs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product: selectedProduct,
+          fit: selectedFit,
+          color: selectedColor,
+          size: selectedSize,
+          frontLayers: serializedFront,
+          backLayers: serializedBack,
+        }),
       });
+      if (!res.ok) throw new Error("Server error");
+      const { id } = await res.json() as { id: string };
+      const url = `${window.location.origin}/design?share=${id}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast({ title: "Link copied!", description: "Share it with anyone to open this exact design." });
+      } catch {
+        toast({ title: "Share link ready", description: url });
+      }
+    } catch {
+      toast({ title: "Share failed", description: "Could not generate a share link." });
     } finally {
       setSharing(false);
     }
-  }, [backLayers, localBackBbox, frontLayers, localFrontBbox, mockup, mockupSize, toast]);
+  }, [selectedProduct, selectedFit, selectedColor, selectedSize, frontLayers, backLayers, toast]);
 
   // ── Save Design ─────────────────────────────────────────────────────────────
 

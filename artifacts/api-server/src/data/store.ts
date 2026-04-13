@@ -64,16 +64,43 @@ export interface Mockup {
   mockupOffsetY?: number;
 }
 
+export interface DesignLayer {
+  id: string;
+  name: string;
+  imageUrl: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  visible: boolean;
+  naturalWidth: number;
+  naturalHeight: number;
+}
+
+export interface SharedDesign {
+  id: string;
+  product: Product;
+  fit: Fit;
+  color: Color;
+  size: Size;
+  frontLayers: DesignLayer[];
+  backLayers: DesignLayer[];
+  createdAt: string;
+}
+
 export interface Store {
   products: Product[];
   fits: Fit[];
   colors: Color[];
   sizes: Size[];
   mockups: Record<string, Mockup>;
+  sharedDesigns: Record<string, SharedDesign>;
 }
 
 const DEFAULT_STORE: Store = {
   mockups: {},
+  sharedDesigns: {},
   products: [
     { id: "tshirt", name: "T-Shirt", available: true, comingSoon: false },
     { id: "sweatshirt", name: "Sweatshirt", available: false, comingSoon: true },
@@ -115,6 +142,7 @@ function loadStore(): Store {
         ...JSON.parse(JSON.stringify(DEFAULT_STORE)),
         ...parsed,
         mockups: parsed.mockups ?? {},
+        sharedDesigns: parsed.sharedDesigns ?? {},
       };
     }
   } catch {
