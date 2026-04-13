@@ -839,7 +839,9 @@ function MockupFilenameInput({ label, value, generatedFilename }: {
         <p className="text-sm font-mono break-all text-foreground">{generatedFilename || "Select product, fit, and color first"}</p>
         {expectedUrl && (
           <p className="text-[10px] text-muted-foreground leading-relaxed">
-            Upload the image to the mockups uploads folder and rename it exactly to this file name. The mockup will use:
+            Put the PNG file in this folder and rename it exactly to the required file name:
+            <span className="block font-mono break-all mt-1 text-foreground">artifacts/uploads/mockups/</span>
+            The app will display it using this URL:
             <span className="block font-mono break-all mt-1">{expectedUrl}</span>
           </p>
         )}
