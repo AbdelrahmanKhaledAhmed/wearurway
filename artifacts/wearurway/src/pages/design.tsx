@@ -6,6 +6,7 @@ import { useCustomizer } from "@/hooks/use-customizer";
 import { useToast } from "@/hooks/use-toast";
 import ImageEditor, { type ImageEditResult } from "@/components/ImageEditor";
 import TextLayerModal from "@/components/TextLayerModal";
+import OrderReviewModal from "@/components/OrderReviewModal";
 
 interface BBox { x: number; y: number; width: number; height: number }
 
@@ -67,6 +68,7 @@ export default function Design() {
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [showOrderModal, setShowOrderModal] = useState(false);
   const [clipSize, setClipSize] = useState<{ w: number; h: number } | null>(null);
   const [editorFile, setEditorFile] = useState<File | null>(null);
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
@@ -1404,6 +1406,17 @@ export default function Design() {
           </div>
 
 
+          {/* ── ORDER NOW ── */}
+          <div className="px-6 py-5 border-b border-border">
+            <button
+              onClick={() => setShowOrderModal(true)}
+              className="w-full py-4 font-black uppercase text-sm tracking-[0.2em] transition-all active:scale-[0.98] hover:opacity-90"
+              style={{ backgroundColor: "#f5c842", color: "#0d0d0d", letterSpacing: "0.25em" }}
+            >
+              Order Now
+            </button>
+          </div>
+
           {/* ── Tools ── */}
           <div className="p-6 border-b border-border space-y-3">
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Tools</p>
@@ -1469,6 +1482,21 @@ export default function Design() {
           <div className="flex-1" /></div>
       </div>
     </div>
+
+    <OrderReviewModal
+      isOpen={showOrderModal}
+      onClose={() => setShowOrderModal(false)}
+      frontLayers={frontLayers}
+      backLayers={backLayers}
+      localFrontBbox={localFrontBbox}
+      localBackBbox={localBackBbox}
+      mockup={mockup}
+      mockupSize={mockupSize}
+      selectedProduct={selectedProduct}
+      selectedFit={selectedFit}
+      selectedColor={selectedColor}
+      selectedSize={selectedSize}
+    />
     </>
   );
 }

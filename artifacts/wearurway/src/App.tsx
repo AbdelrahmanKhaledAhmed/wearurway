@@ -14,6 +14,7 @@ import Sizes from "@/pages/sizes";
 import AdminLogin from "@/pages/admin/login";
 import AdminDashboard from "@/pages/admin/dashboard";
 import Design from "@/pages/design";
+import Checkout from "@/pages/checkout";
 
 import { Navbar } from "@/components/layout/navbar";
 import { CustomizerProvider } from "@/hooks/use-customizer";
@@ -34,6 +35,7 @@ function Router() {
           <Route path="/colors" component={Colors} />
           <Route path="/sizes" component={Sizes} />
           <Route path="/design" component={Design} />
+          <Route path="/checkout" component={Checkout} />
           <Route path="/admin" component={AdminLogin} />
           <Route path="/admin/dashboard" component={AdminDashboard} />
           <Route component={NotFound} />
