@@ -162,8 +162,8 @@ async function renderTextToCanvas(
   // Crop to ink + uniform padding on all sides.
   const tx = Math.max(0, bounds.x - strokePad);
   const ty = Math.max(0, bounds.y - strokePad);
-  const tw = Math.min(BIG - tx, bounds.w + strokePad * 2);
-  const th = Math.min(BIG - ty, bounds.h + strokePad * 2);
+  const tw = Math.min(bigW - tx, bounds.w + strokePad * 2);
+  const th = Math.min(bigH - ty, bounds.h + strokePad * 2);
 
   const out = document.createElement("canvas");
   out.width  = tw;
