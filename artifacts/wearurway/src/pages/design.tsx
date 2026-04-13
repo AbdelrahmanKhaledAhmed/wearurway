@@ -177,6 +177,25 @@ export default function Design() {
     };
   }, [onMouseMove, onMouseUp]);
 
+  // Delete selected layer with Delete or Backspace key
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable) return;
+      if (!selectedLayerId) return;
+      e.preventDefault();
+      setLayers(prev => {
+        const layer = prev.find(l => l.id === selectedLayerId);
+        if (layer?.imageUrl.startsWith("blob:")) URL.revokeObjectURL(layer.imageUrl);
+        return prev.filter(l => l.id !== selectedLayerId);
+      });
+      setSelectedLayerId(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedLayerId, setLayers]);
+
   const startDrag = (e: React.MouseEvent, layer: DesignLayer) => {
     if (layer.id !== selectedLayerId) return;
     e.preventDefault();
