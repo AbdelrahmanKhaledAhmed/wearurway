@@ -68,23 +68,36 @@ async function renderTextToCanvas(
   const applyStroke = outlineWidth > 0;
   const strokePad = applyStroke ? outlineWidth + 8 : 8;
 
-  // Work on a 3× oversized canvas so no glyph can possibly be clipped.
-  const BIG = Math.max(outW, outH) * 3;
-  const big = document.createElement("canvas");
-  big.width  = BIG;
-  big.height = BIG;
-  const ctx = big.getContext("2d")!;
-  ctx.clearRect(0, 0, BIG, BIG);
-
   const fontSize = Math.round(outH * 0.3);
+
+  // Measure advance width on a throwaway canvas to correctly size for long strings.
+  // Note: we use measureText only to estimate canvas SIZE — not for clipping bounds.
+  const sizer = document.createElement("canvas");
+  const sCtx  = sizer.getContext("2d")!;
+  sCtx.font = `${fontSize}px "${font.family}"`;
+  const advanceWidth = sCtx.measureText(text).width;
+
+  // Use a RECTANGULAR oversized canvas, not a square one — otherwise 30-char text
+  // would require a 20 000×20 000 canvas and crash the browser.
+  // Width : 2× the advance width handles even the most extreme decorative overhangs.
+  // Height: 3× the font height handles the tallest ascenders/descenders.
+  const bigW = Math.ceil(Math.max(outW, advanceWidth) * 2 + strokePad * 4);
+  const bigH = Math.ceil(Math.max(outH, fontSize) * 3 + strokePad * 4);
+
+  const big = document.createElement("canvas");
+  big.width  = bigW;
+  big.height = bigH;
+  const ctx = big.getContext("2d")!;
+  ctx.clearRect(0, 0, bigW, bigH);
+
   ctx.font = `${fontSize}px "${font.family}"`;
 
   if (Math.abs(arcDeg) < 2) {
     // ── Straight text ──
     ctx.textAlign    = "center";
     ctx.textBaseline = "middle";
-    const cx = BIG / 2;
-    const cy = BIG / 2;
+    const cx = bigW / 2;
+    const cy = bigH / 2;
     if (applyStroke) {
       ctx.strokeStyle = outlineColor;
       ctx.lineWidth   = outlineWidth * 2;
@@ -106,8 +119,8 @@ async function renderTextToCanvas(
     const radius = totalWidth / arcRad;
     const isUp   = arcDeg > 0;
 
-    const cx = BIG / 2;
-    const cy = isUp ? BIG * 0.5 + radius * 0.5 : BIG * 0.5 - radius * 0.5;
+    const cx = bigW / 2;
+    const cy = isUp ? bigH * 0.5 + radius * 0.5 : bigH * 0.5 - radius * 0.5;
 
     let angle = isUp
       ? -Math.PI / 2 - arcRad / 2
