@@ -152,6 +152,23 @@ export default function Design() {
     if (mockup?.mockupOffsetY !== undefined) setMockupOffsetY(mockup.mockupOffsetY);
   }, [mockup]);
 
+  const savedDesignLoaded = useRef(false);
+  useEffect(() => {
+    if (!selectedProduct || !selectedFit || !selectedColor) return;
+    if (savedDesignLoaded.current) return;
+    savedDesignLoaded.current = true;
+    const key = SAVE_KEY(selectedProduct.id, selectedFit.id, selectedColor.id);
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as { frontLayers?: DesignLayer[]; backLayers?: DesignLayer[] };
+      if (parsed.frontLayers?.length) setFrontLayers(parsed.frontLayers);
+      if (parsed.backLayers?.length) setBackLayers(parsed.backLayers);
+    } catch {
+      // ignore corrupt data
+    }
+  }, [selectedProduct, selectedFit, selectedColor]);
+
   const bbox: BBox | null | undefined = side === "front" ? localFrontBbox : localBackBbox;
 
   const handleAdminSave = () => {
@@ -816,6 +833,29 @@ export default function Design() {
       setSharing(false);
     }
   }, [backLayers, localBackBbox, frontLayers, localFrontBbox, mockup, mockupSize, toast]);
+
+  // ── Save Design ─────────────────────────────────────────────────────────────
+
+  const handleSaveDesign = useCallback(async () => {
+    if (!selectedProduct || !selectedFit || !selectedColor) return;
+    setSaving(true);
+    try {
+      const serializeLayers = async (ls: DesignLayer[]) =>
+        Promise.all(ls.map(async l => ({ ...l, imageUrl: await blobUrlToDataUrl(l.imageUrl) })));
+      const [savedFront, savedBack] = await Promise.all([
+        serializeLayers(frontLayers),
+        serializeLayers(backLayers),
+      ]);
+      const key = SAVE_KEY(selectedProduct.id, selectedFit.id, selectedColor.id);
+      localStorage.setItem(key, JSON.stringify({ frontLayers: savedFront, backLayers: savedBack }));
+      setSavedAt(new Date());
+      toast({ title: "Design saved", description: "Your design will be restored on refresh." });
+    } catch {
+      toast({ title: "Save failed", description: "Could not save your design." });
+    } finally {
+      setSaving(false);
+    }
+  }, [selectedProduct, selectedFit, selectedColor, frontLayers, backLayers, toast]);
 
   // ── Export ─────────────────────────────────────────────────────────────────
 
@@ -1483,6 +1523,24 @@ export default function Design() {
               <p className="text-xs font-bold uppercase tracking-widest">
                 {sharing ? "Preparing…" : "Share Design"}
               </p>
+            </button>
+
+            <button
+              onClick={handleSaveDesign}
+              disabled={saving || (!frontLayers.length && !backLayers.length)}
+              className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span className="text-lg leading-none">↓</span>
+              <div className="text-left">
+                <p className="text-xs font-bold uppercase tracking-widest">
+                  {saving ? "Saving…" : "Save Design"}
+                </p>
+                {savedAt && !saving && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Saved {savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                )}
+              </div>
             </button>
           </div>
 
