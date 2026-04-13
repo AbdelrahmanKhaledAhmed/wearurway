@@ -165,6 +165,9 @@ export default function OrderReviewModal({
   }, [isOpen, generatePreviews]);
 
   const handleConfirm = () => {
+    sessionStorage.setItem("ww_checkout_front", frontPreview ?? "");
+    sessionStorage.setItem("ww_checkout_back", backPreview ?? "");
+    sessionStorage.setItem("ww_checkout_price", String(price));
     setLocation("/checkout");
     onClose();
   };
