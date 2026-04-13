@@ -53,6 +53,10 @@ function getAlphaBounds(canvas: HTMLCanvasElement) {
 }
 
 // ─── Core text-to-canvas renderer ─────────────────────────────────────────────
+// Strategy: draw on a canvas 3× larger than needed (so nothing can overflow),
+// then pixel-scan to find the actual ink bounds and crop tightly.
+// This completely avoids relying on measureText for sizing, which is unreliable
+// for decorative fonts whose glyphs extend far beyond their reported metrics.
 async function renderTextToCanvas(
   opts: TextLayerOptions,
   outW: number,
@@ -61,101 +65,73 @@ async function renderTextToCanvas(
   const { text, font, color, outlineColor, outlineWidth, arcDeg } = opts;
   await ensureFontLoaded(font);
 
-  const canvas = document.createElement("canvas");
-  canvas.width = outW;
-  canvas.height = outH;
-  const ctx = canvas.getContext("2d")!;
+  const applyStroke = outlineWidth > 0;
+  const strokePad = applyStroke ? outlineWidth + 8 : 8;
+
+  // Work on a 3× oversized canvas so no glyph can possibly be clipped.
+  const BIG = Math.max(outW, outH) * 3;
+  const big = document.createElement("canvas");
+  big.width  = BIG;
+  big.height = BIG;
+  const ctx = big.getContext("2d")!;
+  ctx.clearRect(0, 0, BIG, BIG);
 
   const fontSize = Math.round(outH * 0.3);
   ctx.font = `${fontSize}px "${font.family}"`;
 
-  const applyStroke = outlineWidth > 0;
-  const strokePad = applyStroke ? outlineWidth + 8 : 8;
-
   if (Math.abs(arcDeg) < 2) {
     // ── Straight text ──
-    // IMPORTANT: set alignment BEFORE measuring so that actualBoundingBox values
-    // are reported relative to the center/middle draw origin, not the left baseline.
-    ctx.textAlign = "center";
+    ctx.textAlign    = "center";
     ctx.textBaseline = "middle";
-
-    const metrics = ctx.measureText(text);
-    const bLeft  = metrics.actualBoundingBoxLeft;   // distance: draw-point → left ink edge
-    const bRight = metrics.actualBoundingBoxRight;  // distance: draw-point → right ink edge
-    const bAsc   = metrics.actualBoundingBoxAscent; // distance: draw-point → top ink edge
-    const bDesc  = metrics.actualBoundingBoxDescent;// distance: draw-point → bottom ink edge
-
-    // Size the canvas so every side has exactly strokePad clearance beyond the ink.
-    canvas.width  = Math.max(outW, Math.ceil(bLeft  + bRight + strokePad * 2));
-    canvas.height = Math.max(outH, Math.ceil(bAsc   + bDesc  + strokePad * 2));
-
-    // Canvas resize wipes context state — re-apply everything.
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.font = `${fontSize}px "${font.family}"`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    // Anchor the draw point so left ink has strokePad clearance from the canvas edge.
-    // (Right clearance is guaranteed >= strokePad by the canvas width calculation.)
-    const cx = bLeft + strokePad;
-    const cy = bAsc  + strokePad;
-
+    const cx = BIG / 2;
+    const cy = BIG / 2;
     if (applyStroke) {
       ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = outlineWidth * 2;
-      ctx.lineJoin = "round";
+      ctx.lineWidth   = outlineWidth * 2;
+      ctx.lineJoin    = "round";
       ctx.strokeText(text, cx, cy);
     }
     ctx.fillStyle = color;
     ctx.fillText(text, cx, cy);
   } else {
     // ── Curved text ──
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.font = `${fontSize}px "${font.family}"`;
     ctx.textBaseline = "alphabetic";
-    ctx.textAlign = "left";
+    ctx.textAlign    = "left";
 
-    const chars = [...text];
+    const chars      = [...text];
     const charWidths = chars.map((c) => ctx.measureText(c).width);
     const totalWidth = charWidths.reduce((a, b) => a + b, 0);
 
     const arcRad = (Math.abs(arcDeg) * Math.PI) / 180;
     const radius = totalWidth / arcRad;
-    const isUp = arcDeg > 0;
+    const isUp   = arcDeg > 0;
 
-    // Circle center position
-    const cx = outW / 2;
-    // For upward arch: center is below the drawing area baseline
-    // For downward arch: center is above
-    const cy = isUp ? outH * 0.5 + radius * 0.5 : outH * 0.5 - radius * 0.5;
+    const cx = BIG / 2;
+    const cy = isUp ? BIG * 0.5 + radius * 0.5 : BIG * 0.5 - radius * 0.5;
 
-    // Starting angle: centered around -π/2 (pointing up) for upward arch
-    // For downward arch, centered around +π/2 (pointing down)
     let angle = isUp
       ? -Math.PI / 2 - arcRad / 2
       : Math.PI / 2 - arcRad / 2;
 
     chars.forEach((char, i) => {
-      const cw = charWidths[i];
+      const cw        = charWidths[i];
       const charAngle = cw / radius;
-      const midAngle = angle + charAngle / 2;
+      const midAngle  = angle + charAngle / 2;
 
-      const px = cx + radius * Math.cos(midAngle);
-      const py = cy + radius * Math.sin(midAngle);
-      const rotation = isUp
-        ? midAngle + Math.PI / 2
-        : midAngle - Math.PI / 2;
+      const px       = cx + radius * Math.cos(midAngle);
+      const py       = cy + radius * Math.sin(midAngle);
+      const rotation = isUp ? midAngle + Math.PI / 2 : midAngle - Math.PI / 2;
 
       ctx.save();
       ctx.translate(px, py);
       ctx.rotate(rotation);
-      ctx.textAlign = "center";
+      ctx.textAlign    = "center";
       ctx.textBaseline = isUp ? "alphabetic" : "hanging";
 
       if (applyStroke) {
         ctx.strokeStyle = outlineColor;
-        ctx.lineWidth = outlineWidth * 2;
-        ctx.lineJoin = "round";
+        ctx.lineWidth   = outlineWidth * 2;
+        ctx.lineJoin    = "round";
         ctx.strokeText(char, 0, 0);
       }
       ctx.fillStyle = color;
@@ -166,31 +142,28 @@ async function renderTextToCanvas(
     });
   }
 
-  return canvas;
+  // Pixel-scan the oversized canvas to find the true ink bounds.
+  const bounds = getAlphaBounds(big);
+  if (!bounds) return big; // empty — nothing was drawn
+
+  // Crop to ink + uniform padding on all sides.
+  const tx = Math.max(0, bounds.x - strokePad);
+  const ty = Math.max(0, bounds.y - strokePad);
+  const tw = Math.min(BIG - tx, bounds.w + strokePad * 2);
+  const th = Math.min(BIG - ty, bounds.h + strokePad * 2);
+
+  const out = document.createElement("canvas");
+  out.width  = tw;
+  out.height = th;
+  out.getContext("2d")!.drawImage(big, tx, ty, tw, th, 0, 0, tw, th);
+  return out;
 }
 
 // ─── High-res export ──────────────────────────────────────────────────────────
 async function renderTextToBlob(opts: TextLayerOptions): Promise<Blob> {
-  const SIZE = 1200;
-  const raw = await renderTextToCanvas(opts, SIZE, SIZE);
-
-  // Trim to visible pixels
-  const bounds = getAlphaBounds(raw);
-  if (!bounds) {
-    return new Promise((res) => raw.toBlob((b) => res(b!), "image/png"));
-  }
-
-  const pad = Math.max(4, opts.outlineWidth + 2);
-  const tx = Math.max(0, bounds.x - pad);
-  const ty = Math.max(0, bounds.y - pad);
-  const tw = Math.min(SIZE - tx, bounds.w + pad * 2);
-  const th = Math.min(SIZE - ty, bounds.h + pad * 2);
-
-  const out = document.createElement("canvas");
-  out.width = tw;
-  out.height = th;
-  out.getContext("2d")!.drawImage(raw, tx, ty, tw, th, 0, 0, tw, th);
-  return new Promise((res) => out.toBlob((b) => res(b!), "image/png"));
+  // renderTextToCanvas already returns a tightly-cropped canvas, so just encode it.
+  const canvas = await renderTextToCanvas(opts, 1200, 1200);
+  return new Promise((res) => canvas.toBlob((b) => res(b!), "image/png"));
 }
 
 // ─── Small preview card renderer ─────────────────────────────────────────────
