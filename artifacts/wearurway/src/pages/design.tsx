@@ -91,6 +91,8 @@ export default function Design() {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [shareLoading, setShareLoading] = useState(() => !!shareId);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [clipSize, setClipSize] = useState<{ w: number; h: number } | null>(null);
   const [editorFile, setEditorFile] = useState<File | null>(null);
@@ -728,12 +730,24 @@ export default function Design() {
     ctx.drawImage(img, x + (w - drawW) / 2, y + (h - drawH) / 2, drawW, drawH);
   };
 
+  const uploadBlobUrl = useCallback(async (url: string): Promise<string> => {
+    if (!url.startsWith("blob:")) return url;
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const form = new FormData();
+    form.append("file", blob, "layer.png");
+    const uploadRes = await fetch("/api/uploads", { method: "POST", body: form });
+    if (!uploadRes.ok) throw new Error("Upload failed");
+    const { url: serverUrl } = await uploadRes.json() as { url: string };
+    return serverUrl;
+  }, []);
+
   const handleShareDesign = useCallback(async () => {
     if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return;
     setSharing(true);
     try {
       const serializeLayers = async (ls: DesignLayer[]) =>
-        Promise.all(ls.map(async l => ({ ...l, imageUrl: await blobUrlToDataUrl(l.imageUrl) })));
+        Promise.all(ls.map(async l => ({ ...l, imageUrl: await uploadBlobUrl(l.imageUrl) })));
       const [serializedFront, serializedBack] = await Promise.all([
         serializeLayers(frontLayers),
         serializeLayers(backLayers),
@@ -753,18 +767,25 @@ export default function Design() {
       if (!res.ok) throw new Error("Server error");
       const { id } = await res.json() as { id: string };
       const url = `${window.location.origin}/design?share=${id}`;
-      try {
-        await navigator.clipboard.writeText(url);
-        toast({ title: "Link copied!", description: "Share it with anyone to open this exact design." });
-      } catch {
-        toast({ title: "Share link ready", description: url });
-      }
+      setShareUrl(url);
+      setLinkCopied(false);
     } catch {
       toast({ title: "Share failed", description: "Could not generate a share link." });
     } finally {
       setSharing(false);
     }
-  }, [selectedProduct, selectedFit, selectedColor, selectedSize, frontLayers, backLayers, toast]);
+  }, [selectedProduct, selectedFit, selectedColor, selectedSize, frontLayers, backLayers, uploadBlobUrl, toast]);
+
+  const handleCopyShareLink = useCallback(async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    } catch {
+      /* clipboard blocked — user can manually select */
+    }
+  }, [shareUrl]);
 
   // ── Save Design ─────────────────────────────────────────────────────────────
 
@@ -1508,6 +1529,55 @@ export default function Design() {
       selectedColor={selectedColor}
       selectedSize={selectedSize}
     />
+
+    <AnimatePresence>
+      {shareUrl && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+          onClick={() => setShareUrl(null)}
+        >
+          <motion.div
+            initial={{ scale: 0.92, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.92, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 28 }}
+            className="bg-background border border-border w-full max-w-md p-6 flex flex-col gap-5"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold uppercase tracking-widest">Share Your Design</h2>
+              <button
+                onClick={() => setShareUrl(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Anyone with this link can open your design and edit it — same mockup, same layers, everything.
+            </p>
+            <div className="flex gap-2">
+              <input
+                readOnly
+                value={shareUrl}
+                onFocus={e => e.currentTarget.select()}
+                className="flex-1 bg-muted/20 border border-border px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:border-foreground transition-colors min-w-0"
+              />
+              <button
+                onClick={handleCopyShareLink}
+                className="shrink-0 text-xs font-bold uppercase tracking-widest px-4 py-2 bg-foreground text-background hover:opacity-80 transition-opacity"
+              >
+                {linkCopied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
     </>
   );
 }
