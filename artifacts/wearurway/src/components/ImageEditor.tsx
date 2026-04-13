@@ -121,7 +121,8 @@ function getPageZoom() {
 
 export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   // ── Refs ─────────────────────────────────────────────────────────────────────
-  const canvasRef     = useRef<HTMLCanvasElement>(null);  // image canvas
+  const canvasRef     = useRef<HTMLCanvasElement>(null);  // hidden image canvas (ops only)
+  const imgRef        = useRef<HTMLImageElement>(null);   // visible display element
   const areaRef       = useRef<HTMLDivElement>(null);     // outer container for zoom wheel
   const wrapperRef    = useRef<HTMLDivElement>(null);     // inner div — receives CSS transform
   const isDrawing     = useRef(false);
@@ -148,6 +149,7 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     visible: false,
   });
   const [histSig,    setHistSig]    = useState(0);
+  const [displaySrc, setDisplaySrc] = useState<string>("");  // data URL for the visible <img>
 
   // ── Stable refs for values used inside event handlers ───────────────────────
   const brushRef    = useRef(brushSize);
@@ -184,69 +186,93 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   useEffect(() => {
     let cancelled = false;
 
-    const finish = (c: HTMLCanvasElement | null, img: HTMLImageElement | null) => {
+    const drawBitmapToCanvas = (bitmap: ImageBitmap) => {
       if (cancelled) return;
-      const canvas = c ?? canvasRef.current;
-      const image = img;
-      if (canvas && image && image.naturalWidth > 0 && image.naturalHeight > 0) {
-        try {
-          canvas.width  = image.naturalWidth;
-          canvas.height = image.naturalHeight;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(image, 0, 0);
-            try {
-              const trimmed = trimTransparency(canvas);
-              if (
-                trimmed.bounds.x !== 0 ||
-                trimmed.bounds.y !== 0 ||
-                trimmed.bounds.width !== image.naturalWidth ||
-                trimmed.bounds.height !== image.naturalHeight
-              ) {
-                canvas.width = trimmed.canvas.width;
-                canvas.height = trimmed.canvas.height;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(trimmed.canvas, 0, 0);
-              }
-              trimRef.current = {
-                originalWidth: image.naturalWidth,
-                originalHeight: image.naturalHeight,
-                x: trimmed.bounds.x,
-                y: trimmed.bounds.y,
-                width: trimmed.bounds.width,
-                height: trimmed.bounds.height,
-              };
-            } catch {
-              trimRef.current = {
-                originalWidth: image.naturalWidth,
-                originalHeight: image.naturalHeight,
-                x: 0, y: 0,
-                width: image.naturalWidth,
-                height: image.naturalHeight,
-              };
+      const c = canvasRef.current;
+      if (!c) { setLoaded(true); return; }
+      try {
+        c.width  = bitmap.width;
+        c.height = bitmap.height;
+        const ctx = c.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(bitmap, 0, 0);
+          try {
+            const trimmed = trimTransparency(c);
+            if (
+              trimmed.bounds.x !== 0 ||
+              trimmed.bounds.y !== 0 ||
+              trimmed.bounds.width !== bitmap.width ||
+              trimmed.bounds.height !== bitmap.height
+            ) {
+              c.width = trimmed.canvas.width;
+              c.height = trimmed.canvas.height;
+              ctx.clearRect(0, 0, c.width, c.height);
+              ctx.drawImage(trimmed.canvas, 0, 0);
             }
+            trimRef.current = {
+              originalWidth: bitmap.width,
+              originalHeight: bitmap.height,
+              x: trimmed.bounds.x,
+              y: trimmed.bounds.y,
+              width: trimmed.bounds.width,
+              height: trimmed.bounds.height,
+            };
+          } catch {
+            trimRef.current = {
+              originalWidth: bitmap.width,
+              originalHeight: bitmap.height,
+              x: 0, y: 0,
+              width: bitmap.width,
+              height: bitmap.height,
+            };
           }
-        } catch (err) {
-          console.error("ImageEditor: draw error", err);
         }
+      } catch (err) {
+        console.error("ImageEditor: draw error", err);
+      } finally {
+        bitmap.close();
+        setLoaded(true);
       }
-      setLoaded(true);
     };
 
-    // Use FileReader → data URL to avoid blob-URL canvas security restrictions
-    // in proxied/sandboxed iframe environments (e.g. Replit workspace preview).
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (cancelled) return;
-      const dataUrl = e.target?.result as string;
-      if (!dataUrl) { setLoaded(true); return; }
-      const img = new Image();
-      img.onload = () => finish(null, img);
-      img.onerror = () => { if (!cancelled) setLoaded(true); };
-      img.src = dataUrl;
-    };
-    reader.onerror = () => { if (!cancelled) setLoaded(true); };
-    reader.readAsDataURL(file);
+    // createImageBitmap takes the File directly — no URL needed, no security issues.
+    createImageBitmap(file)
+      .then(bitmap => {
+        if (!cancelled) drawBitmapToCanvas(bitmap);
+        else bitmap.close();
+      })
+      .catch(() => {
+        // Fallback: FileReader → data URL → img element
+        if (cancelled) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (cancelled) return;
+          const dataUrl = e.target?.result as string;
+          if (!dataUrl) { setLoaded(true); return; }
+          const img = new Image();
+          img.onload = () => {
+            if (cancelled) return;
+            createImageBitmap(img)
+              .then(bmp => { if (!cancelled) drawBitmapToCanvas(bmp); else bmp.close(); })
+              .catch(() => {
+                // Last resort: draw HTMLImageElement directly
+                const c = canvasRef.current;
+                if (!c) { setLoaded(true); return; }
+                try {
+                  c.width = img.naturalWidth;
+                  c.height = img.naturalHeight;
+                  c.getContext("2d")?.drawImage(img, 0, 0);
+                } finally {
+                  setLoaded(true);
+                }
+              });
+          };
+          img.onerror = () => { if (!cancelled) setLoaded(true); };
+          img.src = dataUrl;
+        };
+        reader.onerror = () => { if (!cancelled) setLoaded(true); };
+        reader.readAsDataURL(file);
+      });
 
     return () => { cancelled = true; };
   }, [file]);
@@ -256,6 +282,26 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     if (!loaded) return;
     requestAnimationFrame(updateDisplaySize);
   }, [loaded, updateDisplaySize]);
+
+  // Keep the visible <img> in sync with the hidden canvas after every operation
+  const refreshDisplay = useCallback(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    try {
+      const dataUrl = c.toDataURL("image/png");
+      setDisplaySrc(dataUrl);
+    } catch {
+      // toDataURL blocked in this environment (rare). Fall back to showing the
+      // original file as a blob URL — at least the image will be visible.
+      const url = URL.createObjectURL(file);
+      setDisplaySrc(url);
+    }
+  }, [file]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    refreshDisplay();
+  }, [histSig, loaded, refreshDisplay]);
 
   // ── Undo / Redo ──────────────────────────────────────────────────────────────
   const saveUndo = useCallback(() => {
@@ -419,10 +465,11 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     return () => window.removeEventListener("mousemove", fn);
   }, []);
 
-  const pointFromEvent = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const pointFromEvent = (e: React.MouseEvent<HTMLElement>) => {
     const c = canvasRef.current;
-    const rect = c?.getBoundingClientRect();
-    if (!c || !rect || !dispSize) return null;
+    // Use the event target (the <img>) for bounds, not the hidden canvas
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    if (!c || !dispSize) return null;
     const displayX = ((e.clientX - rect.left) / rect.width) * dispSize.w;
     const displayY = ((e.clientY - rect.top) / rect.height) * dispSize.h;
     return {
@@ -435,8 +482,9 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   };
 
   const drawCursor = (clientX: number, clientY: number) => {
-    const c  = canvasRef.current;
-    const rect = c?.getBoundingClientRect();
+    const c    = canvasRef.current;
+    const el   = imgRef.current;
+    const rect = el?.getBoundingClientRect();
     if (!c || !rect) return;
     if (toolRef.current !== "brush-erase") return;
     const pageZoom = getPageZoom();
@@ -451,6 +499,16 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   const clearCursor = () => {
     setCursor(prev => ({ ...prev, visible: false }));
   };
+
+  // ── RAF-throttled refresh so brush preview stays up to date ─────────────────
+  const rafRef = useRef<number | null>(null);
+  const scheduleRefresh = useCallback(() => {
+    if (rafRef.current !== null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      refreshDisplay();
+    });
+  }, [refreshDisplay]);
 
   // ── Brush erase — uses same offsetX/Y so guaranteed same position as cursor ──
   const applyBrush = (imgX: number, imgY: number, radius: number) => {
@@ -479,10 +537,11 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     }
     ctx.restore();
     lastBrushPoint.current = { x: imgX, y: imgY };
+    scheduleRefresh();  // real-time visual feedback while brushing
   };
 
-  // ── Canvas mouse events ──────────────────────────────────────────────────────
-  const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // ── Canvas mouse events (now on the visible <img>, not the hidden canvas) ────
+  const onMouseDown = (e: React.MouseEvent<HTMLElement>) => {
     if (!loaded || !dispSize) return;
     const point = pointFromEvent(e);
     if (!point) return;
@@ -516,12 +575,13 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
         else { globalRecolor(id,imgX,imgY,recolorRef.current,tolRef.current); }
         ctx.putImageData(id,0,0);
         if (toolRef.current === "flood-fill") trimCanvasToVisible();
+        else setHistSig(s => s+1);  // refresh display after recolor
         setProcessing(false);
       }, 0);
     }
   };
 
-  const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const onMouseMove = (e: React.MouseEvent<HTMLElement>) => {
     if (toolRef.current === "move" && isMoving.current && moveStartRef.current) {
       const start = moveStartRef.current;
       setPan({
@@ -699,13 +759,12 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
             </div>
           )}
 
-          {/* Wrapper receives the zoom/pan CSS transform.
-              Both canvases inside share the same coordinate system. */}
+          {/* Wrapper receives the zoom/pan CSS transform. */}
           <div
             ref={wrapperRef}
             style={{
               position:        "relative",
-              display:         loaded && dispSize ? "block" : "none",
+              display:         loaded && dispSize && displaySrc ? "block" : "none",
               width:           dispSize ? `${dispSize.w}px` : 0,
               height:          dispSize ? `${dispSize.h}px` : 0,
               transformOrigin: "0 0",
@@ -714,19 +773,26 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
               boxShadow:       "0 0 0 1px rgba(255,255,255,0.08)",
             }}
           >
-            {/* Image canvas */}
-            <canvas
-              ref={canvasRef}
+            {/* Hidden canvas — pixel operations happen here, never displayed */}
+            <canvas ref={canvasRef} style={{ display: "none" }} />
+
+            {/* Visible image — canvas content extracted to data URL and shown here */}
+            <img
+              ref={imgRef}
+              src={displaySrc}
+              alt="editing"
+              draggable={false}
               onMouseDown={onMouseDown}
               onMouseMove={onMouseMove}
               onMouseUp={onMouseUp}
               onMouseLeave={onMouseLeave}
               style={{
-                display:  "block",
-                width:    dispSize ? `${dispSize.w}px` : "auto",
-                height:   dispSize ? `${dispSize.h}px` : "auto",
-                cursor:   processing ? "wait" : tool === "brush-erase" ? "none" : tool === "move" ? (isMoving.current ? "grabbing" : "grab") : "crosshair",
-                imageRendering: zoom >= 6 ? "pixelated" : "auto",
+                display:         "block",
+                width:           dispSize ? `${dispSize.w}px` : "auto",
+                height:          dispSize ? `${dispSize.h}px` : "auto",
+                cursor:          processing ? "wait" : tool === "brush-erase" ? "none" : tool === "move" ? (isMoving.current ? "grabbing" : "grab") : "crosshair",
+                imageRendering:  zoom >= 6 ? "pixelated" : "auto",
+                userSelect:      "none",
               }}
             />
           </div>
