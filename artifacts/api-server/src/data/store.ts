@@ -87,6 +87,8 @@ export interface SharedDesign {
   frontLayers: DesignLayer[];
   backLayers: DesignLayer[];
   createdAt: string;
+  expiresAt: string;
+  layerFilenames: string[];
 }
 
 export interface Store {

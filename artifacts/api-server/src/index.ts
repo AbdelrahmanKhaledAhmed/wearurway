@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { cleanupExpiredDesigns } from "./routes/shared-designs.js";
 
 const rawPort = process.env["PORT"];
 const port = rawPort ? Number(rawPort) : 3000;
@@ -15,4 +16,7 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  cleanupExpiredDesigns();
+  setInterval(cleanupExpiredDesigns, 60 * 60 * 1000);
 });

@@ -4,11 +4,12 @@ import pinoHttp from "pino-http";
 import fs from "fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
-import { UPLOADS_DIR, MOCKUPS_DIR, SIZE_CHARTS_DIR, FRONTEND_DIR, ensureDir } from "./lib/paths";
+import { UPLOADS_DIR, MOCKUPS_DIR, SIZE_CHARTS_DIR, SHARED_LAYERS_DIR, FRONTEND_DIR, ensureDir } from "./lib/paths";
 
 ensureDir(UPLOADS_DIR);
 ensureDir(MOCKUPS_DIR);
 ensureDir(SIZE_CHARTS_DIR);
+ensureDir(SHARED_LAYERS_DIR);
 
 const app: Express = express();
 

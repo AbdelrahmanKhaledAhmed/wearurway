@@ -9,6 +9,7 @@ export const UPLOADS_DIR = process.env.UPLOADS_DIR
   : path.join(__dirname, "..", "..", "uploads");
 
 export const MOCKUPS_DIR = path.join(UPLOADS_DIR, "mockups");
+export const SHARED_LAYERS_DIR = path.join(UPLOADS_DIR, "shared-layers");
 
 export const SIZE_CHARTS_DIR = process.env.SIZE_CHARTS_DIR
   ? path.resolve(process.env.SIZE_CHARTS_DIR)

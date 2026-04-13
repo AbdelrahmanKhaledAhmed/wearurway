@@ -133,7 +133,11 @@ export default function Design() {
     if (!shareId || shareLoadedRef.current) return;
     shareLoadedRef.current = true;
     fetch(`/api/shared-designs/${shareId}`)
-      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(async r => {
+        if (r.status === 410) throw Object.assign(new Error("expired"), { expired: true });
+        if (!r.ok) throw new Error("not found");
+        return r.json();
+      })
       .then((design: { product: Parameters<typeof setProduct>[0]; fit: Parameters<typeof setFit>[0]; color: Parameters<typeof setColor>[0]; size: Parameters<typeof setSize>[0]; frontLayers: DesignLayer[]; backLayers: DesignLayer[] }) => {
         setProduct(design.product);
         setFit(design.fit);
@@ -143,8 +147,14 @@ export default function Design() {
         if (design.backLayers?.length) setBackLayers(design.backLayers);
         savedDesignLoaded.current = true;
       })
-      .catch(() => {
-        toast({ title: "Share link not found", description: "This design link may have expired." });
+      .catch((err: unknown) => {
+        const expired = (err instanceof Error) && (err as Error & { expired?: boolean }).expired;
+        toast({
+          title: expired ? "Design link expired" : "Share link not found",
+          description: expired
+            ? "This design link has expired. Please ask for a new one."
+            : "This design link could not be found.",
+        });
         setLocation("/products");
       })
       .finally(() => setShareLoading(false));
@@ -730,24 +740,29 @@ export default function Design() {
     ctx.drawImage(img, x + (w - drawW) / 2, y + (h - drawH) / 2, drawW, drawH);
   };
 
-  const uploadBlobUrl = useCallback(async (url: string): Promise<string> => {
-    if (!url.startsWith("blob:")) return url;
+  const uploadBlobUrl = useCallback(async (url: string): Promise<{ url: string; filename: string | null }> => {
+    if (!url.startsWith("blob:")) return { url, filename: null };
     const res = await fetch(url);
     const blob = await res.blob();
     const form = new FormData();
     form.append("file", blob, "layer.png");
-    const uploadRes = await fetch("/api/uploads", { method: "POST", body: form });
+    const uploadRes = await fetch("/api/shared-layers", { method: "POST", body: form });
     if (!uploadRes.ok) throw new Error("Upload failed");
-    const { url: serverUrl } = await uploadRes.json() as { url: string };
-    return serverUrl;
+    const { url: serverUrl, filename } = await uploadRes.json() as { url: string; filename: string };
+    return { url: serverUrl, filename };
   }, []);
 
   const handleShareDesign = useCallback(async () => {
     if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return;
     setSharing(true);
     try {
+      const layerFilenames: string[] = [];
       const serializeLayers = async (ls: DesignLayer[]) =>
-        Promise.all(ls.map(async l => ({ ...l, imageUrl: await uploadBlobUrl(l.imageUrl) })));
+        Promise.all(ls.map(async l => {
+          const { url, filename } = await uploadBlobUrl(l.imageUrl);
+          if (filename) layerFilenames.push(filename);
+          return { ...l, imageUrl: url };
+        }));
       const [serializedFront, serializedBack] = await Promise.all([
         serializeLayers(frontLayers),
         serializeLayers(backLayers),
@@ -762,6 +777,7 @@ export default function Design() {
           size: selectedSize,
           frontLayers: serializedFront,
           backLayers: serializedBack,
+          layerFilenames,
         }),
       });
       if (!res.ok) throw new Error("Server error");
@@ -1559,6 +1575,9 @@ export default function Design() {
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Anyone with this link can open your design and edit it — same mockup, same layers, everything.
+            </p>
+            <p className="text-xs text-amber-500/80 font-medium uppercase tracking-widest">
+              This link is available for 24 hours only
             </p>
             <div className="flex gap-2">
               <input
