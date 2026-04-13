@@ -182,74 +182,73 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
   }, []);
 
   useEffect(() => {
-    let revoked = false;
-    const url = URL.createObjectURL(file);
-    const img = new Image();
+    let cancelled = false;
 
-    const finish = () => {
-      if (!revoked) { revoked = true; URL.revokeObjectURL(url); }
+    const finish = (c: HTMLCanvasElement | null, img: HTMLImageElement | null) => {
+      if (cancelled) return;
+      const canvas = c ?? canvasRef.current;
+      const image = img;
+      if (canvas && image && image.naturalWidth > 0 && image.naturalHeight > 0) {
+        try {
+          canvas.width  = image.naturalWidth;
+          canvas.height = image.naturalHeight;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(image, 0, 0);
+            try {
+              const trimmed = trimTransparency(canvas);
+              if (
+                trimmed.bounds.x !== 0 ||
+                trimmed.bounds.y !== 0 ||
+                trimmed.bounds.width !== image.naturalWidth ||
+                trimmed.bounds.height !== image.naturalHeight
+              ) {
+                canvas.width = trimmed.canvas.width;
+                canvas.height = trimmed.canvas.height;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(trimmed.canvas, 0, 0);
+              }
+              trimRef.current = {
+                originalWidth: image.naturalWidth,
+                originalHeight: image.naturalHeight,
+                x: trimmed.bounds.x,
+                y: trimmed.bounds.y,
+                width: trimmed.bounds.width,
+                height: trimmed.bounds.height,
+              };
+            } catch {
+              trimRef.current = {
+                originalWidth: image.naturalWidth,
+                originalHeight: image.naturalHeight,
+                x: 0, y: 0,
+                width: image.naturalWidth,
+                height: image.naturalHeight,
+              };
+            }
+          }
+        } catch (err) {
+          console.error("ImageEditor: draw error", err);
+        }
+      }
       setLoaded(true);
     };
 
-    img.onload = () => {
-      const c = canvasRef.current;
-      if (!c) { finish(); return; }
-
-      try {
-        c.width  = img.naturalWidth;
-        c.height = img.naturalHeight;
-        const ctx = c.getContext("2d");
-        if (!ctx) { finish(); return; }
-        ctx.drawImage(img, 0, 0);
-
-        try {
-          const trimmed = trimTransparency(c);
-          if (
-            trimmed.bounds.x !== 0 ||
-            trimmed.bounds.y !== 0 ||
-            trimmed.bounds.width !== img.naturalWidth ||
-            trimmed.bounds.height !== img.naturalHeight
-          ) {
-            c.width = trimmed.canvas.width;
-            c.height = trimmed.canvas.height;
-            ctx.clearRect(0, 0, c.width, c.height);
-            ctx.drawImage(trimmed.canvas, 0, 0);
-          }
-          trimRef.current = {
-            originalWidth: img.naturalWidth,
-            originalHeight: img.naturalHeight,
-            x: trimmed.bounds.x,
-            y: trimmed.bounds.y,
-            width: trimmed.bounds.width,
-            height: trimmed.bounds.height,
-          };
-        } catch {
-          // trimming failed (e.g. canvas security restriction) — use full image
-          trimRef.current = {
-            originalWidth: img.naturalWidth,
-            originalHeight: img.naturalHeight,
-            x: 0, y: 0,
-            width: img.naturalWidth,
-            height: img.naturalHeight,
-          };
-        }
-      } catch (err) {
-        console.error("ImageEditor: draw error", err);
-      } finally {
-        finish();
-      }
+    // Use FileReader → data URL to avoid blob-URL canvas security restrictions
+    // in proxied/sandboxed iframe environments (e.g. Replit workspace preview).
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (cancelled) return;
+      const dataUrl = e.target?.result as string;
+      if (!dataUrl) { setLoaded(true); return; }
+      const img = new Image();
+      img.onload = () => finish(null, img);
+      img.onerror = () => { if (!cancelled) setLoaded(true); };
+      img.src = dataUrl;
     };
+    reader.onerror = () => { if (!cancelled) setLoaded(true); };
+    reader.readAsDataURL(file);
 
-    img.onerror = () => {
-      console.error("ImageEditor: failed to load image");
-      finish();
-    };
-
-    img.src = url;
-
-    return () => {
-      if (!revoked) { revoked = true; URL.revokeObjectURL(url); }
-    };
+    return () => { cancelled = true; };
   }, [file]);
 
   // Once canvas is loaded, compute the display size that fits the container
