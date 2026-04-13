@@ -40,6 +40,25 @@ const MIN_LAYER_SIZE = 10;
 const MAX_LAYER_SCALE = 200;
 const ROTATE_STEP = 1;
 
+const SAVE_KEY = (productId: string, fitId: string, colorId: string) =>
+  `ww_design_${productId}_${fitId}_${colorId}`;
+
+async function blobUrlToDataUrl(url: string): Promise<string> {
+  if (!url.startsWith("blob:")) return url;
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return url;
+  }
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Design() {
@@ -68,6 +87,8 @@ export default function Design() {
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [clipSize, setClipSize] = useState<{ w: number; h: number } | null>(null);
   const [editorFile, setEditorFile] = useState<File | null>(null);
