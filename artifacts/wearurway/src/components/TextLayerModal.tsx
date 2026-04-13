@@ -65,19 +65,33 @@ async function renderTextToCanvas(
   canvas.width = outW;
   canvas.height = outH;
   const ctx = canvas.getContext("2d")!;
-  ctx.clearRect(0, 0, outW, outH);
 
   const fontSize = Math.round(outH * 0.3);
   ctx.font = `${fontSize}px "${font.family}"`;
 
   const applyStroke = outlineWidth > 0;
+  const strokePad = applyStroke ? outlineWidth + 8 : 8;
 
   if (Math.abs(arcDeg) < 2) {
     // ── Straight text ──
+    // Measure actual rendered bounds (not just advance width) to prevent clipping.
+    // Many decorative fonts have glyphs that extend beyond the advance width.
+    const metrics = ctx.measureText(text);
+    const actualW = metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight;
+    const actualH = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+    const neededW = Math.ceil(actualW + strokePad * 2);
+    const neededH = Math.ceil(actualH + strokePad * 2);
+
+    // Expand canvas if the text is wider or taller than the default size
+    canvas.width  = Math.max(outW, neededW);
+    canvas.height = Math.max(outH, neededH);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = `${fontSize}px "${font.family}"`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const cx = outW / 2;
-    const cy = outH / 2;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
     if (applyStroke) {
       ctx.strokeStyle = outlineColor;
       ctx.lineWidth = outlineWidth * 2;
@@ -88,6 +102,8 @@ async function renderTextToCanvas(
     ctx.fillText(text, cx, cy);
   } else {
     // ── Curved text ──
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = `${fontSize}px "${font.family}"`;
     ctx.textBaseline = "alphabetic";
     ctx.textAlign = "left";
 
