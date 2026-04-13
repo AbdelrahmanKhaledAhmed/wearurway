@@ -95,4 +95,5 @@ A premium streetwear customization website with a multi-step product configurato
   - **Fits tab**: Add/edit/delete fits (linked to a product), toggle available/coming-soon, grouped by product
   - **Colors tab**: Add/delete colors per fit with hex color picker; fit filter tabs
   - **Sizes tab**: Add/edit/delete sizes per fit with width/height/image; fit filter tabs
+  - **Mockups tab**: Automatically generates required mockup image filenames from product, fit, color, and side using `product_fit_color_front.png` / `product_fit_color_back.png` format
   - **Image uploads**: Click "Upload" button in any image field → `POST /api/uploads` → image stored on disk and URL auto-filled

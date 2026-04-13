@@ -124,6 +124,19 @@ function toSafeFilename(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
+function toMockupFilenamePart(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function buildMockupFilename(productName: string, fitName: string, colorName: string, side: "front" | "back"): string {
+  const parts = [productName, fitName, colorName].map(toMockupFilenamePart);
+  if (parts.some(part => !part)) return "";
+  return `${parts.join("_")}_${side}.png`;
+}
+
 function ImageUploader({ value, onChange, label = "Image", uploadPath = "/api/uploads" }: {
   value: string; onChange: (url: string) => void; label?: string; uploadPath?: string;
 }) {
@@ -811,45 +824,24 @@ function BoundingBoxEditor({
   );
 }
 
-function MockupFilenameInput({ label, value, onChange }: {
-  label: string; value: string; onChange: (url: string) => void;
+function MockupFilenameInput({ label, value, generatedFilename }: {
+  label: string; value: string; generatedFilename: string;
 }) {
   const PREFIX = "/api/uploads/mockups/";
-  const filename = value.startsWith(PREFIX) ? value.slice(PREFIX.length) : (value ? value : "");
-  const [input, setInput] = useState(filename);
-
-  useEffect(() => {
-    const f = value.startsWith(PREFIX) ? value.slice(PREFIX.length) : (value ? value : "");
-    setInput(f);
-  }, [value]);
-
-  const handleChange = (v: string) => {
-    setInput(v);
-    if (v.trim()) {
-      onChange(`${PREFIX}${v.trim()}`);
-    } else {
-      onChange("");
-    }
-  };
+  const expectedUrl = generatedFilename ? `${PREFIX}${generatedFilename}` : "";
+  const currentFilename = value.startsWith(PREFIX) ? value.slice(PREFIX.length) : value;
 
   return (
     <div className="space-y-3">
       <Label className="uppercase tracking-widest text-xs">{label}</Label>
-      <div className="flex gap-2 items-center">
-        <Input
-          value={input}
-          onChange={e => handleChange(e.target.value)}
-          placeholder="e.g. black_front.png"
-          className="rounded-none h-9 font-mono text-xs flex-1"
-        />
-        {input && (
-          <button
-            type="button"
-            onClick={() => { setInput(""); onChange(""); }}
-            className="text-xs px-2 py-1 border border-border text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest"
-          >
-            Clear
-          </button>
+      <div className="border border-border bg-muted/10 p-4 space-y-2">
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">Required file name</p>
+        <p className="text-sm font-mono break-all text-foreground">{generatedFilename || "Select product, fit, and color first"}</p>
+        {expectedUrl && (
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
+            Upload the image to the mockups uploads folder and rename it exactly to this file name. The mockup will use:
+            <span className="block font-mono break-all mt-1">{expectedUrl}</span>
+          </p>
         )}
       </div>
       {value && (
@@ -857,7 +849,14 @@ function MockupFilenameInput({ label, value, onChange }: {
           <div className="w-16 h-16 border border-border overflow-hidden bg-muted/10 shrink-0">
             <img src={value} alt="preview" className="w-full h-full object-contain" />
           </div>
-          <p className="text-[10px] text-muted-foreground font-mono break-all leading-relaxed">{value}</p>
+          <div className="space-y-1 min-w-0">
+            <p className="text-[10px] text-muted-foreground font-mono break-all leading-relaxed">{value}</p>
+            {currentFilename && generatedFilename && currentFilename !== generatedFilename && (
+              <p className="text-[10px] text-amber-500 leading-relaxed">
+                This saved path is using an older filename. Saving now will update it to the generated filename.
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -951,17 +950,32 @@ function MockupsManager() {
     setBackBbox(mockup?.back?.boundingBox ?? null);
   }, [mockup]);
 
+  const productName = products?.find(p => p.id === selectedProductId)?.name ?? "";
+  const fitName = fits?.find(f => f.id === selectedFitId)?.name ?? "";
+  const colorName = filteredColors?.find(c => c.id === selectedColorId)?.name ?? "";
+  const colorHex = filteredColors?.find(c => c.id === selectedColorId)?.hex ?? "";
+  const frontGeneratedFilename = buildMockupFilename(productName, fitName, colorName, "front");
+  const backGeneratedFilename = buildMockupFilename(productName, fitName, colorName, "back");
+  const activeGeneratedFilename = activeSide === "front" ? frontGeneratedFilename : backGeneratedFilename;
+  const frontGeneratedImage = frontGeneratedFilename ? `/api/uploads/mockups/${frontGeneratedFilename}` : "";
+  const backGeneratedImage = backGeneratedFilename ? `/api/uploads/mockups/${backGeneratedFilename}` : "";
+
+  useEffect(() => {
+    setFrontImage(frontGeneratedImage);
+    setBackImage(backGeneratedImage);
+  }, [frontGeneratedImage, backGeneratedImage]);
+
   const handleSave = () => {
     if (!mockupParams) return;
     saveMockup.mutate({
       data: {
         ...mockupParams,
         front: {
-          image: frontImage || undefined,
+          image: frontGeneratedImage || frontImage || undefined,
           boundingBox: frontBbox ?? undefined,
         },
         back: {
-          image: backImage || undefined,
+          image: backGeneratedImage || backImage || undefined,
           boundingBox: backBbox ?? undefined,
         },
       }
@@ -975,13 +989,7 @@ function MockupsManager() {
 
   const currentImage = activeSide === "front" ? frontImage : backImage;
   const currentBbox = activeSide === "front" ? frontBbox : backBbox;
-  const setCurrentImage = activeSide === "front" ? setFrontImage : setBackImage;
   const setCurrentBbox = activeSide === "front" ? setFrontBbox : setBackBbox;
-
-  const productName = products?.find(p => p.id === selectedProductId)?.name ?? "";
-  const fitName = fits?.find(f => f.id === selectedFitId)?.name ?? "";
-  const colorName = filteredColors?.find(c => c.id === selectedColorId)?.name ?? "";
-  const colorHex = filteredColors?.find(c => c.id === selectedColorId)?.hex ?? "";
 
   return (
     <div className="space-y-8">
@@ -1057,7 +1065,7 @@ function MockupsManager() {
               <MockupFilenameInput
                 label={`${activeSide === "front" ? "Front" : "Back"} Mockup Image`}
                 value={currentImage}
-                onChange={setCurrentImage}
+                generatedFilename={activeGeneratedFilename}
               />
 
               {currentImage ? (
@@ -1068,8 +1076,8 @@ function MockupsManager() {
                 />
               ) : (
                 <div className="border border-dashed border-border aspect-[3/4] flex flex-col items-center justify-center text-muted-foreground gap-3">
-                  <span className="text-xs uppercase tracking-widest">Enter a filename above</span>
-                  <span className="text-xs text-muted-foreground/60">Then draw the design bounding box on it</span>
+                  <span className="text-xs uppercase tracking-widest">Select a full combination first</span>
+                  <span className="text-xs text-muted-foreground/60">Then upload the image using the generated filename</span>
                 </div>
               )}
             </div>
