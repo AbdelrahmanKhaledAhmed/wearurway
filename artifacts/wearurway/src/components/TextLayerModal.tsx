@@ -74,26 +74,32 @@ async function renderTextToCanvas(
 
   if (Math.abs(arcDeg) < 2) {
     // ── Straight text ──
-    // Measure actual rendered bounds (not just advance width) to prevent clipping.
-    // Many decorative fonts have glyphs that extend beyond the advance width.
-    // Because text is drawn centered, each side's clearance from the center must
-    // be at least the larger of the two asymmetric bounding box halves.
+    // IMPORTANT: set alignment BEFORE measuring so that actualBoundingBox values
+    // are reported relative to the center/middle draw origin, not the left baseline.
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
     const metrics = ctx.measureText(text);
-    const halfW = Math.max(metrics.actualBoundingBoxLeft, metrics.actualBoundingBoxRight);
-    const halfH = Math.max(metrics.actualBoundingBoxAscent, metrics.actualBoundingBoxDescent);
-    const neededW = Math.ceil(halfW * 2 + strokePad * 2);
-    const neededH = Math.ceil(halfH * 2 + strokePad * 2);
+    const bLeft  = metrics.actualBoundingBoxLeft;   // distance: draw-point → left ink edge
+    const bRight = metrics.actualBoundingBoxRight;  // distance: draw-point → right ink edge
+    const bAsc   = metrics.actualBoundingBoxAscent; // distance: draw-point → top ink edge
+    const bDesc  = metrics.actualBoundingBoxDescent;// distance: draw-point → bottom ink edge
 
-    // Expand canvas if the text is wider or taller than the default size
-    canvas.width  = Math.max(outW, neededW);
-    canvas.height = Math.max(outH, neededH);
+    // Size the canvas so every side has exactly strokePad clearance beyond the ink.
+    canvas.width  = Math.max(outW, Math.ceil(bLeft  + bRight + strokePad * 2));
+    canvas.height = Math.max(outH, Math.ceil(bAsc   + bDesc  + strokePad * 2));
 
+    // Canvas resize wipes context state — re-apply everything.
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.font = `${fontSize}px "${font.family}"`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
+
+    // Anchor the draw point so left ink has strokePad clearance from the canvas edge.
+    // (Right clearance is guaranteed >= strokePad by the canvas width calculation.)
+    const cx = bLeft + strokePad;
+    const cy = bAsc  + strokePad;
+
     if (applyStroke) {
       ctx.strokeStyle = outlineColor;
       ctx.lineWidth = outlineWidth * 2;
