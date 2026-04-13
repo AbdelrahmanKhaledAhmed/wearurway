@@ -75,11 +75,13 @@ export default function Design() {
 
   const [showPlaceholder, setShowPlaceholder] = useState(() => localStorage.getItem("wearurway_show_placeholder") !== "false");
   const [showDimLabel, setShowDimLabel] = useState(() => localStorage.getItem("wearurway_show_dim_label") !== "false");
+  const [showExportButton, setShowExportButton] = useState(() => localStorage.getItem("wearurway_show_export_button") !== "false");
 
   useEffect(() => {
     const handler = (e: StorageEvent) => {
       if (e.key === "wearurway_show_placeholder") setShowPlaceholder(e.newValue !== "false");
       if (e.key === "wearurway_show_dim_label") setShowDimLabel(e.newValue !== "false");
+      if (e.key === "wearurway_show_export_button") setShowExportButton(e.newValue !== "false");
     };
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
@@ -1432,7 +1434,7 @@ export default function Design() {
           </div>
 
           {/* ── Export ── */}
-          {layers.some(l => l.visible) && realWidth > 0 && (
+          {showExportButton && layers.some(l => l.visible) && realWidth > 0 && (
             <div className="px-4 pb-4 pt-2">
               <button
                 onClick={handleExport}

@@ -876,6 +876,7 @@ function MockupsManager() {
   const [activeSide, setActiveSide] = useState<"front" | "back">("front");
   const [showPlaceholder, setShowPlaceholder] = useState(() => localStorage.getItem("wearurway_show_placeholder") !== "false");
   const [showDimLabel, setShowDimLabel] = useState(() => localStorage.getItem("wearurway_show_dim_label") !== "false");
+  const [showExportButton, setShowExportButton] = useState(() => localStorage.getItem("wearurway_show_export_button") !== "false");
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -1174,6 +1175,17 @@ function MockupsManager() {
                     onCheckedChange={v => {
                       setShowDimLabel(v);
                       localStorage.setItem("wearurway_show_dim_label", v ? "true" : "false");
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="toggle-export-button" className="text-xs uppercase tracking-widest cursor-pointer">Show Export Image Button</Label>
+                  <Switch
+                    id="toggle-export-button"
+                    checked={showExportButton}
+                    onCheckedChange={v => {
+                      setShowExportButton(v);
+                      localStorage.setItem("wearurway_show_export_button", v ? "true" : "false");
                     }}
                   />
                 </div>
