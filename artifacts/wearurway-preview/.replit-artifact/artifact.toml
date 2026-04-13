@@ -1,5 +1,5 @@
 kind = "web"
-previewPath = "/"
+previewPath = "/wearurway-preview/"
 title = "Wearurway"
 version = "1.0.0"
 id = "artifacts/wearurway-preview"
@@ -11,7 +11,7 @@ version = "1.0.0"
 
 [[services]]
 name = "web"
-paths = [ "/" ]
+paths = [ "/wearurway-preview/" ]
 localPort = 18948
 
 [services.development]
@@ -28,4 +28,4 @@ to = "/index.html"
 
 [services.env]
 PORT = "18948"
-BASE_PATH = "/"
+BASE_PATH = "/wearurway-preview/"
