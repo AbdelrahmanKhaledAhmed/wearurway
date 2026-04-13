@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { CUSTOM_FONTS, type FontConfig } from "@/config/fonts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -191,30 +191,30 @@ function FontPreviewCard({
   selected: boolean;
   onClick: () => void;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [src, setSrc] = useState("");
   const displayText = text.trim() || "Your Text";
 
   useEffect(() => {
     let cancelled = false;
     ensureFontLoaded(font).then(() => {
       if (cancelled) return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+      const W = 220, H = 72;
+      const canvas = document.createElement("canvas");
+      canvas.width = W;
+      canvas.height = H;
       const ctx = canvas.getContext("2d")!;
-      const W = canvas.width;
-      const H = canvas.height;
       ctx.clearRect(0, 0, W, H);
       ctx.font = `${PREVIEW_FONT_SIZE}px "${font.family}"`;
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      // Scale down if text is too wide
       const measured = ctx.measureText(displayText).width;
       if (measured > W - 16) {
         const scale = (W - 16) / measured;
         ctx.font = `${Math.floor(PREVIEW_FONT_SIZE * scale)}px "${font.family}"`;
       }
       ctx.fillText(displayText, W / 2, H / 2);
+      if (!cancelled) setSrc(canvas.toDataURL("image/png"));
     });
     return () => { cancelled = true; };
   }, [font, displayText]);
@@ -228,13 +228,25 @@ function FontPreviewCard({
           : "border-border hover:border-foreground/60"
       }`}
     >
-      <canvas
-        ref={canvasRef}
-        width={220}
-        height={72}
+      {/* Offscreen canvas rendered to data URL and displayed as <img> to
+          avoid the iframe proxy canvas-display restriction */}
+      <div
         className="w-full"
-        style={{ imageRendering: "auto" }}
-      />
+        style={{
+          height: 72,
+          background: "repeating-conic-gradient(#1a1a1a 0% 25%,#242424 0% 50%) 0 0/16px 16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {src ? (
+          <img src={src} alt={font.name} draggable={false}
+            style={{ width: "100%", height: 72, objectFit: "contain", display: "block" }} />
+        ) : (
+          <span className="text-[10px] text-muted-foreground/40 uppercase tracking-widest">…</span>
+        )}
+      </div>
       <p className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1 truncate w-full text-center">
         {font.name}
       </p>
@@ -247,40 +259,51 @@ function FontPreviewCard({
 
 // ─── Live styled preview ──────────────────────────────────────────────────────
 function StyledPreview({ opts }: { opts: TextLayerOptions }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [src, setSrc] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const PW = 520, PH = 200;
       const raw = await renderTextToCanvas(opts, 600, 300);
       if (cancelled) return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d")!;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Scale raw to fit preview
-      const scaleX = canvas.width / raw.width;
-      const scaleY = canvas.height / raw.height;
+      // Composite onto a fixed-size offscreen canvas then extract as data URL
+      const out = document.createElement("canvas");
+      out.width  = PW;
+      out.height = PH;
+      const ctx = out.getContext("2d")!;
+      ctx.clearRect(0, 0, PW, PH);
+      const scaleX = PW / raw.width;
+      const scaleY = PH / raw.height;
       const scale = Math.min(scaleX, scaleY, 1);
-      const dx = (canvas.width - raw.width * scale) / 2;
-      const dy = (canvas.height - raw.height * scale) / 2;
+      const dx = (PW - raw.width * scale) / 2;
+      const dy = (PH - raw.height * scale) / 2;
       ctx.drawImage(raw, dx, dy, raw.width * scale, raw.height * scale);
+
+      if (!cancelled) setSrc(out.toDataURL("image/png"));
     })();
     return () => { cancelled = true; };
   }, [opts]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={520}
-      height={200}
+    <div
       className="w-full border border-border/40"
       style={{
-        background:
-          "repeating-conic-gradient(#1a1a1a 0% 25%, #242424 0% 50%) 0 0 / 16px 16px",
+        height: 200,
+        background: "repeating-conic-gradient(#1a1a1a 0% 25%, #242424 0% 50%) 0 0 / 16px 16px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
       }}
-    />
+    >
+      {src ? (
+        <img src={src} alt="text preview" draggable={false}
+          style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+      ) : (
+        <span className="text-xs text-muted-foreground/40 uppercase tracking-widest animate-pulse">Rendering…</span>
+      )}
+    </div>
   );
 }
 
