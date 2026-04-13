@@ -76,11 +76,13 @@ async function renderTextToCanvas(
     // ── Straight text ──
     // Measure actual rendered bounds (not just advance width) to prevent clipping.
     // Many decorative fonts have glyphs that extend beyond the advance width.
+    // Because text is drawn centered, each side's clearance from the center must
+    // be at least the larger of the two asymmetric bounding box halves.
     const metrics = ctx.measureText(text);
-    const actualW = metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight;
-    const actualH = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
-    const neededW = Math.ceil(actualW + strokePad * 2);
-    const neededH = Math.ceil(actualH + strokePad * 2);
+    const halfW = Math.max(metrics.actualBoundingBoxLeft, metrics.actualBoundingBoxRight);
+    const halfH = Math.max(metrics.actualBoundingBoxAscent, metrics.actualBoundingBoxDescent);
+    const neededW = Math.ceil(halfW * 2 + strokePad * 2);
+    const neededH = Math.ceil(halfH * 2 + strokePad * 2);
 
     // Expand canvas if the text is wider or taller than the default size
     canvas.width  = Math.max(outW, neededW);
