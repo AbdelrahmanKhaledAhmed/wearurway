@@ -912,25 +912,64 @@ export default function Design() {
         }
         if (loaded.length === 0) return;
 
-        let maxNaturalScale = 1;
-        for (const { layer, img } of loaded) {
+        // ── Compute exported crop + real-world size ────────────────────────────
+        let cropX = 0;
+        let cropY = 0;
+        let cropW = clipW;
+        let cropH = clipH;
+        let visCmW: number;
+        let visCmH: number;
+
+        if (loaded.length === 1) {
+          const layer = loaded[0].layer;
           const { width, height } = getRatioLockedSize(layer, layer.width);
-          if (width > 0) maxNaturalScale = Math.max(maxNaturalScale, img.naturalWidth / width);
-          if (height > 0) maxNaturalScale = Math.max(maxNaturalScale, img.naturalHeight / height);
+          const lx = Math.max(0, layer.x);
+          const ly = Math.max(0, layer.y);
+          const rx = Math.min(clipW, layer.x + width);
+          const ry = Math.min(clipH, layer.y + height);
+          if (rx <= lx || ry <= ly) return;
+
+          cropX = lx;
+          cropY = ly;
+          cropW = rx - lx;
+          cropH = ry - ly;
+
+          const dim = layerPrintDim(layer);
+          const fullCmW = dim?.w ?? Math.round((width / clipW) * realWidth * 10) / 10;
+          const fullCmH = dim?.h ?? Math.round((height / width) * fullCmW * 10) / 10;
+          visCmW = Math.round(fullCmW * (cropW / width) * 10) / 10;
+          visCmH = Math.round(fullCmH * (cropH / height) * 10) / 10;
+        } else {
+          let visMinX = clipW, visMaxX = 0, visMinY = clipH, visMaxY = 0;
+          for (const { layer } of loaded) {
+            const { width, height } = getRatioLockedSize(layer, layer.width);
+            const lx = Math.max(0, layer.x);
+            const ly = Math.max(0, layer.y);
+            const rx = Math.min(clipW, layer.x + width);
+            const ry = Math.min(clipH, layer.y + height);
+            if (rx > lx && ry > ly) {
+              visMinX = Math.min(visMinX, lx); visMaxX = Math.max(visMaxX, rx);
+              visMinY = Math.min(visMinY, ly); visMaxY = Math.max(visMaxY, ry);
+            }
+          }
+          if (visMaxX <= visMinX || visMaxY <= visMinY) return;
+
+          cropX = visMinX;
+          cropY = visMinY;
+          cropW = visMaxX - visMinX;
+          cropH = visMaxY - visMinY;
+          visCmW = Math.round((cropW / clipW) * realWidth * 10) / 10;
+          visCmH = Math.round((cropH / clipH) * realHeight * 10) / 10;
         }
-        const printScale = Math.max(
-          (realWidth / 2.54 * 300) / clipW,
-          (realHeight / 2.54 * 300) / clipH,
-          1,
-        );
+
         const MAX_SIDE = 8192;
-        const exportScale = Math.min(
-          Math.max(maxNaturalScale, printScale, 1),
-          MAX_SIDE / clipW,
-          MAX_SIDE / clipH,
-        );
-        const exportW = Math.round(clipW * exportScale);
-        const exportH = Math.round(clipH * exportScale);
+        const targetW = Math.max(1, Math.round((visCmW / 2.54) * 300));
+        const targetH = Math.max(1, Math.round((visCmH / 2.54) * 300));
+        const sideScale = Math.min(1, MAX_SIDE / targetW, MAX_SIDE / targetH);
+        const exportW = Math.max(1, Math.round(targetW * sideScale));
+        const exportH = Math.max(1, Math.round(targetH * sideScale));
+        const scaleX = exportW / cropW;
+        const scaleY = exportH / cropH;
 
         // ── Build canvas ───────────────────────────────────────────────────────
         const canvas = document.createElement("canvas");
@@ -941,10 +980,7 @@ export default function Design() {
 
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
-        ctx.scale(exportScale, exportScale);
-        ctx.beginPath();
-        ctx.rect(0, 0, clipW, clipH);
-        ctx.clip();
+        ctx.setTransform(scaleX, 0, 0, scaleY, -cropX * scaleX, -cropY * scaleY);
 
         for (const { layer, img } of loaded) {
           const { width, height } = getRatioLockedSize(layer, layer.width);
@@ -959,34 +995,6 @@ export default function Design() {
         }
 
         for (const { blobUrl } of loaded) URL.revokeObjectURL(blobUrl);
-
-        // ── Compute real-world size for filename ───────────────────────────────
-        let visCmW: number;
-        let visCmH: number;
-        if (loaded.length === 1) {
-          const dim = layerPrintDim(loaded[0].layer);
-          visCmW = dim?.w ?? Math.round(realWidth * 10) / 10;
-          visCmH = dim?.h ?? Math.round(realHeight * 10) / 10;
-        } else {
-          let visMinX = clipW, visMaxX = 0, visMinY = clipH, visMaxY = 0;
-          for (const { layer } of loaded) {
-            const { width, height } = getRatioLockedSize(layer, layer.width);
-            const lx = Math.max(0, layer.x);
-            const ly = Math.max(0, layer.y);
-            const rx = Math.min(clipW, layer.x + width);
-            const ry = Math.min(clipH, layer.y + height);
-            if (rx > lx && ry > ly) {
-              visMinX = Math.min(visMinX, lx); visMaxX = Math.max(visMaxX, rx);
-              visMinY = Math.min(visMinY, ly); visMaxY = Math.max(visMaxY, ry);
-            }
-          }
-          visCmW = visMaxX > visMinX
-            ? Math.round((visMaxX - visMinX) / clipW * realWidth * 10) / 10
-            : Math.round(realWidth * 10) / 10;
-          visCmH = visMaxY > visMinY
-            ? Math.round((visMaxY - visMinY) / clipH * realHeight * 10) / 10
-            : Math.round(realHeight * 10) / 10;
-        }
 
         // ── Download ───────────────────────────────────────────────────────────
         await new Promise<void>(resolve => {
