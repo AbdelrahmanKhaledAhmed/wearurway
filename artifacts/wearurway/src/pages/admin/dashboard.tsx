@@ -943,11 +943,9 @@ function MockupsManager() {
   const [backImage, setBackImage] = useState("");
   const [backBbox, setBackBbox] = useState<BBox | null>(null);
 
-  // Sync from fetched mockup when selection changes
+  // Sync bboxes from fetched mockup when selection changes (images come from generated filenames)
   useEffect(() => {
-    setFrontImage(mockup?.front?.image ?? "");
     setFrontBbox(mockup?.front?.boundingBox ?? null);
-    setBackImage(mockup?.back?.image ?? "");
     setBackBbox(mockup?.back?.boundingBox ?? null);
   }, [mockup]);
 
