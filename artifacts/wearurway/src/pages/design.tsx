@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGetMockup, useSaveMockup, getGetMockupQueryKey } from "@workspace/api-client-react";
@@ -214,7 +214,7 @@ export default function Design() {
   }, [selectedProduct, selectedFit, selectedColor]);
 
   const bbox: BBox | null | undefined = side === "front" ? localFrontBbox : localBackBbox;
-  const effectiveBbox: BBox = useMemo(() => bbox ?? { x: 0, y: 0, width: 100, height: 100 }, [bbox]);
+  const effectiveBbox: BBox = { x: 0, y: 0, width: 100, height: 100 };
 
   const handleAdminSave = () => {
     if (!selectedProduct || !selectedFit || !selectedColor) return;
@@ -850,17 +850,15 @@ export default function Design() {
       // ── Helper: render one side and trigger download ─────────────────────────
       const renderSide = async (
         visibleLayers: DesignLayer[],
-        sideBbox: BBox | null,
         label: "front" | "back",
       ) => {
-        if (visibleLayers.length === 0 || !sideBbox) return;
+        if (visibleLayers.length === 0) return;
 
-        // Derive clip dimensions from mockupSize (same formula the DOM uses).
-        // mockup container: width = mockupSize, height = mockupSize * 4/3 (aspect 3:4)
+        // Clip dimensions = full mockup container (layers can be placed anywhere on the shirt).
         const mockupContainerW = mockupSize;
         const mockupContainerH = mockupSize * (4 / 3);
-        const clipW = Math.round(mockupContainerW * sideBbox.width  / 100);
-        const clipH = Math.round(mockupContainerH * sideBbox.height / 100);
+        const clipW = mockupContainerW;
+        const clipH = mockupContainerH;
         if (!clipW || !clipH) return;
 
         // ── Load images ────────────────────────────────────────────────────────
@@ -981,12 +979,12 @@ export default function Design() {
         });
       };
 
-      await renderSide(frontVisible, localFrontBbox, "front");
-      await renderSide(backVisible,  localBackBbox,  "back");
+      await renderSide(frontVisible, "front");
+      await renderSide(backVisible,  "back");
     } finally {
       setExporting(false);
     }
-  }, [frontLayers, backLayers, localFrontBbox, localBackBbox, realWidth, realHeight, mockupSize]);
+  }, [frontLayers, backLayers, realWidth, realHeight, mockupSize]);
 
   if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return null;
 
