@@ -1237,8 +1237,18 @@ export default function Design() {
                 top: `${effectiveBbox.y}%`,
                 width: `${effectiveBbox.width}%`,
                 height: `${effectiveBbox.height}%`,
-                overflow: "hidden",
+                overflow: "visible",
                 zIndex: 5,
+                WebkitMaskImage: [
+                  "linear-gradient(to right, transparent 0px, black 28px, black calc(100% - 28px), transparent 100%)",
+                  "linear-gradient(to bottom, transparent 0px, black 28px, black calc(100% - 28px), transparent 100%)",
+                ].join(", "),
+                maskImage: [
+                  "linear-gradient(to right, transparent 0px, black 28px, black calc(100% - 28px), transparent 100%)",
+                  "linear-gradient(to bottom, transparent 0px, black 28px, black calc(100% - 28px), transparent 100%)",
+                ].join(", "),
+                WebkitMaskComposite: "destination-in",
+                maskComposite: "intersect",
               }}
             >
               {layers.map((layer) =>
