@@ -1228,60 +1228,79 @@ export default function Design() {
               </motion.div>
             </AnimatePresence>
 
-            {/* ── Design clip area ── */}
+            {/* ── Design clip area — isolated compositing group ── */}
+            {/* isolation:isolate + destination-in shirt overlay = design only visible on shirt */}
             <div
-              ref={clipAreaRef}
               style={{
                 position: "absolute",
-                left: `${effectiveBbox.x}%`,
-                top: `${effectiveBbox.y}%`,
-                width: `${effectiveBbox.width}%`,
-                height: `${effectiveBbox.height}%`,
-                overflow: "visible",
+                inset: 0,
                 zIndex: 5,
-                ...(currentSide?.image ? {
-                  WebkitMaskImage: `url(${currentSide.image})`,
-                  maskImage: `url(${currentSide.image})`,
-                  WebkitMaskSize: `${100 / effectiveBbox.width * 100}% ${100 / effectiveBbox.height * 100}%`,
-                  maskSize: `${100 / effectiveBbox.width * 100}% ${100 / effectiveBbox.height * 100}%`,
-                  WebkitMaskPosition: `${-effectiveBbox.x / effectiveBbox.width * 100}% ${-effectiveBbox.y / effectiveBbox.height * 100}%`,
-                  maskPosition: `${-effectiveBbox.x / effectiveBbox.width * 100}% ${-effectiveBbox.y / effectiveBbox.height * 100}%`,
-                  WebkitMaskRepeat: "no-repeat",
-                  maskRepeat: "no-repeat",
-                } : { overflow: "hidden" }),
+                isolation: "isolate",
               }}
             >
-              {layers.map((layer) =>
-                layer.visible ? (() => {
-                  const { width, height } = getRatioLockedSize(layer, layer.width);
-                  return (
-                  <img
-                    key={layer.id}
-                    src={layer.imageUrl}
-                    alt={layer.name}
-                    draggable={false}
-                    onMouseDown={e => startDrag(e, layer)}
-                    style={{
-                      position: "absolute",
-                      left: layer.x,
-                      top: layer.y,
-                      width,
-                      height,
-                      minWidth: width,
-                      minHeight: height,
-                      maxWidth: "none",
-                      maxHeight: "none",
-                      transform: `rotate(${layer.rotation}deg)`,
-                      transformOrigin: "center center",
-                      cursor: dragRef.current?.layerId === layer.id ? "grabbing" : "grab",
-                      userSelect: "none",
-                      background: "none",
-                      flexShrink: 0,
-                      imageRendering: "high-quality" as React.CSSProperties["imageRendering"],
-                    }}
-                  />
-                  );
-                })() : null
+              {/* Inner clip area — keeps designs within the bounding box */}
+              <div
+                ref={clipAreaRef}
+                style={{
+                  position: "absolute",
+                  left: `${effectiveBbox.x}%`,
+                  top: `${effectiveBbox.y}%`,
+                  width: `${effectiveBbox.width}%`,
+                  height: `${effectiveBbox.height}%`,
+                  overflow: "hidden",
+                }}
+              >
+                {layers.map((layer) =>
+                  layer.visible ? (() => {
+                    const { width, height } = getRatioLockedSize(layer, layer.width);
+                    return (
+                    <img
+                      key={layer.id}
+                      src={layer.imageUrl}
+                      alt={layer.name}
+                      draggable={false}
+                      onMouseDown={e => startDrag(e, layer)}
+                      style={{
+                        position: "absolute",
+                        left: layer.x,
+                        top: layer.y,
+                        width,
+                        height,
+                        minWidth: width,
+                        minHeight: height,
+                        maxWidth: "none",
+                        maxHeight: "none",
+                        transform: `rotate(${layer.rotation}deg)`,
+                        transformOrigin: "center center",
+                        cursor: dragRef.current?.layerId === layer.id ? "grabbing" : "grab",
+                        userSelect: "none",
+                        background: "none",
+                        flexShrink: 0,
+                        imageRendering: "high-quality" as React.CSSProperties["imageRendering"],
+                      }}
+                    />
+                    );
+                  })() : null
+                )}
+              </div>
+
+              {/* Shirt alpha mask — uses destination-in to punch out non-shirt areas */}
+              {currentSide?.image && (
+                <img
+                  src={currentSide.image}
+                  alt=""
+                  draggable={false}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    mixBlendMode: "destination-in",
+                    pointerEvents: "none",
+                    zIndex: 10,
+                  }}
+                />
               )}
             </div>
           </div>
