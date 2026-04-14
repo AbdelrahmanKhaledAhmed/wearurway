@@ -903,12 +903,11 @@ export default function Design() {
       ) => {
         if (visibleLayers.length === 0 || !sideBbox) return;
 
-        // Derive clip dimensions from mockupSize (same formula the DOM uses).
-        // mockup container: width = mockupSize, height = mockupSize * 4/3 (aspect 3:4)
+        const visibleClipSize = label === side ? clipSize : null;
         const mockupContainerW = mockupSize;
         const mockupContainerH = mockupSize * (4 / 3);
-        const clipW = Math.round(mockupContainerW * sideBbox.width  / 100);
-        const clipH = Math.round(mockupContainerH * sideBbox.height / 100);
+        const clipW = visibleClipSize?.w ?? Math.round(mockupContainerW * sideBbox.width  / 100);
+        const clipH = visibleClipSize?.h ?? Math.round(mockupContainerH * sideBbox.height / 100);
         if (!clipW || !clipH) return;
 
         // ── Load images ────────────────────────────────────────────────────────
@@ -930,63 +929,8 @@ export default function Design() {
         }
         if (loaded.length === 0) return;
 
-        // ── Compute exported crop + real-world size ────────────────────────────
-        let cropX = 0;
-        let cropY = 0;
-        let cropW = clipW;
-        let cropH = clipH;
-        let visCmW: number;
-        let visCmH: number;
-
-        if (loaded.length === 1) {
-          const layer = loaded[0].layer;
-          const { width, height } = getRatioLockedSize(layer, layer.width);
-          const lx = Math.max(0, layer.x);
-          const ly = Math.max(0, layer.y);
-          const rx = Math.min(clipW, layer.x + width);
-          const ry = Math.min(clipH, layer.y + height);
-          if (rx <= lx || ry <= ly) return;
-
-          cropX = lx;
-          cropY = ly;
-          cropW = rx - lx;
-          cropH = ry - ly;
-
-          const fullCmW = Math.round((width / clipW) * realWidth * 10) / 10;
-          const fullCmH = Math.round((height / clipH) * realHeight * 10) / 10;
-          visCmW = Math.round(fullCmW * (cropW / width) * 10) / 10;
-          visCmH = Math.round(fullCmH * (cropH / height) * 10) / 10;
-        } else {
-          let visMinX = clipW, visMaxX = 0, visMinY = clipH, visMaxY = 0;
-          for (const { layer } of loaded) {
-            const { width, height } = getRatioLockedSize(layer, layer.width);
-            const lx = Math.max(0, layer.x);
-            const ly = Math.max(0, layer.y);
-            const rx = Math.min(clipW, layer.x + width);
-            const ry = Math.min(clipH, layer.y + height);
-            if (rx > lx && ry > ly) {
-              visMinX = Math.min(visMinX, lx); visMaxX = Math.max(visMaxX, rx);
-              visMinY = Math.min(visMinY, ly); visMaxY = Math.max(visMaxY, ry);
-            }
-          }
-          if (visMaxX <= visMinX || visMaxY <= visMinY) return;
-
-          cropX = visMinX;
-          cropY = visMinY;
-          cropW = visMaxX - visMinX;
-          cropH = visMaxY - visMinY;
-          visCmW = Math.round((cropW / clipW) * realWidth * 10) / 10;
-          visCmH = Math.round((cropH / clipH) * realHeight * 10) / 10;
-        }
-
-        const MAX_SIDE = 8192;
-        const targetW = Math.max(1, Math.round((visCmW / 2.54) * 300));
-        const targetH = Math.max(1, Math.round((visCmH / 2.54) * 300));
-        const sideScale = Math.min(1, MAX_SIDE / targetW, MAX_SIDE / targetH);
-        const exportW = Math.max(1, Math.round(targetW * sideScale));
-        const exportH = Math.max(1, Math.round(targetH * sideScale));
-        const scaleX = exportW / cropW;
-        const scaleY = exportH / cropH;
+        const exportW = clipW;
+        const exportH = clipH;
 
         // ── Build canvas ───────────────────────────────────────────────────────
         const canvas = document.createElement("canvas");
@@ -995,9 +939,12 @@ export default function Design() {
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
+        ctx.clearRect(0, 0, exportW, exportH);
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
-        ctx.setTransform(scaleX, 0, 0, scaleY, -cropX * scaleX, -cropY * scaleY);
+        ctx.beginPath();
+        ctx.rect(0, 0, exportW, exportH);
+        ctx.clip();
 
         for (const { layer, img } of loaded) {
           const { width, height } = getRatioLockedSize(layer, layer.width);
@@ -1020,7 +967,7 @@ export default function Design() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `${visCmW}x${visCmH}cm-${label}.png`;
+            a.download = `${realWidth}x${realHeight}cm-box-${label}.png`;
             a.click();
             URL.revokeObjectURL(url);
             resolve();
@@ -1033,7 +980,7 @@ export default function Design() {
     } finally {
       setExporting(false);
     }
-  }, [frontLayers, backLayers, localFrontBbox, localBackBbox, realWidth, realHeight, mockupSize]);
+  }, [frontLayers, backLayers, localFrontBbox, localBackBbox, realWidth, realHeight, mockupSize, side, clipSize]);
 
   if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return null;
 
