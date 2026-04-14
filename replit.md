@@ -46,7 +46,7 @@ A premium streetwear customization website with a multi-step product configurato
 - Mockup layer resizing is ratio-locked to each layer's natural image dimensions across wheel zoom, pinch zoom, render, export, and live dimension labels.
 - Live print dimensions for selected layers are calculated from the portion of the layer visibly clipped inside the print box, so the cm label updates when the image is dragged partly outside the printable area.
 - Export Design now composites the already-processed layer images at the mockup design pixel dimensions without print-scale upscaling or sharpening during export.
-- Export Design outputs high-resolution PNG files using print-DPI canvas scaling and uses rotated layer bounds when cropping so rotated artwork edges are preserved.
+- Export Design outputs high-resolution PNG files using print-DPI canvas scaling while keeping filename dimensions aligned with the live selected-layer size shown on the mockup.
 - Tools includes Share Design, which generates a ready-to-share PNG combining the full front and back mockups side-by-side with all visible design layers applied.
 
 ### Backend (artifacts/api-server)
