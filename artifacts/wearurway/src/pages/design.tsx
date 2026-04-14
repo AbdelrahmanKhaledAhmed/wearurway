@@ -445,18 +445,36 @@ export default function Design() {
     return () => ro.disconnect();
   }, [bbox]);
 
-  // ── Compute print dimensions in cm for any layer, locked to image ratio ─────
+  // ── Compute print dimensions in cm for the selected layer's visible crop ────
   const selectedLayer = layers.find(l => l.id === selectedLayerId) ?? null;
 
-  const layerPrintDim = (layer: DesignLayer) => {
-    if (!clipSize || !realWidth || !realHeight) return null;
-    const { width } = getRatioLockedSize(layer, layer.width);
-    const w = Math.round((width / clipSize.w) * realWidth * 10) / 10;
-    const h = Math.round((w / getLayerAspectRatio(layer)) * 10) / 10;
-    return { w, h };
+  const getVisibleLayerRect = (layer: DesignLayer, clipW: number, clipH: number) => {
+    const { width, height } = getRatioLockedSize(layer, layer.width);
+    const left = Math.max(0, layer.x);
+    const top = Math.max(0, layer.y);
+    const right = Math.min(clipW, layer.x + width);
+    const bottom = Math.min(clipH, layer.y + height);
+    if (right <= left || bottom <= top) return null;
+    return {
+      x: left,
+      y: top,
+      width: right - left,
+      height: bottom - top,
+      centerX: left + (right - left) / 2,
+      centerY: top + (bottom - top) / 2,
+    };
   };
 
-  const printDim = selectedLayer ? layerPrintDim(selectedLayer) : null;
+  const layerVisiblePrintDim = (layer: DesignLayer) => {
+    if (!clipSize || !realWidth || !realHeight) return null;
+    const visibleRect = getVisibleLayerRect(layer, clipSize.w, clipSize.h);
+    if (!visibleRect) return null;
+    const w = Math.round((visibleRect.width / clipSize.w) * realWidth * 10) / 10;
+    const h = Math.round((visibleRect.height / clipSize.h) * realHeight * 10) / 10;
+    return { w, h, rect: visibleRect };
+  };
+
+  const printDim = selectedLayer ? layerVisiblePrintDim(selectedLayer) : null;
 
   // ── Zoom helpers ───────────────────────────────────────────────────────────
 
@@ -934,9 +952,8 @@ export default function Design() {
           cropW = rx - lx;
           cropH = ry - ly;
 
-          const dim = layerPrintDim(layer);
-          const fullCmW = dim?.w ?? Math.round((width / clipW) * realWidth * 10) / 10;
-          const fullCmH = dim?.h ?? Math.round((height / width) * fullCmW * 10) / 10;
+          const fullCmW = Math.round((width / clipW) * realWidth * 10) / 10;
+          const fullCmH = Math.round((height / clipH) * realHeight * 10) / 10;
           visCmW = Math.round(fullCmW * (cropW / width) * 10) / 10;
           visCmH = Math.round(fullCmH * (cropH / height) * 10) / 10;
         } else {
@@ -1312,8 +1329,8 @@ export default function Design() {
                   <div
                     style={{
                       position: "absolute",
-                      left: selectedLayer.x + getRatioLockedSize(selectedLayer, selectedLayer.width).width / 2,
-                      top: selectedLayer.y + getRatioLockedSize(selectedLayer, selectedLayer.width).height / 2,
+                      left: printDim.rect.centerX,
+                      top: printDim.rect.centerY,
                       transform: "translateX(-50%) translateY(-50%)",
                       pointerEvents: "none",
                       zIndex: 20,
