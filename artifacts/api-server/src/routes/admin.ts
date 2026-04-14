@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import crypto from "node:crypto";
 import {
   AdminLoginBody,
   AdminLoginResponse,
@@ -12,7 +13,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "admin123";
 const sessions = new Set<string>();
 
 function generateSessionToken(): string {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  return crypto.randomBytes(32).toString("base64url");
 }
 
 export function isAdminAuthenticated(req: { headers: Record<string, string | string[] | undefined> }): boolean {
