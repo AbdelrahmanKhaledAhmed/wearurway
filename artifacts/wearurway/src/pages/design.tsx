@@ -1239,16 +1239,16 @@ export default function Design() {
                 height: `${effectiveBbox.height}%`,
                 overflow: "visible",
                 zIndex: 5,
-                WebkitMaskImage: [
-                  "linear-gradient(to right, transparent 0px, black 28px, black calc(100% - 28px), transparent 100%)",
-                  "linear-gradient(to bottom, transparent 0px, black 28px, black calc(100% - 28px), transparent 100%)",
-                ].join(", "),
-                maskImage: [
-                  "linear-gradient(to right, transparent 0px, black 28px, black calc(100% - 28px), transparent 100%)",
-                  "linear-gradient(to bottom, transparent 0px, black 28px, black calc(100% - 28px), transparent 100%)",
-                ].join(", "),
-                WebkitMaskComposite: "destination-in",
-                maskComposite: "intersect",
+                ...(currentSide?.image ? {
+                  WebkitMaskImage: `url(${currentSide.image})`,
+                  maskImage: `url(${currentSide.image})`,
+                  WebkitMaskSize: `${100 / effectiveBbox.width * 100}% ${100 / effectiveBbox.height * 100}%`,
+                  maskSize: `${100 / effectiveBbox.width * 100}% ${100 / effectiveBbox.height * 100}%`,
+                  WebkitMaskPosition: `${-effectiveBbox.x / effectiveBbox.width * 100}% ${-effectiveBbox.y / effectiveBbox.height * 100}%`,
+                  maskPosition: `${-effectiveBbox.x / effectiveBbox.width * 100}% ${-effectiveBbox.y / effectiveBbox.height * 100}%`,
+                  WebkitMaskRepeat: "no-repeat",
+                  maskRepeat: "no-repeat",
+                } : { overflow: "hidden" }),
               }}
             >
               {layers.map((layer) =>
