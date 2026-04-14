@@ -10,6 +10,8 @@ import uploadsRouter from "./uploads.js";
 import sizeChartsRouter from "./size-charts.js";
 import sharedDesignsRouter from "./shared-designs.js";
 import sharedLayersRouter from "./shared-layers.js";
+import orderSettingsRouter from "./order-settings.js";
+import ordersRouter from "./orders.js";
 
 const router: IRouter = Router();
 
@@ -24,5 +26,7 @@ router.use(uploadsRouter);
 router.use(sizeChartsRouter);
 router.use(sharedDesignsRouter);
 router.use(sharedLayersRouter);
+router.use(orderSettingsRouter);
+router.use(ordersRouter);
 
 export default router;

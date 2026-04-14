@@ -24,13 +24,17 @@ import type {
   AdminMeResponse,
   Color,
   CreateFitBody,
+  CreateOrderBody,
+  CreateOrderResponse,
   CreateProductBody,
   ErrorResponse,
   Fit,
   GetMockupParams,
   HealthStatus,
   Mockup,
+  OrderSettings,
   Product,
+  PublicOrderSettings,
   SaveMockupBody,
   Size,
   UpdateFitBody,
@@ -1604,6 +1608,167 @@ export const useUploadImage = <
   return useMutation(getUploadImageMutationOptions(options));
 };
 
+/**
+ * @summary Get public checkout settings
+ */
+export const getGetOrderSettingsUrl = () => {
+  return `/api/order-settings`;
+};
+
+export const getOrderSettings = async (
+  options?: RequestInit,
+): Promise<PublicOrderSettings> => {
+  return customFetch<PublicOrderSettings>(getGetOrderSettingsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetOrderSettingsQueryKey = () => {
+  return [`/api/order-settings`] as const;
+};
+
+export const getGetOrderSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOrderSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getOrderSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetOrderSettingsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getOrderSettings>>
+  > = ({ signal }) => getOrderSettings({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOrderSettings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOrderSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOrderSettings>>
+>;
+export type GetOrderSettingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get public checkout settings
+ */
+
+export function useGetOrderSettings<
+  TData = Awaited<ReturnType<typeof getOrderSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getOrderSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOrderSettingsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create an order and send it to Telegram
+ */
+export const getCreateOrderUrl = () => {
+  return `/api/create-order`;
+};
+
+export const createOrder = async (
+  createOrderBody: CreateOrderBody,
+  options?: RequestInit,
+): Promise<CreateOrderResponse> => {
+  return customFetch<CreateOrderResponse>(getCreateOrderUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createOrderBody),
+  });
+};
+
+export const getCreateOrderMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createOrder>>,
+    TError,
+    { data: BodyType<CreateOrderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createOrder>>,
+  TError,
+  { data: BodyType<CreateOrderBody> },
+  TContext
+> => {
+  const mutationKey = ["createOrder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createOrder>>,
+    { data: BodyType<CreateOrderBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createOrder(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateOrderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createOrder>>
+>;
+export type CreateOrderMutationBody = BodyType<CreateOrderBody>;
+export type CreateOrderMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Create an order and send it to Telegram
+ */
+export const useCreateOrder = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createOrder>>,
+    TError,
+    { data: BodyType<CreateOrderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createOrder>>,
+  TError,
+  { data: BodyType<CreateOrderBody> },
+  TContext
+> => {
+  return useMutation(getCreateOrderMutationOptions(options));
+};
+
 export const getAdminLoginUrl = () => {
   return `/api/admin/login`;
 };
@@ -1824,3 +1989,164 @@ export function useGetAdminMe<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Get full order settings
+ */
+export const getGetAdminOrderSettingsUrl = () => {
+  return `/api/admin/order-settings`;
+};
+
+export const getAdminOrderSettings = async (
+  options?: RequestInit,
+): Promise<OrderSettings> => {
+  return customFetch<OrderSettings>(getGetAdminOrderSettingsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAdminOrderSettingsQueryKey = () => {
+  return [`/api/admin/order-settings`] as const;
+};
+
+export const getGetAdminOrderSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminOrderSettings>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminOrderSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAdminOrderSettingsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAdminOrderSettings>>
+  > = ({ signal }) => getAdminOrderSettings({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminOrderSettings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminOrderSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminOrderSettings>>
+>;
+export type GetAdminOrderSettingsQueryError = ErrorType<void>;
+
+/**
+ * @summary Get full order settings
+ */
+
+export function useGetAdminOrderSettings<
+  TData = Awaited<ReturnType<typeof getAdminOrderSettings>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminOrderSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminOrderSettingsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update order settings
+ */
+export const getUpdateAdminOrderSettingsUrl = () => {
+  return `/api/admin/order-settings`;
+};
+
+export const updateAdminOrderSettings = async (
+  orderSettings: OrderSettings,
+  options?: RequestInit,
+): Promise<OrderSettings> => {
+  return customFetch<OrderSettings>(getUpdateAdminOrderSettingsUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(orderSettings),
+  });
+};
+
+export const getUpdateAdminOrderSettingsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAdminOrderSettings>>,
+    TError,
+    { data: BodyType<OrderSettings> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminOrderSettings>>,
+  TError,
+  { data: BodyType<OrderSettings> },
+  TContext
+> => {
+  const mutationKey = ["updateAdminOrderSettings"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminOrderSettings>>,
+    { data: BodyType<OrderSettings> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateAdminOrderSettings(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAdminOrderSettingsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminOrderSettings>>
+>;
+export type UpdateAdminOrderSettingsMutationBody = BodyType<OrderSettings>;
+export type UpdateAdminOrderSettingsMutationError = ErrorType<void>;
+
+/**
+ * @summary Update order settings
+ */
+export const useUpdateAdminOrderSettings = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAdminOrderSettings>>,
+    TError,
+    { data: BodyType<OrderSettings> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAdminOrderSettings>>,
+  TError,
+  { data: BodyType<OrderSettings> },
+  TContext
+> => {
+  return useMutation(getUpdateAdminOrderSettingsMutationOptions(options));
+};

@@ -128,6 +128,47 @@ export interface AdminMeResponse {
   authenticated: boolean;
 }
 
+export interface PublicOrderSettings {
+  shippingCompanyName: string;
+  shippingDescription: string;
+  shippingPrice: number;
+  frontOnlyPrice: number;
+  frontBackPrice: number;
+  instaPayPhone: string;
+}
+
+export interface OrderSettings {
+  shippingCompanyName: string;
+  shippingDescription: string;
+  shippingPrice: number;
+  frontOnlyPrice: number;
+  frontBackPrice: number;
+  instaPayPhone: string;
+  telegramChatId?: string;
+  telegramBotToken?: string;
+}
+
+export interface CreateOrderSize {
+  name: string;
+  realWidth?: number;
+  realHeight?: number;
+}
+
+export interface CreateOrderBody {
+  name: string;
+  phone: string;
+  address: string;
+  size: CreateOrderSize;
+  color: string;
+  total: number;
+  frontImage?: string;
+  backImage?: string;
+}
+
+export interface CreateOrderResponse {
+  orderId: string;
+}
+
 export interface BoundingBox {
   /** Left position as percentage (0-100) of image width */
   x: number;

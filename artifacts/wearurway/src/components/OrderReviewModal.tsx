@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGetOrderSettings } from "@workspace/api-client-react";
 
 interface BBox { x: number; y: number; width: number; height: number }
 
@@ -144,6 +145,7 @@ export default function OrderReviewModal({
   selectedProduct, selectedFit, selectedColor, selectedSize,
 }: Props) {
   const [, setLocation] = useLocation();
+  const { data: orderSettings } = useGetOrderSettings();
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
   const [backPreview, setBackPreview] = useState<string | null>(null);
   const [generatingPreviews, setGeneratingPreviews] = useState(false);
@@ -151,7 +153,7 @@ export default function OrderReviewModal({
 
   const hasFront = frontLayers.some(l => l.visible);
   const hasBack = backLayers.some(l => l.visible);
-  const price = hasFront && hasBack ? 700 : 550;
+  const price = hasFront && hasBack ? (orderSettings?.frontBackPrice ?? 700) : (orderSettings?.frontOnlyPrice ?? 550);
 
   const generatePreviews = useCallback(async () => {
     if (generatedRef.current) return;

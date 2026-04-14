@@ -415,6 +415,40 @@ export const UploadImageBody = zod.object({
   file: zod.instanceof(File),
 });
 
+/**
+ * @summary Get public checkout settings
+ */
+export const GetOrderSettingsResponse = zod.object({
+  shippingCompanyName: zod.string(),
+  shippingDescription: zod.string(),
+  shippingPrice: zod.number(),
+  frontOnlyPrice: zod.number(),
+  frontBackPrice: zod.number(),
+  instaPayPhone: zod.string(),
+});
+
+/**
+ * @summary Create an order and send it to Telegram
+ */
+export const CreateOrderBody = zod.object({
+  name: zod.string(),
+  phone: zod.string(),
+  address: zod.string(),
+  size: zod.object({
+    name: zod.string(),
+    realWidth: zod.number().optional(),
+    realHeight: zod.number().optional(),
+  }),
+  color: zod.string(),
+  total: zod.number(),
+  frontImage: zod.string().optional(),
+  backImage: zod.string().optional(),
+});
+
+export const CreateOrderResponse = zod.object({
+  orderId: zod.string(),
+});
+
 export const AdminLoginBody = zod.object({
   password: zod.string(),
 });
@@ -427,4 +461,43 @@ export const AdminLoginResponse = zod.object({
 
 export const GetAdminMeResponse = zod.object({
   authenticated: zod.boolean(),
+});
+
+/**
+ * @summary Get full order settings
+ */
+export const GetAdminOrderSettingsResponse = zod.object({
+  shippingCompanyName: zod.string(),
+  shippingDescription: zod.string(),
+  shippingPrice: zod.number(),
+  frontOnlyPrice: zod.number(),
+  frontBackPrice: zod.number(),
+  instaPayPhone: zod.string(),
+  telegramChatId: zod.string().optional(),
+  telegramBotToken: zod.string().optional(),
+});
+
+/**
+ * @summary Update order settings
+ */
+export const UpdateAdminOrderSettingsBody = zod.object({
+  shippingCompanyName: zod.string(),
+  shippingDescription: zod.string(),
+  shippingPrice: zod.number(),
+  frontOnlyPrice: zod.number(),
+  frontBackPrice: zod.number(),
+  instaPayPhone: zod.string(),
+  telegramChatId: zod.string().optional(),
+  telegramBotToken: zod.string().optional(),
+});
+
+export const UpdateAdminOrderSettingsResponse = zod.object({
+  shippingCompanyName: zod.string(),
+  shippingDescription: zod.string(),
+  shippingPrice: zod.number(),
+  frontOnlyPrice: zod.number(),
+  frontBackPrice: zod.number(),
+  instaPayPhone: zod.string(),
+  telegramChatId: zod.string().optional(),
+  telegramBotToken: zod.string().optional(),
 });

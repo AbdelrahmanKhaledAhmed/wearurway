@@ -106,4 +106,6 @@ A premium streetwear customization website with a multi-step product configurato
   - **Sizes tab**: Add/edit/delete sizes per fit with width/height/image; fit filter tabs
 - Size availability, coming-soon state, and height/weight ranges are included in the API schema so admin controls persist and storefront size cards remain selectable when available.
   - **Mockups tab**: Automatically generates required mockup image filenames from product, fit, color, and side using `product_fit_color_front.png` / `product_fit_color_back.png` format
+- **Settings tab**: Admin can edit shipping company, shipping description, shipping price, front-only price, front+back price, InstaPay phone, Telegram chat ID, and Telegram bot token.
+- `POST /api/create-order` creates a `WW-xxxxx` order ID, sends the order summary to Telegram via `sendMessage`, then sends the checkout front/back preview images sequentially as Telegram documents via `sendDocument`.
   - **Image uploads**: Click "Upload" button in any image field → `POST /api/uploads` → image stored on disk and URL auto-filled

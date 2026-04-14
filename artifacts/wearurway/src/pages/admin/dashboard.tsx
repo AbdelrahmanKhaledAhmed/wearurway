@@ -8,6 +8,7 @@ import {
   useGetColors, useAddColor, useDeleteColor, getGetColorsQueryKey,
   useGetSizes, useAddSize, useUpdateSize, useDeleteSize, getGetSizesQueryKey,
   useGetMockup, useSaveMockup, getGetMockupQueryKey,
+  useGetAdminOrderSettings, useUpdateAdminOrderSettings, getGetAdminOrderSettingsQueryKey,
   useAdminLogout,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -90,7 +91,7 @@ export default function AdminDashboard() {
 
         <Tabs defaultValue="products" className="w-full">
           <TabsList className="mb-12 rounded-none border-b border-border bg-transparent h-auto p-0 flex space-x-8 overflow-x-auto justify-start w-full">
-            {["products", "fits", "colors", "sizes", "mockups", "fonts"].map(tab => (
+            {["products", "fits", "colors", "sizes", "mockups", "settings", "fonts"].map(tab => (
               <TabsTrigger
                 key={tab}
                 value={tab}
@@ -105,6 +106,7 @@ export default function AdminDashboard() {
           <TabsContent value="colors"><ColorsManager /></TabsContent>
           <TabsContent value="sizes"><SizesManager /></TabsContent>
           <TabsContent value="mockups"><MockupsManager /></TabsContent>
+          <TabsContent value="settings"><OrderSettingsManager /></TabsContent>
           <TabsContent value="fonts"><FontsManager /></TabsContent>
         </Tabs>
       </motion.div>
@@ -1333,6 +1335,112 @@ function SizesManager() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function OrderSettingsManager() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: settings } = useGetAdminOrderSettings();
+  const updateSettings = useUpdateAdminOrderSettings();
+  const [form, setForm] = useState({
+    shippingCompanyName: "Wasslaha Standard",
+    shippingDescription: "Delivered in 2–3 working days",
+    shippingPrice: 85,
+    frontOnlyPrice: 550,
+    frontBackPrice: 700,
+    instaPayPhone: "01069383482",
+    telegramChatId: "",
+    telegramBotToken: "",
+  });
+
+  useEffect(() => {
+    if (!settings) return;
+    setForm({
+      shippingCompanyName: settings.shippingCompanyName,
+      shippingDescription: settings.shippingDescription,
+      shippingPrice: settings.shippingPrice,
+      frontOnlyPrice: settings.frontOnlyPrice,
+      frontBackPrice: settings.frontBackPrice,
+      instaPayPhone: settings.instaPayPhone,
+      telegramChatId: settings.telegramChatId ?? "",
+      telegramBotToken: settings.telegramBotToken ?? "",
+    });
+  }, [settings]);
+
+  const setText = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm(prev => ({ ...prev, [key]: e.target.value }));
+  };
+
+  const setNumber = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm(prev => ({ ...prev, [key]: Number(e.target.value) }));
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateSettings.mutate({ data: form }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetAdminOrderSettingsQueryKey() });
+        toast({ title: "Settings saved" });
+      },
+      onError: () => toast({ title: "Settings failed", description: "Could not save order settings." }),
+    });
+  };
+
+  return (
+    <form onSubmit={handleSave} className="max-w-3xl space-y-8">
+      <div>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6">Checkout Settings</h2>
+        <div className="border border-border p-6 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-widest">Shipping Company Name</Label>
+              <Input value={form.shippingCompanyName} onChange={setText("shippingCompanyName")} className="rounded-none" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-widest">Shipping Price</Label>
+              <Input type="number" value={form.shippingPrice} onChange={setNumber("shippingPrice")} className="rounded-none" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs uppercase tracking-widest">Shipping Description</Label>
+            <Input value={form.shippingDescription} onChange={setText("shippingDescription")} className="rounded-none" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-widest">Price for Front Only</Label>
+              <Input type="number" value={form.frontOnlyPrice} onChange={setNumber("frontOnlyPrice")} className="rounded-none" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-widest">Price for Front + Back</Label>
+              <Input type="number" value={form.frontBackPrice} onChange={setNumber("frontBackPrice")} className="rounded-none" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs uppercase tracking-widest">InstaPay Phone Number</Label>
+            <Input value={form.instaPayPhone} onChange={setText("instaPayPhone")} className="rounded-none" />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6">Telegram Settings</h2>
+        <div className="border border-border p-6 space-y-5">
+          <div className="space-y-2">
+            <Label className="text-xs uppercase tracking-widest">Telegram CHAT_ID</Label>
+            <Input value={form.telegramChatId} onChange={setText("telegramChatId")} className="rounded-none" />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs uppercase tracking-widest">Telegram BOT_TOKEN</Label>
+            <Input type="password" value={form.telegramBotToken} onChange={setText("telegramBotToken")} className="rounded-none" />
+          </div>
+        </div>
+      </div>
+
+      <Button type="submit" className="rounded-none uppercase tracking-widest font-bold h-12 px-8" disabled={updateSettings.isPending}>
+        {updateSettings.isPending ? "Saving..." : "Save Settings"}
+      </Button>
+    </form>
   );
 }
 

@@ -14,6 +14,7 @@ tags:
   - name: colors
   - name: sizes
   - name: mockups
+  - name: orders
   - name: admin
 paths:
   /healthz:
@@ -389,6 +390,56 @@ paths:
               schema:
                 $ref: "#/components/schemas/UploadResponse"
 
+  /order-settings:
+    get:
+      operationId: getOrderSettings
+      tags: [orders]
+      summary: Get public checkout settings
+      responses:
+        "200":
+          description: Public checkout settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicOrderSettings"
+
+  /create-order:
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Create an order and send it to Telegram
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderBody"
+      responses:
+        "200":
+          description: Order submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateOrderResponse"
+        "400":
+          description: Invalid order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Telegram not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Telegram submission failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /admin/login:
     post:
       operationId: adminLogin
@@ -432,6 +483,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminMeResponse"
+        "401":
+          description: Not authenticated
+
+  /admin/order-settings:
+    get:
+      operationId: getAdminOrderSettings
+      tags: [admin]
+      summary: Get full order settings
+      responses:
+        "200":
+          description: Full order settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderSettings"
+        "401":
+          description: Not authenticated
+    put:
+      operationId: updateAdminOrderSettings
+      tags: [admin]
+      summary: Update order settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderSettings"
+      responses:
+        "200":
+          description: Updated order settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderSettings"
         "401":
           description: Not authenticated
 
@@ -662,6 +747,83 @@ components:
         authenticated:
           type: boolean
       required: [authenticated]
+
+    PublicOrderSettings:
+      type: object
+      properties:
+        shippingCompanyName:
+          type: string
+        shippingDescription:
+          type: string
+        shippingPrice:
+          type: number
+        frontOnlyPrice:
+          type: number
+        frontBackPrice:
+          type: number
+        instaPayPhone:
+          type: string
+      required: [shippingCompanyName, shippingDescription, shippingPrice, frontOnlyPrice, frontBackPrice, instaPayPhone]
+
+    OrderSettings:
+      type: object
+      properties:
+        shippingCompanyName:
+          type: string
+        shippingDescription:
+          type: string
+        shippingPrice:
+          type: number
+        frontOnlyPrice:
+          type: number
+        frontBackPrice:
+          type: number
+        instaPayPhone:
+          type: string
+        telegramChatId:
+          type: string
+        telegramBotToken:
+          type: string
+      required: [shippingCompanyName, shippingDescription, shippingPrice, frontOnlyPrice, frontBackPrice, instaPayPhone]
+
+    CreateOrderSize:
+      type: object
+      properties:
+        name:
+          type: string
+        realWidth:
+          type: number
+        realHeight:
+          type: number
+      required: [name]
+
+    CreateOrderBody:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        size:
+          $ref: "#/components/schemas/CreateOrderSize"
+        color:
+          type: string
+        total:
+          type: number
+        frontImage:
+          type: string
+        backImage:
+          type: string
+      required: [name, phone, address, size, color, total]
+
+    CreateOrderResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+      required: [orderId]
 
     BoundingBox:
       type: object

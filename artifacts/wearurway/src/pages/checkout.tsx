@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCustomizer } from "@/hooks/use-customizer";
+import { useCreateOrder, useGetOrderSettings } from "@workspace/api-client-react";
 
 const FREE_SHIPPING_AREAS = ["6th of October", "Sheikh Zayed"];
 
@@ -30,6 +31,8 @@ export default function Checkout() {
   const frontPreview = sessionStorage.getItem("ww_checkout_front") || "";
   const backPreview  = sessionStorage.getItem("ww_checkout_back")  || "";
   const productPrice = Number(sessionStorage.getItem("ww_checkout_price") || "550");
+  const { data: orderSettings } = useGetOrderSettings();
+  const createOrder = useCreateOrder();
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [shipping, setShipping] = useState<ShippingOption>("wasslaha");
@@ -39,9 +42,11 @@ export default function Checkout() {
   const [errors, setErrors] = useState<Partial<Record<keyof FormState | "proof", string>>>({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [orderId, setOrderId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const shippingCost = shipping === "free" ? 0 : 85;
+  const shippingCost = shipping === "free" ? 0 : (orderSettings?.shippingPrice ?? 85);
   const total = productPrice + shippingCost;
 
   useEffect(() => {
@@ -72,13 +77,35 @@ export default function Checkout() {
 
   const handleSubmit = async () => {
     if (!validate()) return;
+    setSubmitError("");
     setSubmitting(true);
-    await new Promise(r => setTimeout(r, 900));
-    sessionStorage.removeItem("ww_checkout_front");
-    sessionStorage.removeItem("ww_checkout_back");
-    sessionStorage.removeItem("ww_checkout_price");
-    setSubmitting(false);
-    setSubmitted(true);
+    try {
+      const response = await createOrder.mutateAsync({
+        data: {
+          name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
+          phone: form.phone.trim(),
+          address: `${form.building.trim()}, ${form.street.trim()}, ${form.area.trim()}, ${form.city.trim()}`,
+          size: {
+            name: selectedSize?.name ?? "",
+            realWidth: selectedSize?.realWidth,
+            realHeight: selectedSize?.realHeight,
+          },
+          color: selectedColor?.name ?? "",
+          total,
+          frontImage: frontPreview || undefined,
+          backImage: backPreview || undefined,
+        },
+      });
+      sessionStorage.removeItem("ww_checkout_front");
+      sessionStorage.removeItem("ww_checkout_back");
+      sessionStorage.removeItem("ww_checkout_price");
+      setOrderId(response.orderId);
+      setSubmitted(true);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Could not submit order. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -104,7 +131,7 @@ export default function Checkout() {
           <p className="text-[10px] tracking-[0.3em] text-white/40 uppercase mb-3">Order Confirmed</p>
           <h1 className="text-4xl font-black uppercase mb-4" style={{ fontFamily: "monospace" }}>You're all set.</h1>
           <p className="text-sm text-white/50 leading-relaxed mb-10">
-            Your order has been received. Our team will reach out to {form.phone} to confirm delivery details.
+            Your order has been received. Your Order ID is <span className="font-black text-white">{orderId}</span>. Our team will reach out to {form.phone} to confirm delivery details.
           </p>
           <button
             onClick={() => { reset(); setLocation("/products"); }}
@@ -174,9 +201,9 @@ export default function Checkout() {
                 <ShippingCard
                   selected={shipping === "wasslaha"}
                   onSelect={() => setShipping("wasslaha")}
-                  title="Wasslaha Standard"
-                  description="Delivered in 2–3 working days"
-                  price="85 EGP"
+                  title={orderSettings?.shippingCompanyName ?? "Wasslaha Standard"}
+                  description={orderSettings?.shippingDescription ?? "Delivered in 2–3 working days"}
+                  price={`${orderSettings?.shippingPrice ?? 85} EGP`}
                 />
               </div>
             </section>
@@ -197,7 +224,7 @@ export default function Checkout() {
                       <Radio checked={payment === "instapay"} />
                       <div>
                         <p className="text-xs font-black uppercase tracking-widest">InstaPay</p>
-                        <p className="text-[11px] text-white/40 mt-0.5">Send to <span className="text-white/70 font-bold">01069383482</span></p>
+                        <p className="text-[11px] text-white/40 mt-0.5">Send to <span className="text-white/70 font-bold">{orderSettings?.instaPayPhone ?? "01069383482"}</span></p>
                       </div>
                     </div>
                     <div className="w-8 h-8 rounded flex items-center justify-center" style={{ backgroundColor: "#f5c842" }}>
@@ -278,6 +305,7 @@ export default function Checkout() {
             {/* Complete Order — mobile visible */}
             <div className="lg:hidden">
               <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleSubmit} />
+              {submitError && <p className="text-xs text-red-400 mt-3">{submitError}</p>}
             </div>
 
           </div>
@@ -357,6 +385,7 @@ export default function Checkout() {
             {/* Complete Order — desktop */}
             <div className="hidden lg:block">
               <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleSubmit} />
+              {submitError && <p className="text-xs text-red-400 mt-3">{submitError}</p>}
             </div>
 
           </div>

@@ -98,6 +98,17 @@ export interface SharedDesign {
   layerFilenames: string[];
 }
 
+export interface OrderSettings {
+  shippingCompanyName: string;
+  shippingDescription: string;
+  shippingPrice: number;
+  frontOnlyPrice: number;
+  frontBackPrice: number;
+  instaPayPhone: string;
+  telegramChatId?: string;
+  telegramBotToken?: string;
+}
+
 export interface Store {
   products: Product[];
   fits: Fit[];
@@ -105,11 +116,20 @@ export interface Store {
   sizes: Size[];
   mockups: Record<string, Mockup>;
   sharedDesigns: Record<string, SharedDesign>;
+  orderSettings: OrderSettings;
 }
 
 const DEFAULT_STORE: Store = {
   mockups: {},
   sharedDesigns: {},
+  orderSettings: {
+    shippingCompanyName: "Wasslaha Standard",
+    shippingDescription: "Delivered in 2–3 working days",
+    shippingPrice: 85,
+    frontOnlyPrice: 550,
+    frontBackPrice: 700,
+    instaPayPhone: "01069383482",
+  },
   products: [
     { id: "tshirt", name: "T-Shirt", available: true, comingSoon: false },
     { id: "sweatshirt", name: "Sweatshirt", available: false, comingSoon: true },
@@ -152,6 +172,10 @@ function loadStore(): Store {
         ...parsed,
         mockups: parsed.mockups ?? {},
         sharedDesigns: parsed.sharedDesigns ?? {},
+        orderSettings: {
+          ...DEFAULT_STORE.orderSettings,
+          ...(parsed.orderSettings ?? {}),
+        },
       };
     }
   } catch {
