@@ -1136,7 +1136,7 @@ export default function Design() {
         drawContain(finalCtx, shirtImg, exportW, exportH);   // shirt at native resolution
         finalCtx.drawImage(layerCanvas, 0, 0);               // layers already masked
 
-        await downloadCanvas(finalCanvas, fileName);
+        await downloadCanvas(trimCanvas(finalCanvas), fileName);
       };
 
       await exportLayers(frontVisible, mockup?.front?.image, "front");
