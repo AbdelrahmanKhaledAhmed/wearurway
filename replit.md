@@ -42,6 +42,8 @@ A premium streetwear customization website with a multi-step product configurato
 - Customization flow: Landing → Products → Fits → Colors → Sizes
 - Admin flow: /admin (login) → /admin/dashboard
 - Design editor supports cursor-centered mouse-wheel zoom on selected image layers, free layer dragging, and an edit-image modal with deep cursor-centered zoom, Move/pan tool, precise circular brush erase, and automatic transparent-edge trimming on image load, brush erase, and fill removal so layer bounds shrink to visible pixels.
+- Image quality enhancement now runs when Add to Design is clicked in the image editor, using print-scale high-quality smoothing and sharpening to create the layer's final image buffer before it is placed on the mockup.
+- Export Design now composites the already-processed layer images at the mockup design pixel dimensions without print-scale upscaling or sharpening during export.
 - Tools includes Share Design, which generates a ready-to-share PNG combining the full front and back mockups side-by-side with all visible design layers applied.
 
 ### Backend (artifacts/api-server)

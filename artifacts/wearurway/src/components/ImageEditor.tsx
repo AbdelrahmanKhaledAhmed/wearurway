@@ -15,6 +15,7 @@ interface Props {
   file: File;
   onConfirm: (blob: Blob, edit: ImageEditResult) => void;
   onCancel: () => void;
+  qualityScale?: number;
 }
 
 interface CanvasSnapshot {
@@ -117,9 +118,55 @@ function getPageZoom() {
   return Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
 }
 
+function sharpenImageData(id: ImageData) {
+  const src = id.data;
+  const dst = new Uint8ClampedArray(src);
+  const w = id.width;
+  const h = id.height;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = (y * w + x) * 4;
+      if (src[i + 3] === 0) continue;
+      for (let c = 0; c < 3; c++) {
+        const v =
+          9 * src[i + c]
+          - src[((y - 1) * w + (x - 1)) * 4 + c]
+          - src[((y - 1) * w + x) * 4 + c]
+          - src[((y - 1) * w + (x + 1)) * 4 + c]
+          - src[(y * w + (x - 1)) * 4 + c]
+          - src[(y * w + (x + 1)) * 4 + c]
+          - src[((y + 1) * w + (x - 1)) * 4 + c]
+          - src[((y + 1) * w + x) * 4 + c]
+          - src[((y + 1) * w + (x + 1)) * 4 + c];
+        dst[i + c] = Math.max(0, Math.min(255, v));
+      }
+    }
+  }
+  for (let i = 3; i < dst.length; i += 4) {
+    dst[i] = Math.max(0, Math.min(255, Math.round(8 * (src[i] - 128) + 128)));
+  }
+  return new ImageData(dst, w, h);
+}
+
+function enhanceCanvas(src: HTMLCanvasElement, qualityScale = 1) {
+  const maxSide = 8192;
+  const scale = Math.min(Math.max(qualityScale, 1), maxSide / src.width, maxSide / src.height);
+  const out = document.createElement("canvas");
+  out.width = Math.max(1, Math.round(src.width * scale));
+  out.height = Math.max(1, Math.round(src.height * scale));
+  const ctx = out.getContext("2d");
+  if (!ctx) return src;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(src, 0, 0, out.width, out.height);
+  const id = ctx.getImageData(0, 0, out.width, out.height);
+  ctx.putImageData(sharpenImageData(id), 0, 0);
+  return out;
+}
+
 // ── Component ───────────────────────────────────────────────────────────────────
 
-export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
+export default function ImageEditor({ file, onConfirm, onCancel, qualityScale = 1 }: Props) {
   // ── Refs ─────────────────────────────────────────────────────────────────────
   const canvasRef     = useRef<HTMLCanvasElement>(null);  // hidden image canvas (ops only)
   const imgRef        = useRef<HTMLImageElement>(null);   // visible display element
@@ -619,7 +666,9 @@ export default function ImageEditor({ file, onConfirm, onCancel }: Props) {
     const c = canvasRef.current; if (!c) return;
     trimCanvasToVisible();
     const edit = trimRef.current ?? { originalWidth: c.width, originalHeight: c.height, x: 0, y: 0, width: c.width, height: c.height };
-    trimTransparency(c).canvas.toBlob(b => { if (b) onConfirm(b, edit); }, "image/png");
+    const trimmed = trimTransparency(c).canvas;
+    const enhanced = enhanceCanvas(trimmed, qualityScale);
+    enhanced.toBlob(b => { if (b) onConfirm(b, edit); }, "image/png");
   };
 
   // ── Derived ──────────────────────────────────────────────────────────────────

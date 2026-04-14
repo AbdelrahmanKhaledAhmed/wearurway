@@ -183,6 +183,18 @@ export default function Design() {
   const realWidth = selectedSize?.realWidth ?? 0;
   const realHeight = selectedSize?.realHeight ?? 0;
 
+  const getEditorQualityScale = useCallback(() => {
+    const clipEl = clipAreaRef.current;
+    const clipW = clipEl?.offsetWidth ?? 0;
+    const clipH = clipEl?.offsetHeight ?? 0;
+    if (!clipW || !clipH || !realWidth || !realHeight) return 1;
+    return Math.max(
+      (realWidth / 2.54 * 300) / clipW,
+      (realHeight / 2.54 * 300) / clipH,
+      1,
+    );
+  }, [realWidth, realHeight]);
+
   // Sync local bboxes and display settings when mockup loads
   useEffect(() => {
     if (mockup?.front?.boundingBox) setLocalFrontBbox(mockup.front.boundingBox as BBox);
@@ -874,21 +886,8 @@ export default function Design() {
         }
         if (loaded.length === 0) return;
 
-        // ── Determine export scale ─────────────────────────────────────────────
-        let maxNaturalScale = 1;
-        for (const { layer, img } of loaded) {
-          if (layer.width  > 0) maxNaturalScale = Math.max(maxNaturalScale, img.naturalWidth  / layer.width);
-          if (layer.height > 0) maxNaturalScale = Math.max(maxNaturalScale, img.naturalHeight / layer.height);
-        }
-        const printScale = Math.max(
-          (realWidth  / 2.54 * 300) / clipW,
-          (realHeight / 2.54 * 300) / clipH,
-        );
-        const MAX_SIDE    = 8192;
-        const rawScale    = Math.max(maxNaturalScale, printScale);
-        const exportScale = Math.min(Math.max(rawScale, 1), MAX_SIDE / clipW, MAX_SIDE / clipH);
-        const exportW = Math.round(clipW * exportScale);
-        const exportH = Math.round(clipH * exportScale);
+        const exportW = clipW;
+        const exportH = clipH;
 
         // ── Build canvas ───────────────────────────────────────────────────────
         const canvas = document.createElement("canvas");
@@ -899,7 +898,6 @@ export default function Design() {
 
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
-        ctx.scale(exportW / clipW, exportH / clipH);
         ctx.beginPath();
         ctx.rect(0, 0, clipW, clipH);
         ctx.clip();
@@ -916,37 +914,6 @@ export default function Design() {
         }
 
         for (const { blobUrl } of loaded) URL.revokeObjectURL(blobUrl);
-
-        // ── DTF edge sharpening ────────────────────────────────────────────────
-        {
-          const id  = ctx.getImageData(0, 0, exportW, exportH);
-          const src = id.data;
-          const dst = new Uint8ClampedArray(src);
-          const w = exportW, h = exportH;
-          for (let y = 1; y < h - 1; y++) {
-            for (let x = 1; x < w - 1; x++) {
-              const i = (y * w + x) * 4;
-              if (src[i + 3] === 0) continue;
-              for (let c = 0; c < 3; c++) {
-                const v =
-                  9  * src[i + c]
-                  - src[((y-1)*w + (x-1))*4 + c]
-                  - src[((y-1)*w +  x   )*4 + c]
-                  - src[((y-1)*w + (x+1))*4 + c]
-                  - src[( y   *w + (x-1))*4 + c]
-                  - src[( y   *w + (x+1))*4 + c]
-                  - src[((y+1)*w + (x-1))*4 + c]
-                  - src[((y+1)*w +  x   )*4 + c]
-                  - src[((y+1)*w + (x+1))*4 + c];
-                dst[i + c] = Math.max(0, Math.min(255, v));
-              }
-            }
-          }
-          for (let i = 3; i < dst.length; i += 4) {
-            dst[i] = Math.max(0, Math.min(255, Math.round(8 * (src[i] - 128) + 128)));
-          }
-          ctx.putImageData(new ImageData(dst, w, h), 0, 0);
-        }
 
         // ── Compute real-world size for filename ───────────────────────────────
         let visMinX = clipW, visMaxX = 0, visMinY = clipH, visMaxY = 0;
@@ -997,6 +964,7 @@ export default function Design() {
       <ImageEditor
         file={editorFile}
         onConfirm={handleEditorConfirm}
+        qualityScale={getEditorQualityScale()}
         onCancel={() => {
           if (newUploadLayerId) {
             setLayers(prev => {
