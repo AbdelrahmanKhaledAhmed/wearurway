@@ -874,22 +874,28 @@ export default function Design() {
         ctx.drawImage(img, dx, dy, dw, dh);
       };
 
-      // ── Export each layer individually ────────────────────────────────────────
+      // ── Export each layer individually at maximum quality ─────────────────────
       const exportLayers = async (
         visibleLayers: DesignLayer[],
         shirtUrl: string | undefined,
       ) => {
         if (visibleLayers.length === 0) return;
 
-        // Match the on-screen coordinate space
-        const srcW = mockupSize;
-        const srcH = mockupSize * (4 / 3);
-        const SCALE = 2;
-        const exportW = Math.round(srcW * SCALE);
-        const exportH = Math.round(srcH * SCALE);
-
-        // Load the shirt mask once (used to clip every layer)
+        // Load the shirt mask once — its natural resolution sets the export size
         const shirtImg = shirtUrl ? await loadImg(shirtUrl) : null;
+
+        // Export canvas matches the shirt image's native pixel dimensions.
+        // Fall back to a high-resolution 3000×4000 if there is no shirt image.
+        const MIN_EXPORT_W = 3000;
+        const exportW = shirtImg
+          ? Math.max(shirtImg.naturalWidth,  MIN_EXPORT_W)
+          : MIN_EXPORT_W;
+        const exportH = shirtImg
+          ? Math.round(exportW * (shirtImg.naturalHeight / shirtImg.naturalWidth))
+          : Math.round(exportW * (4 / 3));
+
+        // Scale factor: on-screen mockup pixels → export pixels
+        const SCALE = exportW / mockupSize;
 
         for (const layer of visibleLayers) {
           const img = await loadImg(layer.imageUrl);
@@ -904,25 +910,33 @@ export default function Design() {
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = "high";
 
-          // Draw this single layer at its position/rotation
+          // Position and size in export space
           const { width, height } = getRatioLockedSize(layer, layer.width);
-          const cx    = (layer.x + width  / 2) * SCALE;
-          const cy    = (layer.y + height / 2) * SCALE;
+          const exportLayerW = width  * SCALE;
+          const exportLayerH = height * SCALE;
+          const cx = (layer.x + width  / 2) * SCALE;
+          const cy = (layer.y + height / 2) * SCALE;
           const angle = (layer.rotation * Math.PI) / 180;
+
           ctx.save();
           ctx.translate(cx, cy);
           ctx.rotate(angle);
-          ctx.drawImage(img, -(width * SCALE) / 2, -(height * SCALE) / 2, width * SCALE, height * SCALE);
+          // Draw at the layer's export dimensions — if the source image is
+          // larger than the destination, canvas downsamples (sharp result).
+          // If smaller, we only upscale to the needed export size, not beyond.
+          ctx.drawImage(img, -exportLayerW / 2, -exportLayerH / 2, exportLayerW, exportLayerH);
           ctx.restore();
 
-          // Clip to the shirt's alpha silhouette so only the part on the shirt is kept
+          // Clip to the shirt's alpha silhouette
           if (shirtImg) {
             ctx.globalCompositeOperation = "destination-in";
+            // Draw shirt at its exact natural size centred in the export canvas
+            // (same contain behaviour as the CSS mask)
             drawContain(ctx, shirtImg, exportW, exportH);
             ctx.globalCompositeOperation = "source-over";
           }
 
-          // Download this layer
+          // Download
           const fileName = `${layer.name.replace(/\s+/g, '-').toLowerCase()}.png`;
           await new Promise<void>(resolve => {
             canvas.toBlob(blob => {
