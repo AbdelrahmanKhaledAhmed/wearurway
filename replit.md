@@ -23,7 +23,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
-- Main Replit workflow starts both services together: API on port 8080 and Vite frontend on port 3000
+- Replit artifact workflows run the API on port 8080 and Vite frontend on port 3000
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
 
