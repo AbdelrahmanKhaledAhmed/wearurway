@@ -912,8 +912,25 @@ export default function Design() {
         }
         if (loaded.length === 0) return;
 
-        const exportW = clipW;
-        const exportH = clipH;
+        let maxNaturalScale = 1;
+        for (const { layer, img } of loaded) {
+          const { width, height } = getRatioLockedSize(layer, layer.width);
+          if (width > 0) maxNaturalScale = Math.max(maxNaturalScale, img.naturalWidth / width);
+          if (height > 0) maxNaturalScale = Math.max(maxNaturalScale, img.naturalHeight / height);
+        }
+        const printScale = Math.max(
+          (realWidth / 2.54 * 300) / clipW,
+          (realHeight / 2.54 * 300) / clipH,
+          1,
+        );
+        const MAX_SIDE = 8192;
+        const exportScale = Math.min(
+          Math.max(maxNaturalScale, printScale, 1),
+          MAX_SIDE / clipW,
+          MAX_SIDE / clipH,
+        );
+        const exportW = Math.round(clipW * exportScale);
+        const exportH = Math.round(clipH * exportScale);
 
         // ── Build canvas ───────────────────────────────────────────────────────
         const canvas = document.createElement("canvas");
@@ -924,13 +941,14 @@ export default function Design() {
 
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
+        ctx.scale(exportScale, exportScale);
         ctx.beginPath();
         ctx.rect(0, 0, clipW, clipH);
         ctx.clip();
 
         for (const { layer, img } of loaded) {
           const { width, height } = getRatioLockedSize(layer, layer.width);
-          const cx    = layer.x + layer.width  / 2;
+          const cx    = layer.x + width  / 2;
           const cy    = layer.y + height / 2;
           const angle = (layer.rotation * Math.PI) / 180;
           ctx.save();
@@ -943,24 +961,32 @@ export default function Design() {
         for (const { blobUrl } of loaded) URL.revokeObjectURL(blobUrl);
 
         // ── Compute real-world size for filename ───────────────────────────────
-        let visMinX = clipW, visMaxX = 0, visMinY = clipH, visMaxY = 0;
-        for (const { layer } of loaded) {
-          const { width, height } = getRatioLockedSize(layer, layer.width);
-          const lx = Math.max(0, layer.x);
-          const ly = Math.max(0, layer.y);
-          const rx = Math.min(clipW, layer.x + width);
-          const ry = Math.min(clipH, layer.y + height);
-          if (rx > lx && ry > ly) {
-            visMinX = Math.min(visMinX, lx); visMaxX = Math.max(visMaxX, rx);
-            visMinY = Math.min(visMinY, ly); visMaxY = Math.max(visMaxY, ry);
+        let visCmW: number;
+        let visCmH: number;
+        if (loaded.length === 1) {
+          const dim = layerPrintDim(loaded[0].layer);
+          visCmW = dim?.w ?? Math.round(realWidth * 10) / 10;
+          visCmH = dim?.h ?? Math.round(realHeight * 10) / 10;
+        } else {
+          let visMinX = clipW, visMaxX = 0, visMinY = clipH, visMaxY = 0;
+          for (const { layer } of loaded) {
+            const { width, height } = getRatioLockedSize(layer, layer.width);
+            const lx = Math.max(0, layer.x);
+            const ly = Math.max(0, layer.y);
+            const rx = Math.min(clipW, layer.x + width);
+            const ry = Math.min(clipH, layer.y + height);
+            if (rx > lx && ry > ly) {
+              visMinX = Math.min(visMinX, lx); visMaxX = Math.max(visMaxX, rx);
+              visMinY = Math.min(visMinY, ly); visMaxY = Math.max(visMaxY, ry);
+            }
           }
+          visCmW = visMaxX > visMinX
+            ? Math.round((visMaxX - visMinX) / clipW * realWidth * 10) / 10
+            : Math.round(realWidth * 10) / 10;
+          visCmH = visMaxY > visMinY
+            ? Math.round((visMaxY - visMinY) / clipH * realHeight * 10) / 10
+            : Math.round(realHeight * 10) / 10;
         }
-        const visCmW = visMaxX > visMinX
-          ? Math.round((visMaxX - visMinX) / clipW * realWidth  * 10) / 10
-          : Math.round(realWidth  * 10) / 10;
-        const visCmH = visMaxY > visMinY
-          ? Math.round((visMaxY - visMinY) / clipH * realHeight * 10) / 10
-          : Math.round(realHeight * 10) / 10;
 
         // ── Download ───────────────────────────────────────────────────────────
         await new Promise<void>(resolve => {
