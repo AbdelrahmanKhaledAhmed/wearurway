@@ -465,6 +465,39 @@ export default function Design() {
     };
   };
 
+  const getVisibleRotatedLayerRect = (layer: DesignLayer, clipW: number, clipH: number) => {
+    const { width, height } = getRatioLockedSize(layer, layer.width);
+    const cx = layer.x + width / 2;
+    const cy = layer.y + height / 2;
+    const angle = (layer.rotation * Math.PI) / 180;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const corners = [
+      { x: -width / 2, y: -height / 2 },
+      { x: width / 2, y: -height / 2 },
+      { x: width / 2, y: height / 2 },
+      { x: -width / 2, y: height / 2 },
+    ].map(point => ({
+      x: cx + point.x * cos - point.y * sin,
+      y: cy + point.x * sin + point.y * cos,
+    }));
+    const minX = Math.min(...corners.map(point => point.x));
+    const maxX = Math.max(...corners.map(point => point.x));
+    const minY = Math.min(...corners.map(point => point.y));
+    const maxY = Math.max(...corners.map(point => point.y));
+    const left = Math.max(0, minX);
+    const top = Math.max(0, minY);
+    const right = Math.min(clipW, maxX);
+    const bottom = Math.min(clipH, maxY);
+    if (right <= left || bottom <= top) return null;
+    return {
+      x: left,
+      y: top,
+      width: right - left,
+      height: bottom - top,
+    };
+  };
+
   const layerVisiblePrintDim = (layer: DesignLayer) => {
     if (!clipSize || !realWidth || !realHeight) return null;
     const visibleRect = getVisibleLayerRect(layer, clipSize.w, clipSize.h);
@@ -940,34 +973,25 @@ export default function Design() {
 
         if (loaded.length === 1) {
           const layer = loaded[0].layer;
-          const { width, height } = getRatioLockedSize(layer, layer.width);
-          const lx = Math.max(0, layer.x);
-          const ly = Math.max(0, layer.y);
-          const rx = Math.min(clipW, layer.x + width);
-          const ry = Math.min(clipH, layer.y + height);
-          if (rx <= lx || ry <= ly) return;
+          const visibleRect = getVisibleRotatedLayerRect(layer, clipW, clipH);
+          if (!visibleRect) return;
 
-          cropX = lx;
-          cropY = ly;
-          cropW = rx - lx;
-          cropH = ry - ly;
+          cropX = visibleRect.x;
+          cropY = visibleRect.y;
+          cropW = visibleRect.width;
+          cropH = visibleRect.height;
 
-          const fullCmW = Math.round((width / clipW) * realWidth * 10) / 10;
-          const fullCmH = Math.round((height / clipH) * realHeight * 10) / 10;
-          visCmW = Math.round(fullCmW * (cropW / width) * 10) / 10;
-          visCmH = Math.round(fullCmH * (cropH / height) * 10) / 10;
+          visCmW = Math.round((cropW / clipW) * realWidth * 10) / 10;
+          visCmH = Math.round((cropH / clipH) * realHeight * 10) / 10;
         } else {
           let visMinX = clipW, visMaxX = 0, visMinY = clipH, visMaxY = 0;
           for (const { layer } of loaded) {
-            const { width, height } = getRatioLockedSize(layer, layer.width);
-            const lx = Math.max(0, layer.x);
-            const ly = Math.max(0, layer.y);
-            const rx = Math.min(clipW, layer.x + width);
-            const ry = Math.min(clipH, layer.y + height);
-            if (rx > lx && ry > ly) {
-              visMinX = Math.min(visMinX, lx); visMaxX = Math.max(visMaxX, rx);
-              visMinY = Math.min(visMinY, ly); visMaxY = Math.max(visMaxY, ry);
-            }
+            const visibleRect = getVisibleRotatedLayerRect(layer, clipW, clipH);
+            if (!visibleRect) continue;
+            visMinX = Math.min(visMinX, visibleRect.x);
+            visMaxX = Math.max(visMaxX, visibleRect.x + visibleRect.width);
+            visMinY = Math.min(visMinY, visibleRect.y);
+            visMaxY = Math.max(visMaxY, visibleRect.y + visibleRect.height);
           }
           if (visMaxX <= visMinX || visMaxY <= visMinY) return;
 
