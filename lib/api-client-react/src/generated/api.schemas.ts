@@ -132,8 +132,12 @@ export interface Mockup {
   colorId: string;
   front?: MockupSide;
   back?: MockupSide;
+  /** Display size of the mockup in pixels */
   mockupSize?: number;
+  /** Vertical offset of the mockup in pixels */
   mockupOffsetY?: number;
+  /** Whether the Save Design button is shown in the designer */
+  showSaveDesignButton?: boolean;
 }
 
 export interface SaveMockupBody {
@@ -142,8 +146,12 @@ export interface SaveMockupBody {
   colorId: string;
   front?: MockupSide;
   back?: MockupSide;
+  /** Display size of the mockup in pixels */
   mockupSize?: number;
+  /** Vertical offset of the mockup in pixels */
   mockupOffsetY?: number;
+  /** Whether the Save Design button is shown in the designer */
+  showSaveDesignButton?: boolean;
 }
 
 export interface ErrorResponse {

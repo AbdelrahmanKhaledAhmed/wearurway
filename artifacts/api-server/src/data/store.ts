@@ -68,6 +68,7 @@ export interface Mockup {
   back?: MockupSide;
   mockupSize?: number;
   mockupOffsetY?: number;
+  showSaveDesignButton?: boolean;
 }
 
 export interface DesignLayer {

@@ -150,13 +150,8 @@ export const GetSizesResponseItem = zod.object({
   name: zod.string(),
   realWidth: zod.number(),
   realHeight: zod.number(),
+  image: zod.string().optional(),
   fitId: zod.string(),
-  available: zod.boolean().optional(),
-  comingSoon: zod.boolean().optional(),
-  heightMin: zod.number().optional(),
-  heightMax: zod.number().optional(),
-  weightMin: zod.number().optional(),
-  weightMax: zod.number().optional(),
 });
 export const GetSizesResponse = zod.array(GetSizesResponseItem);
 
@@ -168,12 +163,7 @@ export const AddSizeBody = zod.object({
   name: zod.string(),
   realWidth: zod.number(),
   realHeight: zod.number(),
-  available: zod.boolean().optional(),
-  comingSoon: zod.boolean().optional(),
-  heightMin: zod.number().optional(),
-  heightMax: zod.number().optional(),
-  weightMin: zod.number().optional(),
-  weightMax: zod.number().optional(),
+  image: zod.string().optional(),
 });
 
 export const UpdateSizeParams = zod.object({
@@ -185,12 +175,7 @@ export const UpdateSizeBody = zod.object({
   name: zod.string().optional(),
   realWidth: zod.number().optional(),
   realHeight: zod.number().optional(),
-  available: zod.boolean().optional(),
-  comingSoon: zod.boolean().optional(),
-  heightMin: zod.number().optional(),
-  heightMax: zod.number().optional(),
-  weightMin: zod.number().optional(),
-  weightMax: zod.number().optional(),
+  image: zod.string().optional(),
 });
 
 export const UpdateSizeResponse = zod.object({
@@ -198,13 +183,8 @@ export const UpdateSizeResponse = zod.object({
   name: zod.string(),
   realWidth: zod.number(),
   realHeight: zod.number(),
+  image: zod.string().optional(),
   fitId: zod.string(),
-  available: zod.boolean().optional(),
-  comingSoon: zod.boolean().optional(),
-  heightMin: zod.number().optional(),
-  heightMax: zod.number().optional(),
-  weightMin: zod.number().optional(),
-  weightMax: zod.number().optional(),
 });
 
 export const DeleteSizeParams = zod.object({
@@ -267,6 +247,18 @@ export const GetMockupResponse = zod.object({
         .optional(),
     })
     .optional(),
+  mockupSize: zod
+    .number()
+    .optional()
+    .describe("Display size of the mockup in pixels"),
+  mockupOffsetY: zod
+    .number()
+    .optional()
+    .describe("Vertical offset of the mockup in pixels"),
+  showSaveDesignButton: zod
+    .boolean()
+    .optional()
+    .describe("Whether the Save Design button is shown in the designer"),
 });
 
 /**
@@ -318,6 +310,18 @@ export const SaveMockupBody = zod.object({
         .optional(),
     })
     .optional(),
+  mockupSize: zod
+    .number()
+    .optional()
+    .describe("Display size of the mockup in pixels"),
+  mockupOffsetY: zod
+    .number()
+    .optional()
+    .describe("Vertical offset of the mockup in pixels"),
+  showSaveDesignButton: zod
+    .boolean()
+    .optional()
+    .describe("Whether the Save Design button is shown in the designer"),
 });
 
 export const SaveMockupResponse = zod.object({
@@ -366,6 +370,18 @@ export const SaveMockupResponse = zod.object({
         .optional(),
     })
     .optional(),
+  mockupSize: zod
+    .number()
+    .optional()
+    .describe("Display size of the mockup in pixels"),
+  mockupOffsetY: zod
+    .number()
+    .optional()
+    .describe("Vertical offset of the mockup in pixels"),
+  showSaveDesignButton: zod
+    .boolean()
+    .optional()
+    .describe("Whether the Save Design button is shown in the designer"),
 });
 
 /**

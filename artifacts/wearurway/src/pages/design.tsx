@@ -212,6 +212,7 @@ export default function Design() {
   );
 
   const currentSide = side === "front" ? mockup?.front : mockup?.back;
+  const showSaveDesignButton = mockup?.showSaveDesignButton !== false;
   const realWidth = selectedSize?.realWidth ?? 0;
   const realHeight = selectedSize?.realHeight ?? 0;
 
@@ -1594,23 +1595,25 @@ export default function Design() {
               </p>
             </button>
 
-            <button
-              onClick={handleSaveDesign}
-              disabled={saving || (!frontLayers.length && !backLayers.length)}
-              className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <span className="text-lg leading-none">↓</span>
-              <div className="text-left">
-                <p className="text-xs font-bold uppercase tracking-widest">
-                  {saving ? "Saving…" : "Save Design"}
-                </p>
-                {savedAt && !saving && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Saved {savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            {showSaveDesignButton && (
+              <button
+                onClick={handleSaveDesign}
+                disabled={saving || (!frontLayers.length && !backLayers.length)}
+                className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <span className="text-lg leading-none">↓</span>
+                <div className="text-left">
+                  <p className="text-xs font-bold uppercase tracking-widest">
+                    {saving ? "Saving…" : "Save Design"}
                   </p>
-                )}
-              </div>
-            </button>
+                  {savedAt && !saving && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Saved {savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  )}
+                </div>
+              </button>
+            )}
           </div>
 
           {/* ── Export ── */}

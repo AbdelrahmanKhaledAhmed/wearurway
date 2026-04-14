@@ -671,6 +671,9 @@ components:
         mockupOffsetY:
           type: number
           description: Vertical offset of the mockup in pixels
+        showSaveDesignButton:
+          type: boolean
+          description: Whether the Save Design button is shown in the designer
       required: [productId, fitId, colorId]
 
     SaveMockupBody:
@@ -692,6 +695,9 @@ components:
         mockupOffsetY:
           type: number
           description: Vertical offset of the mockup in pixels
+        showSaveDesignButton:
+          type: boolean
+          description: Whether the Save Design button is shown in the designer
       required: [productId, fitId, colorId]
 
     ErrorResponse:

@@ -942,11 +942,13 @@ function MockupsManager() {
   const [frontBbox, setFrontBbox] = useState<BBox | null>(null);
   const [backImage, setBackImage] = useState("");
   const [backBbox, setBackBbox] = useState<BBox | null>(null);
+  const [showSaveDesignButton, setShowSaveDesignButton] = useState(true);
 
   // Sync bboxes from fetched mockup when selection changes (images come from generated filenames)
   useEffect(() => {
     setFrontBbox(mockup?.front?.boundingBox ?? null);
     setBackBbox(mockup?.back?.boundingBox ?? null);
+    setShowSaveDesignButton(mockup?.showSaveDesignButton !== false);
   }, [mockup]);
 
   const productName = products?.find(p => p.id === selectedProductId)?.name ?? "";
@@ -977,6 +979,7 @@ function MockupsManager() {
           image: backGeneratedImage || backImage || undefined,
           boundingBox: backBbox ?? undefined,
         },
+        showSaveDesignButton,
       }
     }, {
       onSuccess: () => {
@@ -1101,6 +1104,14 @@ function MockupsManager() {
                       setShowExportButton(v);
                       localStorage.setItem("wearurway_show_export_button", v ? "true" : "false");
                     }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="toggle-save-design-button" className="text-xs uppercase tracking-widest cursor-pointer">Show Save Design Button</Label>
+                  <Switch
+                    id="toggle-save-design-button"
+                    checked={showSaveDesignButton}
+                    onCheckedChange={setShowSaveDesignButton}
                   />
                 </div>
               </div>
