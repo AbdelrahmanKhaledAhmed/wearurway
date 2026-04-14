@@ -929,8 +929,13 @@ export default function Design() {
         }
         if (loaded.length === 0) return;
 
-        const exportW = clipW;
-        const exportH = clipH;
+        const MAX_SIDE = 8192;
+        const printPixelW = (realWidth / 2.54) * 300;
+        const printPixelH = (realHeight / 2.54) * 300;
+        const qualityScale = Math.max(printPixelW / clipW, printPixelH / clipH, window.devicePixelRatio || 1, 1);
+        const sideScale = Math.min(qualityScale, MAX_SIDE / clipW, MAX_SIDE / clipH);
+        const exportW = Math.max(1, Math.round(clipW * sideScale));
+        const exportH = Math.max(1, Math.round(clipH * sideScale));
 
         // ── Build canvas ───────────────────────────────────────────────────────
         const canvas = document.createElement("canvas");
@@ -942,8 +947,9 @@ export default function Design() {
         ctx.clearRect(0, 0, exportW, exportH);
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
+        ctx.setTransform(sideScale, 0, 0, sideScale, 0, 0);
         ctx.beginPath();
-        ctx.rect(0, 0, exportW, exportH);
+        ctx.rect(0, 0, clipW, clipH);
         ctx.clip();
 
         for (const { layer, img } of loaded) {

@@ -45,7 +45,7 @@ A premium streetwear customization website with a multi-step product configurato
 - Image quality enhancement now runs when Add to Design is clicked in the image editor, using print-scale high-quality smoothing and sharpening to create the layer's final image buffer before it is placed on the mockup.
 - Mockup layer resizing is ratio-locked to each layer's natural image dimensions across wheel zoom, pinch zoom, render, export, and live dimension labels.
 - Live print dimensions for selected layers are calculated from the portion of the layer visibly clipped inside the print box, so the cm label updates when the image is dragged partly outside the printable area.
-- Export Design composites the processed layer images into a canvas that exactly matches the visible print box pixel area, preserving on-screen layer positions, clipping, and rotation without print-DPI rescaling.
+- Export Design composites the processed layer images using the exact visible print box coordinate space while rendering to a high-resolution canvas, preserving on-screen layer positions, clipping, and rotation without low-resolution output.
 - Tools includes Share Design, which generates a ready-to-share PNG combining the full front and back mockups side-by-side with all visible design layers applied.
 
 ### Backend (artifacts/api-server)
