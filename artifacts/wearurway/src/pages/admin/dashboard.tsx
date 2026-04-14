@@ -874,8 +874,6 @@ function MockupsManager() {
   const [selectedFitId, setSelectedFitId] = useState<string>("");
   const [selectedColorId, setSelectedColorId] = useState<string>("");
   const [activeSide, setActiveSide] = useState<"front" | "back">("front");
-  const [showPlaceholder, setShowPlaceholder] = useState(() => localStorage.getItem("wearurway_show_placeholder") !== "false");
-  const [showDimLabel, setShowDimLabel] = useState(() => localStorage.getItem("wearurway_show_dim_label") !== "false");
   const [showExportButton, setShowExportButton] = useState(() => localStorage.getItem("wearurway_show_export_button") !== "false");
 
   const queryClient = useQueryClient();
@@ -1063,21 +1061,14 @@ function MockupsManager() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Left: mockup image + bbox editor */}
+            {/* Left: mockup image */}
             <div className="space-y-4">
               <MockupFilenameInput
                 label={`${activeSide === "front" ? "Front" : "Back"} Mockup Image`}
                 value={currentImage}
                 generatedFilename={activeGeneratedFilename}
               />
-
-              {currentImage ? (
-                <BoundingBoxEditor
-                  image={currentImage}
-                  bbox={currentBbox}
-                  onChange={setCurrentBbox}
-                />
-              ) : (
+              {!currentImage && (
                 <div className="border border-dashed border-border aspect-[3/4] flex flex-col items-center justify-center text-muted-foreground gap-3">
                   <span className="text-xs uppercase tracking-widest">Select a full combination first</span>
                   <span className="text-xs text-muted-foreground/60">Then upload the image using the generated filename</span>
@@ -1085,53 +1076,8 @@ function MockupsManager() {
               )}
             </div>
 
-            {/* Right: info + current bounding box values */}
+            {/* Right: summary */}
             <div className="space-y-6">
-              <div className="border border-border p-6 space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest">Bounding Box Values</h3>
-                <div className="space-y-3">
-                  <p className="text-xs text-muted-foreground uppercase tracking-widest">
-                    Stored as % of image dimensions (0–100). Draw on the image to set.
-                  </p>
-                  {currentBbox ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      {(["x", "y", "width", "height"] as const).map(field => (
-                        <div key={field} className="space-y-1">
-                          <Label className="text-xs uppercase tracking-widest">{field === "x" ? "Left (X)" : field === "y" ? "Top (Y)" : field === "width" ? "Width" : "Height"}</Label>
-                          <div className="flex gap-1 items-center">
-                            <Input
-                              type="number"
-                              min={0}
-                              max={100}
-                              step={0.1}
-                              value={currentBbox[field].toFixed(1)}
-                              onChange={e => {
-                                const v = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
-                                const next = { ...currentBbox, [field]: v };
-                                setCurrentBbox(next);
-                              }}
-                              className="rounded-none h-9 font-mono text-xs"
-                            />
-                            <span className="text-xs text-muted-foreground">%</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground italic">No bounding box drawn yet</p>
-                  )}
-                </div>
-                {currentBbox && (
-                  <Button
-                    variant="ghost"
-                    className="rounded-none text-xs uppercase tracking-widest text-destructive"
-                    onClick={() => setCurrentBbox(null)}
-                  >
-                    Clear Bounding Box
-                  </Button>
-                )}
-              </div>
-
               <div className="border border-border p-6 space-y-3">
                 <h3 className="text-xs font-bold uppercase tracking-widest">Summary</h3>
                 <div className="space-y-2 text-xs">
@@ -1140,44 +1086,14 @@ function MockupsManager() {
                     <span className={frontImage ? "text-foreground" : "text-muted-foreground"}>{frontImage ? "Uploaded" : "Missing"}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground uppercase tracking-widest">Front bbox</span>
-                    <span className={frontBbox ? "text-foreground" : "text-muted-foreground"}>{frontBbox ? "Defined" : "Missing"}</span>
-                  </div>
-                  <div className="flex justify-between">
                     <span className="text-muted-foreground uppercase tracking-widest">Back image</span>
                     <span className={backImage ? "text-foreground" : "text-muted-foreground"}>{backImage ? "Uploaded" : "Missing"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground uppercase tracking-widest">Back bbox</span>
-                    <span className={backBbox ? "text-foreground" : "text-muted-foreground"}>{backBbox ? "Defined" : "Missing"}</span>
                   </div>
                 </div>
               </div>
 
               <div className="border border-border p-4 space-y-3">
                 <p className="text-xs uppercase tracking-widest text-muted-foreground">Designer Display</p>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="toggle-placeholder" className="text-xs uppercase tracking-widest cursor-pointer">Show Placeholder Box</Label>
-                  <Switch
-                    id="toggle-placeholder"
-                    checked={showPlaceholder}
-                    onCheckedChange={v => {
-                      setShowPlaceholder(v);
-                      localStorage.setItem("wearurway_show_placeholder", v ? "true" : "false");
-                    }}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="toggle-dim-label" className="text-xs uppercase tracking-widest cursor-pointer">Show Dimension Indicator</Label>
-                  <Switch
-                    id="toggle-dim-label"
-                    checked={showDimLabel}
-                    onCheckedChange={v => {
-                      setShowDimLabel(v);
-                      localStorage.setItem("wearurway_show_dim_label", v ? "true" : "false");
-                    }}
-                  />
-                </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="toggle-export-button" className="text-xs uppercase tracking-widest cursor-pointer">Show Export Image Button</Label>
                   <Switch

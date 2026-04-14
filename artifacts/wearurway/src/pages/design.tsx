@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGetMockup, useSaveMockup, getGetMockupQueryKey } from "@workspace/api-client-react";
@@ -94,20 +94,15 @@ export default function Design() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
-  const [clipSize, setClipSize] = useState<{ w: number; h: number } | null>(null);
   const [editorFile, setEditorFile] = useState<File | null>(null);
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [newUploadLayerId, setNewUploadLayerId] = useState<string | null>(null);
   const [showTextModal, setShowTextModal] = useState(false);
 
-  const [showPlaceholder, setShowPlaceholder] = useState(() => localStorage.getItem("wearurway_show_placeholder") !== "false");
-  const [showDimLabel, setShowDimLabel] = useState(() => localStorage.getItem("wearurway_show_dim_label") !== "false");
   const [showExportButton, setShowExportButton] = useState(() => localStorage.getItem("wearurway_show_export_button") !== "false");
 
   useEffect(() => {
     const handler = (e: StorageEvent) => {
-      if (e.key === "wearurway_show_placeholder") setShowPlaceholder(e.newValue !== "false");
-      if (e.key === "wearurway_show_dim_label") setShowDimLabel(e.newValue !== "false");
       if (e.key === "wearurway_show_export_button") setShowExportButton(e.newValue !== "false");
     };
     window.addEventListener("storage", handler);
@@ -219,6 +214,7 @@ export default function Design() {
   }, [selectedProduct, selectedFit, selectedColor]);
 
   const bbox: BBox | null | undefined = side === "front" ? localFrontBbox : localBackBbox;
+  const effectiveBbox: BBox = useMemo(() => bbox ?? { x: 0, y: 0, width: 100, height: 100 }, [bbox]);
 
   const handleAdminSave = () => {
     if (!selectedProduct || !selectedFit || !selectedColor) return;
@@ -429,64 +425,8 @@ export default function Design() {
     };
   }, [onTouchStart, onTouchMove, onTouchEnd, bbox]);
 
-  // ── Track clip area pixel size via ResizeObserver ───────────────────────────
-  // Use offsetWidth/offsetHeight (integer CSS pixels) so the boundary values
-  // match the coordinate space of layer.x/y/width/height exactly.
-  useEffect(() => {
-    const el = clipAreaRef.current;
-    if (!el) return;
-    const update = () => {
-      setClipSize({ w: el.offsetWidth, h: el.offsetHeight });
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [bbox]);
 
-  // ── Compute print dimensions in cm for the selected layer's visible crop ────
   const selectedLayer = layers.find(l => l.id === selectedLayerId) ?? null;
-
-  const getVisibleLayerRect = (layer: DesignLayer, clipW: number, clipH: number) => {
-    const { width, height } = getRatioLockedSize(layer, layer.width);
-    const left = Math.max(0, layer.x);
-    const top = Math.max(0, layer.y);
-    const right = Math.min(clipW, layer.x + width);
-    const bottom = Math.min(clipH, layer.y + height);
-    if (right <= left || bottom <= top) return null;
-    return {
-      x: left,
-      y: top,
-      width: right - left,
-      height: bottom - top,
-      centerX: left + (right - left) / 2,
-      centerY: top + (bottom - top) / 2,
-    };
-  };
-
-  const layerVisiblePrintDim = (layer: DesignLayer) => {
-    if (!clipSize || !realWidth || !realHeight) return null;
-    const visibleRect = getVisibleLayerRect(layer, clipSize.w, clipSize.h);
-    if (!visibleRect) return null;
-    const { width, height } = getRatioLockedSize(layer, layer.width);
-    const aspect = getLayerAspectRatio(layer);
-    const visibleScale = Math.min(
-      visibleRect.width / width,
-      visibleRect.height / height,
-      1,
-    );
-    // Use the full mockup container size as the px-to-cm reference so that
-    // realWidth/realHeight (full shirt dimensions) map correctly to real
-    // print sizes. clipSize is only the print-box area, which is a subset
-    // of the full shirt, so using it as denominator inflates the cm values.
-    const mockupW = mockupSize;
-    const fullW = (width / mockupW) * realWidth;
-    const w = Math.round(fullW * visibleScale * 10) / 10;
-    const h = Math.round((w / aspect) * 10) / 10;
-    return { w, h, rect: visibleRect };
-  };
-
-  const printDim = selectedLayer ? layerVisiblePrintDim(selectedLayer) : null;
 
   // ── Zoom helpers ───────────────────────────────────────────────────────────
 
@@ -1024,13 +964,16 @@ export default function Design() {
         for (const { blobUrl } of loaded) URL.revokeObjectURL(blobUrl);
 
         // ── Download ───────────────────────────────────────────────────────────
+        const downloadName = loaded.length === 1
+          ? `${loaded[0].layer.name.replace(/\s+/g, '-').toLowerCase()}.png`
+          : `design-${label}.png`;
         await new Promise<void>(resolve => {
           canvas.toBlob(blob => {
             if (!blob) { resolve(); return; }
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `${visCmW}x${visCmH}cm-${label}.png`;
+            a.download = downloadName;
             a.click();
             URL.revokeObjectURL(url);
             resolve();
@@ -1288,120 +1231,51 @@ export default function Design() {
             </AnimatePresence>
 
             {/* ── Design clip area ── */}
-            {bbox && (
-              <div
-                ref={clipAreaRef}
-                style={{
-                  position: "absolute",
-                  left: `${bbox.x}%`,
-                  top: `${bbox.y}%`,
-                  width: `${bbox.width}%`,
-                  height: `${bbox.height}%`,
-                  overflow: "hidden",
-                  zIndex: 5,
-                }}
-              >
-                {layers.map((layer) =>
-                  layer.visible ? (() => {
-                    const { width, height } = getRatioLockedSize(layer, layer.width);
-                    return (
-                    <img
-                      key={layer.id}
-                      src={layer.imageUrl}
-                      alt={layer.name}
-                      draggable={false}
-                      onMouseDown={e => startDrag(e, layer)}
-                      style={{
-                        position: "absolute",
-                        left: layer.x,
-                        top: layer.y,
-                        width,
-                        height,
-                        minWidth: width,
-                        minHeight: height,
-                        maxWidth: "none",
-                        maxHeight: "none",
-                        transform: `rotate(${layer.rotation}deg)`,
-                        transformOrigin: "center center",
-                        cursor: dragRef.current?.layerId === layer.id ? "grabbing" : "grab",
-                        userSelect: "none",
-                        background: "none",
-                        flexShrink: 0,
-                        imageRendering: "high-quality" as React.CSSProperties["imageRendering"],
-                      }}
-                    />
-                    );
-                  })() : null
-                )}
-
-                {/* ── Print dimension label for selected layer ── */}
-                {selectedLayer && selectedLayer.visible && printDim && clipSize && showDimLabel && (
-                  <div
+            <div
+              ref={clipAreaRef}
+              style={{
+                position: "absolute",
+                left: `${effectiveBbox.x}%`,
+                top: `${effectiveBbox.y}%`,
+                width: `${effectiveBbox.width}%`,
+                height: `${effectiveBbox.height}%`,
+                overflow: "hidden",
+                zIndex: 5,
+              }}
+            >
+              {layers.map((layer) =>
+                layer.visible ? (() => {
+                  const { width, height } = getRatioLockedSize(layer, layer.width);
+                  return (
+                  <img
+                    key={layer.id}
+                    src={layer.imageUrl}
+                    alt={layer.name}
+                    draggable={false}
+                    onMouseDown={e => startDrag(e, layer)}
                     style={{
                       position: "absolute",
-                      left: printDim.rect.centerX,
-                      top: printDim.rect.centerY,
-                      transform: "translateX(-50%) translateY(-50%)",
-                      pointerEvents: "none",
-                      zIndex: 20,
-                      whiteSpace: "nowrap",
+                      left: layer.x,
+                      top: layer.y,
+                      width,
+                      height,
+                      minWidth: width,
+                      minHeight: height,
+                      maxWidth: "none",
+                      maxHeight: "none",
+                      transform: `rotate(${layer.rotation}deg)`,
+                      transformOrigin: "center center",
+                      cursor: dragRef.current?.layerId === layer.id ? "grabbing" : "grab",
+                      userSelect: "none",
+                      background: "none",
+                      flexShrink: 0,
+                      imageRendering: "high-quality" as React.CSSProperties["imageRendering"],
                     }}
-                  >
-                    <span style={{
-                      display: "inline-flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: 2,
-                      background: "rgba(0,0,0,0.65)",
-                      color: "#fff",
-                      fontFamily: "monospace",
-                      fontWeight: 700,
-                      fontSize: "11px",
-                      letterSpacing: "0.08em",
-                      padding: "4px 8px",
-                      borderRadius: 2,
-                      backdropFilter: "blur(4px)",
-                      border: "1px solid rgba(255,255,255,0.15)",
-                      textAlign: "center",
-                    }}>
-                      <span>{printDim.w} × {printDim.h} cm</span>
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── Bbox border overlay ── */}
-            {bbox && (
-              <div
-                style={{
-                  position: "absolute",
-                  left: `${bbox.x}%`,
-                  top: `${bbox.y}%`,
-                  width: `${bbox.width}%`,
-                  height: `${bbox.height}%`,
-                  border: (layers.length === 0 && showPlaceholder) ? "1px dashed rgba(255,255,255,0.18)" : "none",
-                  zIndex: 6,
-                  pointerEvents: "none",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 2,
-                }}
-              >
-                {layers.length === 0 && realWidth > 0 && showPlaceholder && clipSize && (
-                  <>
-                    <p style={{ fontSize: "clamp(10px, 2vw, 18px)", fontWeight: 900, fontFamily: "monospace", color: "rgba(255,255,255,0.4)", lineHeight: 1 }}>
-                      {Math.round((clipSize.w / mockupSize) * realWidth * 10) / 10} × {Math.round((clipSize.h / (mockupSize * 4 / 3)) * realHeight * 10) / 10}
-                    </p>
-                    <p style={{ fontSize: "clamp(8px, 1vw, 10px)", color: "rgba(255,255,255,0.25)", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace" }}>
-                      cm
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
+                  />
+                  );
+                })() : null
+              )}
+            </div>
           </div>
 
           </div>{/* close absolute inset-0 wrapper */}
@@ -1514,7 +1388,7 @@ export default function Design() {
             {/* Add Image */}
             <button
               onClick={handleAddImage}
-              disabled={uploading || !bbox}
+              disabled={uploading}
               className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span className="text-lg leading-none">🖼</span>
@@ -1522,24 +1396,17 @@ export default function Design() {
                 <p className="text-xs font-bold uppercase tracking-widest">
                   {uploading ? "Uploading…" : "Add Image"}
                 </p>
-                {!bbox && (
-                  <p className="text-xs text-muted-foreground mt-0.5">Set bbox in admin first</p>
-                )}
               </div>
             </button>
 
             {/* Add Text */}
             <button
               onClick={() => setShowTextModal(true)}
-              disabled={!bbox}
               className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span className="text-lg leading-none">T</span>
               <div className="text-left">
                 <p className="text-xs font-bold uppercase tracking-widest">Add Text</p>
-                {!bbox && (
-                  <p className="text-xs text-muted-foreground mt-0.5">Set bbox in admin first</p>
-                )}
               </div>
             </button>
 
