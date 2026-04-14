@@ -881,22 +881,37 @@ export default function Design() {
       ) => {
         if (visibleLayers.length === 0) return;
 
-        // The export canvas must keep the same 3:4 ratio as the on-screen mockup
-        // so that every layer lands in exactly the right position.
-        // We scale up to at least 4000px wide, or higher if the shirt image is
-        // natively larger — whichever gives more pixels.
         const shirtImg = shirtUrl ? await loadImg(shirtUrl) : null;
-        const MIN_EXPORT_W = 4000;
-        const shirtNativeW = shirtImg?.naturalWidth ?? 0;
-        const SCALE = Math.max(MIN_EXPORT_W, shirtNativeW) / mockupSize;
 
-        // Export dimensions mirror the mockup's 3:4 coordinate space
-        const exportW = Math.round(mockupSize * SCALE);
-        const exportH = Math.round(mockupSize * (4 / 3) * SCALE);
+        // Hard limits to avoid crashing the browser tab
+        const MAX_CANVAS_PX = 16384;
 
         for (const layer of visibleLayers) {
           const img = await loadImg(layer.imageUrl);
           if (!img) continue;
+
+          const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
+
+          // ── Determine the optimal scale for this layer ──────────────────────
+          // Ideal: the layer fills exactly its native pixel dimensions in the
+          // export canvas → zero upscaling → maximum sharpness.
+          // Also ensure the canvas is at least 4000 px wide.
+          const scaleForNative  = img.naturalWidth  / displayW;   // 1:1 native px
+          const scaleForMinimum = 4000 / mockupSize;               // 4000 px floor
+          const scaleForShirt   = (shirtImg?.naturalWidth ?? 0) / mockupSize;
+
+          let SCALE = Math.max(scaleForNative, scaleForMinimum, scaleForShirt);
+
+          // Clamp so neither dimension exceeds the hard limit
+          const rawW = mockupSize       * SCALE;
+          const rawH = mockupSize * (4/3) * SCALE;
+          if (rawW > MAX_CANVAS_PX || rawH > MAX_CANVAS_PX) {
+            SCALE = Math.min(MAX_CANVAS_PX / mockupSize, MAX_CANVAS_PX / (mockupSize * 4/3));
+          }
+
+          // Export canvas mirrors the mockup's 3:4 coordinate space exactly
+          const exportW = Math.round(mockupSize       * SCALE);
+          const exportH = Math.round(mockupSize * (4/3) * SCALE);
 
           const canvas = document.createElement("canvas");
           canvas.width  = exportW;
@@ -907,33 +922,27 @@ export default function Design() {
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = "high";
 
-          // Layer position and display size in export-pixel space
-          const { width, height } = getRatioLockedSize(layer, layer.width);
-          const exportLayerW = width  * SCALE;
-          const exportLayerH = height * SCALE;
-          const cx    = (layer.x + width  / 2) * SCALE;
-          const cy    = (layer.y + height / 2) * SCALE;
+          // ── Draw layer at full native resolution ────────────────────────────
+          const exportLayerW = displayW * SCALE;   // ≈ img.naturalWidth when scaleForNative wins
+          const exportLayerH = displayH * SCALE;
+          const cx    = (layer.x + displayW / 2) * SCALE;
+          const cy    = (layer.y + displayH / 2) * SCALE;
           const angle = (layer.rotation * Math.PI) / 180;
 
           ctx.save();
           ctx.translate(cx, cy);
           ctx.rotate(angle);
-          // Draw the layer image at its full export size.
-          // Canvas uses bicubic-quality downsampling when the source is larger,
-          // giving the sharpest possible result.
           ctx.drawImage(img, -exportLayerW / 2, -exportLayerH / 2, exportLayerW, exportLayerH);
           ctx.restore();
 
-          // Apply the shirt's alpha silhouette as a clip mask.
-          // drawContain mirrors the CSS mask-size:contain / mask-position:center
-          // used in the designer, so the clipped area matches exactly.
+          // ── Clip to the shirt's alpha silhouette ────────────────────────────
           if (shirtImg) {
             ctx.globalCompositeOperation = "destination-in";
             drawContain(ctx, shirtImg, exportW, exportH);
             ctx.globalCompositeOperation = "source-over";
           }
 
-          // Download
+          // ── Download as lossless PNG ────────────────────────────────────────
           const fileName = `${layer.name.replace(/\s+/g, '-').toLowerCase()}.png`;
           await new Promise<void>(resolve => {
             canvas.toBlob(blob => {
