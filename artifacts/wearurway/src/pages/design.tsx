@@ -469,8 +469,16 @@ export default function Design() {
     if (!clipSize || !realWidth || !realHeight) return null;
     const visibleRect = getVisibleLayerRect(layer, clipSize.w, clipSize.h);
     if (!visibleRect) return null;
-    const w = Math.round((visibleRect.width / clipSize.w) * realWidth * 10) / 10;
-    const h = Math.round((visibleRect.height / clipSize.h) * realHeight * 10) / 10;
+    const { width, height } = getRatioLockedSize(layer, layer.width);
+    const aspect = getLayerAspectRatio(layer);
+    const visibleScale = Math.min(
+      visibleRect.width / width,
+      visibleRect.height / height,
+      1,
+    );
+    const fullW = (width / clipSize.w) * realWidth;
+    const w = Math.round(fullW * visibleScale * 10) / 10;
+    const h = Math.round((w / aspect) * 10) / 10;
     return { w, h, rect: visibleRect };
   };
 

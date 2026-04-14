@@ -44,7 +44,7 @@ A premium streetwear customization website with a multi-step product configurato
 - Design editor supports cursor-centered mouse-wheel zoom on selected image layers, free layer dragging, and an edit-image modal with deep cursor-centered zoom, Move/pan tool, precise circular brush erase, and automatic transparent-edge trimming on image load, brush erase, and fill removal so layer bounds shrink to visible pixels.
 - Image quality enhancement now runs when Add to Design is clicked in the image editor, using print-scale high-quality smoothing and sharpening to create the layer's final image buffer before it is placed on the mockup.
 - Mockup layer resizing is ratio-locked to each layer's natural image dimensions across wheel zoom, pinch zoom, render, export, and live dimension labels.
-- Live print dimensions for selected layers are calculated from the portion of the layer visibly clipped inside the print box, so the cm label updates when the image is dragged partly outside the printable area.
+- Live print dimensions for selected layers are scaled from the portion visibly clipped inside the print box while preserving the selected image's fixed natural aspect ratio in the cm label.
 - Export Design composites the already-processed layer images with uniform X/Y scaling so exported PNGs preserve the same aspect ratio shown on the mockup.
 - Export Design outputs high-resolution PNG files using print-DPI canvas scaling while keeping filename dimensions aligned with the live selected-layer size shown on the mockup.
 - Tools includes Share Design, which generates a ready-to-share PNG combining the full front and back mockups side-by-side with all visible design layers applied.
