@@ -49,9 +49,15 @@ export interface BoundingBox {
   height: number;
 }
 
+export interface ClipPoint {
+  x: number;
+  y: number;
+}
+
 export interface MockupSide {
   image?: string;
   boundingBox?: BoundingBox;
+  clipPolygon?: ClipPoint[];
 }
 
 export interface Mockup {
