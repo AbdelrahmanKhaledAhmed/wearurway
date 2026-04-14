@@ -184,16 +184,15 @@ export default function Design() {
   const realHeight = selectedSize?.realHeight ?? 0;
 
   const getEditorQualityScale = useCallback(() => {
-    const clipEl = clipAreaRef.current;
-    const clipW = clipEl?.offsetWidth ?? 0;
-    const clipH = clipEl?.offsetHeight ?? 0;
-    if (!clipW || !clipH || !realWidth || !realHeight) return 1;
+    if (!realWidth || !realHeight || !mockupSize) return 1;
+    const mockupW = mockupSize;
+    const mockupH = mockupSize * (4 / 3);
     return Math.max(
-      (realWidth / 2.54 * 300) / clipW,
-      (realHeight / 2.54 * 300) / clipH,
+      (realWidth / 2.54 * 300) / mockupW,
+      (realHeight / 2.54 * 300) / mockupH,
       1,
     );
-  }, [realWidth, realHeight]);
+  }, [realWidth, realHeight, mockupSize]);
 
   // Sync local bboxes and display settings when mockup loads
   useEffect(() => {
@@ -476,7 +475,12 @@ export default function Design() {
       visibleRect.height / height,
       1,
     );
-    const fullW = (width / clipSize.w) * realWidth;
+    // Use the full mockup container size as the px-to-cm reference so that
+    // realWidth/realHeight (full shirt dimensions) map correctly to real
+    // print sizes. clipSize is only the print-box area, which is a subset
+    // of the full shirt, so using it as denominator inflates the cm values.
+    const mockupW = mockupSize;
+    const fullW = (width / mockupW) * realWidth;
     const w = Math.round(fullW * visibleScale * 10) / 10;
     const h = Math.round((w / aspect) * 10) / 10;
     return { w, h, rect: visibleRect };
@@ -960,8 +964,8 @@ export default function Design() {
           cropW = rx - lx;
           cropH = ry - ly;
 
-          const fullCmW = Math.round((width / clipW) * realWidth * 10) / 10;
-          const fullCmH = Math.round((height / clipH) * realHeight * 10) / 10;
+          const fullCmW = Math.round((width / mockupContainerW) * realWidth * 10) / 10;
+          const fullCmH = Math.round((height / mockupContainerH) * realHeight * 10) / 10;
           visCmW = Math.round(fullCmW * (cropW / width) * 10) / 10;
           visCmH = Math.round(fullCmH * (cropH / height) * 10) / 10;
         } else {
@@ -983,8 +987,8 @@ export default function Design() {
           cropY = visMinY;
           cropW = visMaxX - visMinX;
           cropH = visMaxY - visMinY;
-          visCmW = Math.round((cropW / clipW) * realWidth * 10) / 10;
-          visCmH = Math.round((cropH / clipH) * realHeight * 10) / 10;
+          visCmW = Math.round((cropW / mockupContainerW) * realWidth * 10) / 10;
+          visCmH = Math.round((cropH / mockupContainerH) * realHeight * 10) / 10;
         }
 
         const MAX_SIDE = 8192;
@@ -1386,10 +1390,10 @@ export default function Design() {
                   gap: 2,
                 }}
               >
-                {layers.length === 0 && realWidth > 0 && showPlaceholder && (
+                {layers.length === 0 && realWidth > 0 && showPlaceholder && clipSize && (
                   <>
                     <p style={{ fontSize: "clamp(10px, 2vw, 18px)", fontWeight: 900, fontFamily: "monospace", color: "rgba(255,255,255,0.4)", lineHeight: 1 }}>
-                      {realWidth} × {realHeight}
+                      {Math.round((clipSize.w / mockupSize) * realWidth * 10) / 10} × {Math.round((clipSize.h / (mockupSize * 4 / 3)) * realHeight * 10) / 10}
                     </p>
                     <p style={{ fontSize: "clamp(8px, 1vw, 10px)", color: "rgba(255,255,255,0.25)", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace" }}>
                       cm
