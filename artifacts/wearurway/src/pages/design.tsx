@@ -1042,8 +1042,80 @@ export default function Design() {
         }
       };
 
+      // ── Export composite (mockup + all layers) per side ──────────────────────
+      const exportComposite = async (
+        visibleLayers: DesignLayer[],
+        shirtUrl: string | undefined,
+        fileName: string,
+      ) => {
+        if (!shirtUrl) return;
+        const shirtImg = await loadImg(shirtUrl);
+        if (!shirtImg) return;
+
+        const MAX_CANVAS_PX = 16384;
+        const scaleForShirt   = shirtImg.naturalWidth / mockupSize;
+        const scaleForMinimum = 4000 / mockupSize;
+        let SCALE = Math.max(scaleForShirt, scaleForMinimum);
+        const rawW = mockupSize * SCALE;
+        const rawH = mockupSize * (4 / 3) * SCALE;
+        if (rawW > MAX_CANVAS_PX || rawH > MAX_CANVAS_PX) {
+          SCALE = Math.min(MAX_CANVAS_PX / mockupSize, MAX_CANVAS_PX / (mockupSize * (4 / 3)));
+        }
+
+        const exportW = Math.round(mockupSize * SCALE);
+        const exportH = Math.round(mockupSize * (4 / 3) * SCALE);
+
+        const canvas = document.createElement("canvas");
+        canvas.width  = exportW;
+        canvas.height = exportH;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+
+        // Draw the mockup shirt as the background
+        drawContain(ctx, shirtImg, exportW, exportH);
+
+        // Draw each visible layer on top
+        for (const layer of visibleLayers) {
+          const img = await loadImg(layer.imageUrl);
+          if (!img) continue;
+
+          const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
+          const exportLayerW = displayW * SCALE;
+          const exportLayerH = displayH * SCALE;
+          const cx    = (layer.x + displayW / 2) * SCALE;
+          const cy    = (layer.y + displayH / 2) * SCALE;
+          const angle = (layer.rotation * Math.PI) / 180;
+
+          // Clip design to shirt silhouette
+          ctx.save();
+          ctx.globalCompositeOperation = "source-atop";
+          ctx.translate(cx, cy);
+          ctx.rotate(angle);
+          ctx.drawImage(img, -exportLayerW / 2, -exportLayerH / 2, exportLayerW, exportLayerH);
+          ctx.restore();
+        }
+
+        await new Promise<void>(resolve => {
+          canvas.toBlob(blob => {
+            if (!blob) { resolve(); return; }
+            const url = URL.createObjectURL(blob);
+            const a   = document.createElement("a");
+            a.href     = url;
+            a.download = fileName;
+            a.click();
+            URL.revokeObjectURL(url);
+            resolve();
+          }, "image/png");
+        });
+      };
+
       await exportLayers(frontVisible, mockup?.front?.image, "front");
       await exportLayers(backVisible,  mockup?.back?.image, "back");
+      await exportComposite(frontVisible, mockup?.front?.image, "front.png");
+      await exportComposite(backVisible,  mockup?.back?.image, "back.png");
     } finally {
       setExporting(false);
     }
