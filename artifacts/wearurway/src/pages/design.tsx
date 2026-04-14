@@ -859,6 +859,51 @@ export default function Design() {
         } catch { return null; }
       };
 
+      // ── Trim transparent border pixels from a canvas ─────────────────────────
+      // Uses early-exit scanning: finds top/bottom first by scanning full rows,
+      // then finds left/right only within that vertical band — much faster on
+      // large canvases where most content is in the centre.
+      const trimCanvas = (src: HTMLCanvasElement): HTMLCanvasElement => {
+        const ctx = src.getContext("2d");
+        if (!ctx) return src;
+        const { width, height } = src;
+        const { data } = ctx.getImageData(0, 0, width, height);
+        const idx = (x: number, y: number) => (y * width + x) * 4 + 3; // alpha channel
+
+        // Top — first row with any opaque pixel
+        let top = -1;
+        for (let y = 0; y < height && top === -1; y++)
+          for (let x = 0; x < width; x++)
+            if (data[idx(x, y)] > 0) { top = y; break; }
+        if (top === -1) return src; // fully transparent
+
+        // Bottom — last row with any opaque pixel
+        let bottom = top;
+        for (let y = height - 1; y > bottom; y--)
+          for (let x = 0; x < width; x++)
+            if (data[idx(x, y)] > 0) { bottom = y; break; }
+
+        // Left — first column with any opaque pixel (within top‥bottom band)
+        let left = width - 1;
+        for (let x = 0; x < left; x++)
+          for (let y = top; y <= bottom; y++)
+            if (data[idx(x, y)] > 0) { left = x; break; }
+
+        // Right — last column with any opaque pixel (within top‥bottom band)
+        let right = left;
+        for (let x = width - 1; x > right; x--)
+          for (let y = top; y <= bottom; y++)
+            if (data[idx(x, y)] > 0) { right = x; break; }
+
+        const trimW = right  - left + 1;
+        const trimH = bottom - top  + 1;
+        const trimmed = document.createElement("canvas");
+        trimmed.width  = trimW;
+        trimmed.height = trimH;
+        trimmed.getContext("2d")!.drawImage(src, left, top, trimW, trimH, 0, 0, trimW, trimH);
+        return trimmed;
+      };
+
       // ── Draw image with object-fit:contain behaviour ──────────────────────────
       const drawContain = (
         ctx: CanvasRenderingContext2D,
@@ -942,10 +987,11 @@ export default function Design() {
             ctx.globalCompositeOperation = "source-over";
           }
 
-          // ── Download as lossless PNG ────────────────────────────────────────
+          // ── Trim transparent border then download as lossless PNG ──────────────
+          const output = trimCanvas(canvas);
           const fileName = `${layer.name.replace(/\s+/g, '-').toLowerCase()}.png`;
           await new Promise<void>(resolve => {
-            canvas.toBlob(blob => {
+            output.toBlob(blob => {
               if (!blob) { resolve(); return; }
               const url = URL.createObjectURL(blob);
               const a   = document.createElement("a");
