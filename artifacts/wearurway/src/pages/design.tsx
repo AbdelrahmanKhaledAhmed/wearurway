@@ -923,6 +923,7 @@ export default function Design() {
       const exportLayers = async (
         visibleLayers: DesignLayer[],
         shirtUrl: string | undefined,
+        side: "front" | "back",
       ) => {
         if (visibleLayers.length === 0) return;
 
@@ -989,7 +990,7 @@ export default function Design() {
 
           // ── Trim transparent border then download as lossless PNG ──────────────
           const output = trimCanvas(canvas);
-          const fileName = `${layer.name.replace(/\s+/g, '-').toLowerCase()}.png`;
+          const fileName = `${layer.name.replace(/\s+/g, '-').toLowerCase()}-${side}.png`;
           await new Promise<void>(resolve => {
             output.toBlob(blob => {
               if (!blob) { resolve(); return; }
@@ -1005,8 +1006,8 @@ export default function Design() {
         }
       };
 
-      await exportLayers(frontVisible, mockup?.front?.image);
-      await exportLayers(backVisible,  mockup?.back?.image);
+      await exportLayers(frontVisible, mockup?.front?.image, "front");
+      await exportLayers(backVisible,  mockup?.back?.image, "back");
     } finally {
       setExporting(false);
     }
