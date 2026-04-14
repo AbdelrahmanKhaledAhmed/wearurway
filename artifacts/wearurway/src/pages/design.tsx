@@ -981,12 +981,10 @@ export default function Design() {
 
         const MAX_SIDE = 8192;
         const targetW = Math.max(1, Math.round((visCmW / 2.54) * 300));
-        const targetH = Math.max(1, Math.round((visCmH / 2.54) * 300));
-        const sideScale = Math.min(1, MAX_SIDE / targetW, MAX_SIDE / targetH);
-        const exportW = Math.max(1, Math.round(targetW * sideScale));
-        const exportH = Math.max(1, Math.round(targetH * sideScale));
-        const scaleX = exportW / cropW;
-        const scaleY = exportH / cropH;
+        const targetH = Math.max(1, Math.round(targetW * (cropH / cropW)));
+        const exportScale = Math.min(targetW / cropW, targetH / cropH, MAX_SIDE / cropW, MAX_SIDE / cropH);
+        const exportW = Math.max(1, Math.round(cropW * exportScale));
+        const exportH = Math.max(1, Math.round(cropH * exportScale));
 
         // ── Build canvas ───────────────────────────────────────────────────────
         const canvas = document.createElement("canvas");
@@ -997,7 +995,7 @@ export default function Design() {
 
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
-        ctx.setTransform(scaleX, 0, 0, scaleY, -cropX * scaleX, -cropY * scaleY);
+        ctx.setTransform(exportScale, 0, 0, exportScale, -cropX * exportScale, -cropY * exportScale);
 
         for (const { layer, img } of loaded) {
           const { width, height } = getRatioLockedSize(layer, layer.width);
