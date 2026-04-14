@@ -9,7 +9,7 @@ ensureDir(MOCKUPS_DIR);
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"];
     const ext = path.extname(file.originalname).toLowerCase();
