@@ -837,106 +837,60 @@ export default function Design() {
   // ── Export ─────────────────────────────────────────────────────────────────
 
   const handleExport = useCallback(async () => {
-    if (!realWidth || !realHeight) return;
-
     const frontVisible = frontLayers.filter(l => l.visible);
     const backVisible  = backLayers.filter(l => l.visible);
     if (frontVisible.length === 0 && backVisible.length === 0) return;
 
     setExporting(true);
     try {
-      type Loaded = { layer: DesignLayer; img: HTMLImageElement; blobUrl: string };
+      // ── Helper: load an image from a URL via blob (avoids CORS issues) ────────
+      const loadImg = async (src: string): Promise<HTMLImageElement | null> => {
+        try {
+          const res = await fetch(src);
+          if (!res.ok) return null;
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          return await new Promise<HTMLImageElement>((resolve, reject) => {
+            const i = new Image();
+            i.onload = () => { URL.revokeObjectURL(blobUrl); resolve(i); };
+            i.onerror = () => { URL.revokeObjectURL(blobUrl); reject(); };
+            i.src = blobUrl;
+          });
+        } catch { return null; }
+      };
 
-      // ── Helper: render one side and trigger download ─────────────────────────
+      // ── Helper: draw an image with object-fit:contain behaviour ──────────────
+      const drawContain = (
+        ctx: CanvasRenderingContext2D,
+        img: HTMLImageElement,
+        canvasW: number,
+        canvasH: number,
+      ) => {
+        const scale = Math.min(canvasW / img.naturalWidth, canvasH / img.naturalHeight);
+        const dw = img.naturalWidth  * scale;
+        const dh = img.naturalHeight * scale;
+        const dx = (canvasW - dw) / 2;
+        const dy = (canvasH - dh) / 2;
+        ctx.drawImage(img, dx, dy, dw, dh);
+      };
+
+      // ── Helper: render one side → download PNG ───────────────────────────────
       const renderSide = async (
         visibleLayers: DesignLayer[],
         label: "front" | "back",
+        shirtUrl: string | undefined,
       ) => {
         if (visibleLayers.length === 0) return;
 
-        // Clip dimensions = full mockup container (layers can be placed anywhere on the shirt).
-        const mockupContainerW = mockupSize;
-        const mockupContainerH = mockupSize * (4 / 3);
-        const clipW = mockupContainerW;
-        const clipH = mockupContainerH;
-        if (!clipW || !clipH) return;
+        // Source coordinate space matches the on-screen clip area
+        const srcW = mockupSize;
+        const srcH = mockupSize * (4 / 3);
 
-        // ── Load images ────────────────────────────────────────────────────────
-        const loaded: Loaded[] = [];
-        for (const layer of visibleLayers) {
-          try {
-            const res = await fetch(layer.imageUrl);
-            if (!res.ok) continue;
-            const blob = await res.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-              const i = new Image();
-              i.onload = () => resolve(i);
-              i.onerror = () => reject(new Error("load failed"));
-              i.src = blobUrl;
-            });
-            loaded.push({ layer, img, blobUrl });
-          } catch { /* skip */ }
-        }
-        if (loaded.length === 0) return;
+        // Export at 2× the on-screen size (good quality, not huge)
+        const SCALE = 2;
+        const exportW = Math.round(srcW * SCALE);
+        const exportH = Math.round(srcH * SCALE);
 
-        // ── Compute exported crop + real-world size ────────────────────────────
-        let cropX = 0;
-        let cropY = 0;
-        let cropW = clipW;
-        let cropH = clipH;
-        let visCmW: number;
-        let visCmH: number;
-
-        if (loaded.length === 1) {
-          const layer = loaded[0].layer;
-          const { width, height } = getRatioLockedSize(layer, layer.width);
-          const lx = Math.max(0, layer.x);
-          const ly = Math.max(0, layer.y);
-          const rx = Math.min(clipW, layer.x + width);
-          const ry = Math.min(clipH, layer.y + height);
-          if (rx <= lx || ry <= ly) return;
-
-          cropX = lx;
-          cropY = ly;
-          cropW = rx - lx;
-          cropH = ry - ly;
-
-          const fullCmW = Math.round((width / mockupContainerW) * realWidth * 10) / 10;
-          const fullCmH = Math.round((height / mockupContainerH) * realHeight * 10) / 10;
-          visCmW = Math.round(fullCmW * (cropW / width) * 10) / 10;
-          visCmH = Math.round(fullCmH * (cropH / height) * 10) / 10;
-        } else {
-          let visMinX = clipW, visMaxX = 0, visMinY = clipH, visMaxY = 0;
-          for (const { layer } of loaded) {
-            const { width, height } = getRatioLockedSize(layer, layer.width);
-            const lx = Math.max(0, layer.x);
-            const ly = Math.max(0, layer.y);
-            const rx = Math.min(clipW, layer.x + width);
-            const ry = Math.min(clipH, layer.y + height);
-            if (rx > lx && ry > ly) {
-              visMinX = Math.min(visMinX, lx); visMaxX = Math.max(visMaxX, rx);
-              visMinY = Math.min(visMinY, ly); visMaxY = Math.max(visMaxY, ry);
-            }
-          }
-          if (visMaxX <= visMinX || visMaxY <= visMinY) return;
-
-          cropX = visMinX;
-          cropY = visMinY;
-          cropW = visMaxX - visMinX;
-          cropH = visMaxY - visMinY;
-          visCmW = Math.round((cropW / mockupContainerW) * realWidth * 10) / 10;
-          visCmH = Math.round((cropH / mockupContainerH) * realHeight * 10) / 10;
-        }
-
-        const MAX_SIDE = 8192;
-        const targetW = Math.max(1, Math.round((visCmW / 2.54) * 300));
-        const targetH = Math.max(1, Math.round(targetW * (cropH / cropW)));
-        const exportScale = Math.min(targetW / cropW, targetH / cropH, MAX_SIDE / cropW, MAX_SIDE / cropH);
-        const exportW = Math.max(1, Math.round(cropW * exportScale));
-        const exportH = Math.max(1, Math.round(cropH * exportScale));
-
-        // ── Build canvas ───────────────────────────────────────────────────────
         const canvas = document.createElement("canvas");
         canvas.width  = exportW;
         canvas.height = exportH;
@@ -945,33 +899,42 @@ export default function Design() {
 
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
-        ctx.setTransform(exportScale, 0, 0, exportScale, -cropX * exportScale, -cropY * exportScale);
 
-        for (const { layer, img } of loaded) {
+        // 1. Draw the shirt image as the background
+        const shirtImg = shirtUrl ? await loadImg(shirtUrl) : null;
+        if (shirtImg) drawContain(ctx, shirtImg, exportW, exportH);
+
+        // 2. Draw each design layer on top (scaled to export space)
+        for (const layer of visibleLayers) {
+          const img = await loadImg(layer.imageUrl);
+          if (!img) continue;
           const { width, height } = getRatioLockedSize(layer, layer.width);
-          const cx    = layer.x + width  / 2;
-          const cy    = layer.y + height / 2;
+          const cx    = (layer.x + width  / 2) * SCALE;
+          const cy    = (layer.y + height / 2) * SCALE;
           const angle = (layer.rotation * Math.PI) / 180;
           ctx.save();
           ctx.translate(cx, cy);
           ctx.rotate(angle);
-          ctx.drawImage(img, -width / 2, -height / 2, width, height);
+          ctx.drawImage(img, -(width * SCALE) / 2, -(height * SCALE) / 2, width * SCALE, height * SCALE);
           ctx.restore();
         }
 
-        for (const { blobUrl } of loaded) URL.revokeObjectURL(blobUrl);
+        // 3. Clip the entire composite to the shirt's alpha shape
+        //    (mirrors the CSS mask-image used in the designer)
+        if (shirtImg) {
+          ctx.globalCompositeOperation = "destination-in";
+          drawContain(ctx, shirtImg, exportW, exportH);
+          ctx.globalCompositeOperation = "source-over";
+        }
 
-        // ── Download ───────────────────────────────────────────────────────────
-        const downloadName = loaded.length === 1
-          ? `${loaded[0].layer.name.replace(/\s+/g, '-').toLowerCase()}.png`
-          : `design-${label}.png`;
+        // 4. Download
         await new Promise<void>(resolve => {
           canvas.toBlob(blob => {
             if (!blob) { resolve(); return; }
             const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = downloadName;
+            const a   = document.createElement("a");
+            a.href     = url;
+            a.download = `mockup-${label}.png`;
             a.click();
             URL.revokeObjectURL(url);
             resolve();
@@ -979,12 +942,12 @@ export default function Design() {
         });
       };
 
-      await renderSide(frontVisible, "front");
-      await renderSide(backVisible,  "back");
+      await renderSide(frontVisible, "front", mockup?.front?.image);
+      await renderSide(backVisible,  "back",  mockup?.back?.image);
     } finally {
       setExporting(false);
     }
-  }, [frontLayers, backLayers, realWidth, realHeight, mockupSize]);
+  }, [frontLayers, backLayers, mockupSize, mockup]);
 
   if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return null;
 
