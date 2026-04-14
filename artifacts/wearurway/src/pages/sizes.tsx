@@ -27,7 +27,7 @@ export default function Sizes() {
   }, [fitId, colorId, setLocation]);
 
   const handleSelect = (size: any) => {
-    if (!size.available) return;
+    if (size.available === false) return;
     setSize(size);
     setShowConfirmation(true);
   };
@@ -99,11 +99,11 @@ export default function Sizes() {
             {sizes?.map((size) => (
               <motion.div
                 key={size.id}
-                whileHover={size.available ? { scale: 1.02 } : {}}
-                whileTap={size.available ? { scale: 0.98 } : {}}
+                whileHover={size.available !== false ? { scale: 1.02 } : {}}
+                whileTap={size.available !== false ? { scale: 0.98 } : {}}
                 onClick={() => handleSelect(size)}
                 className={`p-6 border border-border flex flex-col justify-center items-center text-center transition-colors ${
-                  size.available
+                  size.available !== false
                     ? "hover:border-foreground bg-card min-h-48 cursor-pointer"
                     : "opacity-50 cursor-not-allowed bg-muted/20 min-h-48"
                 }`}

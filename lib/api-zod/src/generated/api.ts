@@ -150,6 +150,12 @@ export const GetSizesResponseItem = zod.object({
   name: zod.string(),
   realWidth: zod.number(),
   realHeight: zod.number(),
+  available: zod.boolean().optional(),
+  comingSoon: zod.boolean().optional(),
+  heightMin: zod.number().optional(),
+  heightMax: zod.number().optional(),
+  weightMin: zod.number().optional(),
+  weightMax: zod.number().optional(),
   image: zod.string().optional(),
   fitId: zod.string(),
 });
@@ -163,6 +169,12 @@ export const AddSizeBody = zod.object({
   name: zod.string(),
   realWidth: zod.number(),
   realHeight: zod.number(),
+  available: zod.boolean().optional(),
+  comingSoon: zod.boolean().optional(),
+  heightMin: zod.number().optional(),
+  heightMax: zod.number().optional(),
+  weightMin: zod.number().optional(),
+  weightMax: zod.number().optional(),
   image: zod.string().optional(),
 });
 
@@ -175,6 +187,12 @@ export const UpdateSizeBody = zod.object({
   name: zod.string().optional(),
   realWidth: zod.number().optional(),
   realHeight: zod.number().optional(),
+  available: zod.boolean().optional(),
+  comingSoon: zod.boolean().optional(),
+  heightMin: zod.number().optional(),
+  heightMax: zod.number().optional(),
+  weightMin: zod.number().optional(),
+  weightMax: zod.number().optional(),
   image: zod.string().optional(),
 });
 
@@ -183,6 +201,12 @@ export const UpdateSizeResponse = zod.object({
   name: zod.string(),
   realWidth: zod.number(),
   realHeight: zod.number(),
+  available: zod.boolean().optional(),
+  comingSoon: zod.boolean().optional(),
+  heightMin: zod.number().optional(),
+  heightMax: zod.number().optional(),
+  weightMin: zod.number().optional(),
+  weightMax: zod.number().optional(),
   image: zod.string().optional(),
   fitId: zod.string(),
 });

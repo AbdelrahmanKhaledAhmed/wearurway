@@ -562,6 +562,18 @@ components:
           type: number
         realHeight:
           type: number
+        available:
+          type: boolean
+        comingSoon:
+          type: boolean
+        heightMin:
+          type: number
+        heightMax:
+          type: number
+        weightMin:
+          type: number
+        weightMax:
+          type: number
         image:
           type: string
         fitId:
@@ -577,6 +589,18 @@ components:
           type: number
         realHeight:
           type: number
+        available:
+          type: boolean
+        comingSoon:
+          type: boolean
+        heightMin:
+          type: number
+        heightMax:
+          type: number
+        weightMin:
+          type: number
+        weightMax:
+          type: number
         image:
           type: string
       required: [name, realWidth, realHeight]
@@ -589,6 +613,18 @@ components:
         realWidth:
           type: number
         realHeight:
+          type: number
+        available:
+          type: boolean
+        comingSoon:
+          type: boolean
+        heightMin:
+          type: number
+        heightMax:
+          type: number
+        weightMin:
+          type: number
+        weightMax:
           type: number
         image:
           type: string

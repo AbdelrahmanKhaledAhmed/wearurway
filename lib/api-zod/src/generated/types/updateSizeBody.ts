@@ -10,5 +10,11 @@ export interface UpdateSizeBody {
   name?: string;
   realWidth?: number;
   realHeight?: number;
+  available?: boolean;
+  comingSoon?: boolean;
+  heightMin?: number;
+  heightMax?: number;
+  weightMin?: number;
+  weightMax?: number;
   image?: string;
 }

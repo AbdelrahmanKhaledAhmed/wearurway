@@ -1251,7 +1251,7 @@ function SizesManager() {
             className="flex gap-4 items-start"
           >
             {/* Size card matching sizes.tsx */}
-            <div className={`flex-1 p-6 border border-border flex flex-col justify-center items-center text-center min-h-[160px] ${size.available ? "bg-card" : "opacity-60 bg-muted/20"}`}>
+            <div className={`flex-1 p-6 border border-border flex flex-col justify-center items-center text-center min-h-[160px] ${size.available !== false ? "bg-card" : "opacity-60 bg-muted/20"}`}>
               <h3 className="text-2xl font-bold uppercase tracking-tight mb-2">{size.name}</h3>
               <p className="text-sm font-mono text-foreground mb-2">{size.realWidth} x {size.realHeight} CM</p>
               <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
