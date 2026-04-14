@@ -43,11 +43,48 @@ const ROTATE_STEP = 1;
 const SAVE_KEY = (productId: string, fitId: string, colorId: string) =>
   `ww_design_${productId}_${fitId}_${colorId}`;
 
+const COMPRESS_MAX_DIM = 1500;
+
+async function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+async function compressImageToBlob(url: string, maxDim = COMPRESS_MAX_DIM): Promise<Blob> {
+  let blobObjectUrl: string | null = null;
+  try {
+    let src = url;
+    if (url.startsWith("blob:") || url.startsWith("/") || url.startsWith("http")) {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      blobObjectUrl = URL.createObjectURL(blob);
+      src = blobObjectUrl;
+    }
+    const img = await loadImageFromUrl(src);
+    const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight, 1));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0, w, h);
+    return await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(b => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png")
+    );
+  } finally {
+    if (blobObjectUrl) URL.revokeObjectURL(blobObjectUrl);
+  }
+}
+
 async function blobUrlToDataUrl(url: string): Promise<string> {
   if (!url.startsWith("blob:")) return url;
   try {
-    const res = await fetch(url);
-    const blob = await res.blob();
+    const blob = await compressImageToBlob(url);
     return await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
@@ -750,10 +787,9 @@ export default function Design() {
 
   const uploadBlobUrl = useCallback(async (url: string): Promise<{ url: string; filename: string | null }> => {
     if (!url.startsWith("blob:")) return { url, filename: null };
-    const res = await fetch(url);
-    const blob = await res.blob();
+    const compressed = await compressImageToBlob(url);
     const form = new FormData();
-    form.append("file", blob, "layer.png");
+    form.append("file", compressed, "layer.png");
     const uploadRes = await fetch("/api/shared-layers", { method: "POST", body: form });
     if (!uploadRes.ok) throw new Error("Upload failed");
     const { url: serverUrl, filename } = await uploadRes.json() as { url: string; filename: string };
