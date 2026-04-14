@@ -1126,6 +1126,10 @@ export default function Design() {
         layerCtx.globalCompositeOperation = "destination-in";
         drawContain(layerCtx, shirtImg, exportW, exportH);
 
+        // ── Download combined design without mockup (trimmed) ─────────────────
+        const designFileName = fileName.replace(/\.png$/, "").replace(/^(front|back)$/, "design-$1") + ".png";
+        await downloadCanvas(trimCanvas(layerCanvas), designFileName);
+
         // ── Canvas B: shirt + clipped layers ─────────────────────────────────
         const finalCanvas = makeCanvas();
         const finalCtx    = setupCtx(finalCanvas);
