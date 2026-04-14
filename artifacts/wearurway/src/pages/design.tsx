@@ -298,15 +298,45 @@ export default function Design() {
     };
   };
 
+  const getLayerAspectRatio = (layer: DesignLayer) => {
+    const naturalRatio =
+      layer.naturalWidth > 0 && layer.naturalHeight > 0
+        ? layer.naturalWidth / layer.naturalHeight
+        : 0;
+    const displayRatio =
+      layer.width > 0 && layer.height > 0
+        ? layer.width / layer.height
+        : 1;
+    return Number.isFinite(naturalRatio) && naturalRatio > 0
+      ? naturalRatio
+      : displayRatio;
+  };
+
+  const getRatioLockedSize = (layer: DesignLayer, width: number) => {
+    const aspect = getLayerAspectRatio(layer);
+    const nextW = Math.max(MIN_LAYER_SIZE, width);
+    return {
+      width: nextW,
+      height: Math.max(MIN_LAYER_SIZE, nextW / aspect),
+    };
+  };
+
   const scaleLayerAtPoint = useCallback((layer: DesignLayer, factor: number, anchorX?: number, anchorY?: number) => {
+    const aspect = getLayerAspectRatio(layer);
     const baseW = Math.max(1, layer.naturalWidth || layer.width);
     const baseH = Math.max(1, layer.naturalHeight || layer.height);
-    const maxW = baseW * MAX_LAYER_SCALE;
-    const maxH = baseH * MAX_LAYER_SCALE;
-    const nextW = Math.max(MIN_LAYER_SIZE, Math.min(maxW, layer.width * factor));
-    const nextH = Math.max(MIN_LAYER_SIZE, Math.min(maxH, layer.height * factor));
-    const appliedFactorX = nextW / layer.width;
-    const appliedFactorY = nextH / layer.height;
+    const maxScale = Math.min(
+      MAX_LAYER_SCALE,
+      (baseW * MAX_LAYER_SCALE) / Math.max(1, layer.width),
+      (baseH * MAX_LAYER_SCALE) / Math.max(1, layer.width / aspect),
+    );
+    const minScale = Math.max(
+      MIN_LAYER_SIZE / Math.max(1, layer.width),
+      MIN_LAYER_SIZE / Math.max(1, layer.width / aspect),
+    );
+    const appliedFactor = Math.min(Math.max(factor, minScale), maxScale);
+    const nextW = layer.width * appliedFactor;
+    const nextH = nextW / aspect;
     const px = anchorX ?? layer.x + layer.width / 2;
     const py = anchorY ?? layer.y + layer.height / 2;
 
@@ -314,8 +344,8 @@ export default function Design() {
       ...layer,
       width: nextW,
       height: nextH,
-      x: px - (px - layer.x) * appliedFactorX,
-      y: py - (py - layer.y) * appliedFactorY,
+      x: px - (px - layer.x) * appliedFactor,
+      y: py - (py - layer.y) * appliedFactor,
     };
   }, []);
 
@@ -375,17 +405,13 @@ export default function Design() {
         setLayers(layers =>
           layers.map(l => {
             if (l.id !== prev) return l;
-            const newW = Math.max(10, l.width * ratio);
-            const newH = Math.max(10, l.height * ratio);
-            const cx = l.x + l.width / 2;
-            const cy = l.y + l.height / 2;
-            return { ...l, width: newW, height: newH, x: cx - newW / 2, y: cy - newH / 2 };
+            return scaleLayerAtPoint(l, ratio);
           })
         );
         return prev;
       });
     }
-  }, []);
+  }, [scaleLayerAtPoint]);
 
   const onTouchEnd = useCallback(() => {
     pinchRef.current = null;
@@ -419,15 +445,14 @@ export default function Design() {
     return () => ro.disconnect();
   }, [bbox]);
 
-  // ── Compute print dimensions in cm for any layer, capped at box size ───────
+  // ── Compute print dimensions in cm for any layer, locked to image ratio ─────
   const selectedLayer = layers.find(l => l.id === selectedLayerId) ?? null;
 
   const layerPrintDim = (layer: DesignLayer) => {
     if (!clipSize || !realWidth || !realHeight) return null;
-    const visibleW = Math.max(0, Math.min(clipSize.w, layer.x + layer.width) - Math.max(0, layer.x));
-    const visibleH = Math.max(0, Math.min(clipSize.h, layer.y + layer.height) - Math.max(0, layer.y));
-    const w = Math.round((visibleW / clipSize.w) * realWidth * 10) / 10;
-    const h = Math.round((visibleH / clipSize.h) * realHeight * 10) / 10;
+    const { width } = getRatioLockedSize(layer, layer.width);
+    const w = Math.round((width / clipSize.w) * realWidth * 10) / 10;
+    const h = Math.round((w / getLayerAspectRatio(layer)) * 10) / 10;
     return { w, h };
   };
 
@@ -564,15 +589,16 @@ export default function Design() {
           if (l.imageUrl.startsWith("blob:")) URL.revokeObjectURL(l.imageUrl);
           const baseW = Math.max(1, edit.originalWidth || l.naturalWidth || l.width);
           const baseH = Math.max(1, edit.originalHeight || l.naturalHeight || l.height);
-          const scaleX = l.width / baseW;
-          const scaleY = l.height / baseH;
+          const scale = l.width / baseW;
+          const nextW = Math.max(MIN_LAYER_SIZE, edit.width * scale);
+          const aspect = natural.w > 0 && natural.h > 0 ? natural.w / natural.h : edit.width / edit.height;
           return {
             ...l,
             imageUrl: objectUrl,
-            x: l.x + edit.x * scaleX,
-            y: l.y + edit.y * scaleY,
-            width: Math.max(MIN_LAYER_SIZE, edit.width * scaleX),
-            height: Math.max(MIN_LAYER_SIZE, edit.height * scaleY),
+            x: l.x + edit.x * scale,
+            y: l.y + edit.y * (l.height / baseH),
+            width: nextW,
+            height: nextW / aspect,
             naturalWidth: natural.w,
             naturalHeight: natural.h,
           };
@@ -903,13 +929,14 @@ export default function Design() {
         ctx.clip();
 
         for (const { layer, img } of loaded) {
+          const { width, height } = getRatioLockedSize(layer, layer.width);
           const cx    = layer.x + layer.width  / 2;
-          const cy    = layer.y + layer.height / 2;
+          const cy    = layer.y + height / 2;
           const angle = (layer.rotation * Math.PI) / 180;
           ctx.save();
           ctx.translate(cx, cy);
           ctx.rotate(angle);
-          ctx.drawImage(img, -layer.width / 2, -layer.height / 2, layer.width, layer.height);
+          ctx.drawImage(img, -width / 2, -height / 2, width, height);
           ctx.restore();
         }
 
@@ -918,10 +945,11 @@ export default function Design() {
         // ── Compute real-world size for filename ───────────────────────────────
         let visMinX = clipW, visMaxX = 0, visMinY = clipH, visMaxY = 0;
         for (const { layer } of loaded) {
+          const { width, height } = getRatioLockedSize(layer, layer.width);
           const lx = Math.max(0, layer.x);
           const ly = Math.max(0, layer.y);
-          const rx = Math.min(clipW, layer.x + layer.width);
-          const ry = Math.min(clipH, layer.y + layer.height);
+          const rx = Math.min(clipW, layer.x + width);
+          const ry = Math.min(clipH, layer.y + height);
           if (rx > lx && ry > ly) {
             visMinX = Math.min(visMinX, lx); visMaxX = Math.max(visMaxX, rx);
             visMinY = Math.min(visMinY, ly); visMaxY = Math.max(visMaxY, ry);
@@ -1213,7 +1241,9 @@ export default function Design() {
                 }}
               >
                 {layers.map((layer) =>
-                  layer.visible ? (
+                  layer.visible ? (() => {
+                    const { width, height } = getRatioLockedSize(layer, layer.width);
+                    return (
                     <img
                       key={layer.id}
                       src={layer.imageUrl}
@@ -1224,10 +1254,10 @@ export default function Design() {
                         position: "absolute",
                         left: layer.x,
                         top: layer.y,
-                        width: layer.width,
-                        height: layer.height,
-                        minWidth: layer.width,
-                        minHeight: layer.height,
+                        width,
+                        height,
+                        minWidth: width,
+                        minHeight: height,
                         maxWidth: "none",
                         maxHeight: "none",
                         transform: `rotate(${layer.rotation}deg)`,
@@ -1239,7 +1269,8 @@ export default function Design() {
                         imageRendering: "high-quality" as React.CSSProperties["imageRendering"],
                       }}
                     />
-                  ) : null
+                    );
+                  })() : null
                 )}
 
                 {/* ── Print dimension label for selected layer ── */}
@@ -1247,8 +1278,8 @@ export default function Design() {
                   <div
                     style={{
                       position: "absolute",
-                      left: (Math.max(0, selectedLayer.x) + Math.min(clipSize.w, selectedLayer.x + selectedLayer.width)) / 2,
-                      top: (Math.max(0, selectedLayer.y) + Math.min(clipSize.h, selectedLayer.y + selectedLayer.height)) / 2,
+                      left: selectedLayer.x + getRatioLockedSize(selectedLayer, selectedLayer.width).width / 2,
+                      top: selectedLayer.y + getRatioLockedSize(selectedLayer, selectedLayer.width).height / 2,
                       transform: "translateX(-50%) translateY(-50%)",
                       pointerEvents: "none",
                       zIndex: 20,
