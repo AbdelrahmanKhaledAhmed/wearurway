@@ -843,7 +843,7 @@ export default function Design() {
 
     setExporting(true);
     try {
-      // ── Helper: load an image from a URL via blob (avoids CORS issues) ────────
+      // ── Load an image from a URL via blob (avoids CORS issues) ───────────────
       const loadImg = async (src: string): Promise<HTMLImageElement | null> => {
         try {
           const res = await fetch(src);
@@ -859,7 +859,7 @@ export default function Design() {
         } catch { return null; }
       };
 
-      // ── Helper: draw an image with object-fit:contain behaviour ──────────────
+      // ── Draw image with object-fit:contain behaviour ──────────────────────────
       const drawContain = (
         ctx: CanvasRenderingContext2D,
         img: HTMLImageElement,
@@ -874,40 +874,37 @@ export default function Design() {
         ctx.drawImage(img, dx, dy, dw, dh);
       };
 
-      // ── Helper: render one side → download PNG ───────────────────────────────
-      const renderSide = async (
+      // ── Export each layer individually ────────────────────────────────────────
+      const exportLayers = async (
         visibleLayers: DesignLayer[],
-        label: "front" | "back",
         shirtUrl: string | undefined,
       ) => {
         if (visibleLayers.length === 0) return;
 
-        // Source coordinate space matches the on-screen clip area
+        // Match the on-screen coordinate space
         const srcW = mockupSize;
         const srcH = mockupSize * (4 / 3);
-
-        // Export at 2× the on-screen size (good quality, not huge)
         const SCALE = 2;
         const exportW = Math.round(srcW * SCALE);
         const exportH = Math.round(srcH * SCALE);
 
-        const canvas = document.createElement("canvas");
-        canvas.width  = exportW;
-        canvas.height = exportH;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-
-        // 1. Draw the shirt image as the background
+        // Load the shirt mask once (used to clip every layer)
         const shirtImg = shirtUrl ? await loadImg(shirtUrl) : null;
-        if (shirtImg) drawContain(ctx, shirtImg, exportW, exportH);
 
-        // 2. Draw each design layer on top (scaled to export space)
         for (const layer of visibleLayers) {
           const img = await loadImg(layer.imageUrl);
           if (!img) continue;
+
+          const canvas = document.createElement("canvas");
+          canvas.width  = exportW;
+          canvas.height = exportH;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) continue;
+
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+
+          // Draw this single layer at its position/rotation
           const { width, height } = getRatioLockedSize(layer, layer.width);
           const cx    = (layer.x + width  / 2) * SCALE;
           const cy    = (layer.y + height / 2) * SCALE;
@@ -917,33 +914,33 @@ export default function Design() {
           ctx.rotate(angle);
           ctx.drawImage(img, -(width * SCALE) / 2, -(height * SCALE) / 2, width * SCALE, height * SCALE);
           ctx.restore();
-        }
 
-        // 3. Clip the entire composite to the shirt's alpha shape
-        //    (mirrors the CSS mask-image used in the designer)
-        if (shirtImg) {
-          ctx.globalCompositeOperation = "destination-in";
-          drawContain(ctx, shirtImg, exportW, exportH);
-          ctx.globalCompositeOperation = "source-over";
-        }
+          // Clip to the shirt's alpha silhouette so only the part on the shirt is kept
+          if (shirtImg) {
+            ctx.globalCompositeOperation = "destination-in";
+            drawContain(ctx, shirtImg, exportW, exportH);
+            ctx.globalCompositeOperation = "source-over";
+          }
 
-        // 4. Download
-        await new Promise<void>(resolve => {
-          canvas.toBlob(blob => {
-            if (!blob) { resolve(); return; }
-            const url = URL.createObjectURL(blob);
-            const a   = document.createElement("a");
-            a.href     = url;
-            a.download = `mockup-${label}.png`;
-            a.click();
-            URL.revokeObjectURL(url);
-            resolve();
-          }, "image/png");
-        });
+          // Download this layer
+          const fileName = `${layer.name.replace(/\s+/g, '-').toLowerCase()}.png`;
+          await new Promise<void>(resolve => {
+            canvas.toBlob(blob => {
+              if (!blob) { resolve(); return; }
+              const url = URL.createObjectURL(blob);
+              const a   = document.createElement("a");
+              a.href     = url;
+              a.download = fileName;
+              a.click();
+              URL.revokeObjectURL(url);
+              resolve();
+            }, "image/png");
+          });
+        }
       };
 
-      await renderSide(frontVisible, "front", mockup?.front?.image);
-      await renderSide(backVisible,  "back",  mockup?.back?.image);
+      await exportLayers(frontVisible, mockup?.front?.image);
+      await exportLayers(backVisible,  mockup?.back?.image);
     } finally {
       setExporting(false);
     }
