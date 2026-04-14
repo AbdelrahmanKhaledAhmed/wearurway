@@ -1127,7 +1127,7 @@ export default function Design() {
         drawContain(layerCtx, shirtImg, exportW, exportH);
 
         // ── Download combined design without mockup (trimmed) ─────────────────
-        const designFileName = fileName.replace(/\.png$/, "").replace(/^(front|back)$/, "design-$1") + ".png";
+        const designFileName = fileName.replace(/\.png$/, "").replace(/^mockup-(front|back)$/, "design-$1") + ".png";
         await downloadCanvas(trimCanvas(layerCanvas), designFileName);
 
         // ── Canvas B: shirt + clipped layers ─────────────────────────────────
@@ -1141,8 +1141,8 @@ export default function Design() {
 
       await exportLayers(frontVisible, mockup?.front?.image, "front");
       await exportLayers(backVisible,  mockup?.back?.image, "back");
-      await exportComposite(frontVisible, mockup?.front?.image, "front.png");
-      await exportComposite(backVisible,  mockup?.back?.image, "back.png");
+      await exportComposite(frontVisible, mockup?.front?.image, "mockup-front.png");
+      await exportComposite(backVisible,  mockup?.back?.image, "mockup-back.png");
     } finally {
       setExporting(false);
     }
