@@ -67,57 +67,71 @@ function drawImageContain(
 async function generatePreview(
   sideLabel: "FRONT" | "BACK",
   mockupImage: string | undefined,
-  bbox: BBox | null,
+  _bbox: BBox | null,
   sideLayers: DesignLayer[],
   mockupSize: number,
 ): Promise<string | null> {
   const W = 600;
   const H = 800;
+
+  // Scale from the on-screen mockup coordinate space to preview canvas size
+  const scaleX = W / mockupSize;
+  const scaleY = H / (mockupSize * (4 / 3));
+
+  const shirtImg = await loadCanvasImage(mockupImage);
+
+  // ── Off-screen canvas: design layers clipped to shirt silhouette ──────────
+  const designCanvas = document.createElement("canvas");
+  designCanvas.width  = W;
+  designCanvas.height = H;
+  const dctx = designCanvas.getContext("2d");
+  if (!dctx) return null;
+  dctx.imageSmoothingEnabled = true;
+  dctx.imageSmoothingQuality = "high";
+
+  for (const layer of sideLayers.filter(l => l.visible)) {
+    const img = await loadCanvasImage(layer.imageUrl);
+    if (!img) continue;
+    const cx    = (layer.x + layer.width  / 2) * scaleX;
+    const cy    = (layer.y + layer.height / 2) * scaleY;
+    const angle = (layer.rotation * Math.PI) / 180;
+    dctx.save();
+    dctx.translate(cx, cy);
+    dctx.rotate(angle);
+    dctx.drawImage(img,
+      -layer.width  * scaleX / 2,
+      -layer.height * scaleY / 2,
+       layer.width  * scaleX,
+       layer.height * scaleY,
+    );
+    dctx.restore();
+  }
+
+  // Clip design to shirt alpha silhouette (same as CSS mask-image in designer)
+  if (shirtImg) {
+    dctx.globalCompositeOperation = "destination-in";
+    drawImageContain(dctx, shirtImg, 0, 0, W, H);
+    dctx.globalCompositeOperation = "source-over";
+  }
+
+  // ── Main canvas: dark background → shirt → design composite ──────────────
   const canvas = document.createElement("canvas");
-  canvas.width = W;
+  canvas.width  = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
-
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
+
+  // Background
   ctx.fillStyle = "#111111";
   ctx.fillRect(0, 0, W, H);
 
-  const base = await loadCanvasImage(mockupImage);
-  if (base) {
-    drawImageContain(ctx, base, 0, 0, W, H);
-  }
+  // Shirt image
+  if (shirtImg) drawImageContain(ctx, shirtImg, 0, 0, W, H);
 
-  if (bbox) {
-    const clipX = W * bbox.x / 100;
-    const clipY = H * bbox.y / 100;
-    const clipW = W * bbox.width / 100;
-    const clipH = H * bbox.height / 100;
-    const sourceClipW = mockupSize * bbox.width / 100;
-    const sourceClipH = mockupSize * (4 / 3) * bbox.height / 100;
-    const scaleX = clipW / sourceClipW;
-    const scaleY = clipH / sourceClipH;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(clipX, clipY, clipW, clipH);
-    ctx.clip();
-
-    for (const layer of sideLayers.filter(l => l.visible)) {
-      const img = await loadCanvasImage(layer.imageUrl);
-      if (!img) continue;
-      const cx = clipX + (layer.x + layer.width / 2) * scaleX;
-      const cy = clipY + (layer.y + layer.height / 2) * scaleY;
-      const angle = (layer.rotation * Math.PI) / 180;
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(angle);
-      ctx.drawImage(img, -layer.width * scaleX / 2, -layer.height * scaleY / 2, layer.width * scaleX, layer.height * scaleY);
-      ctx.restore();
-    }
-    ctx.restore();
-  }
+  // Design clipped to shirt shape, on top
+  ctx.drawImage(designCanvas, 0, 0);
 
   return canvas.toDataURL("image/png");
 }
