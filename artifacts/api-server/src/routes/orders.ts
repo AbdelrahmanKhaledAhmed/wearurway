@@ -1,8 +1,6 @@
 import { Router, type IRouter } from "express";
-import express from "express";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { unzipSync } from "fflate";
 import { getStore, updateStore, type OrderRecord } from "../data/store.js";
 import { UPLOADS_DIR } from "../lib/paths.js";
 import { logger } from "../lib/logger.js";
@@ -217,47 +215,29 @@ router.post("/create-order", (req, res) => {
     .catch((error) => logger.error({ err: error, orderId }, "Failed to save order documents"));
 });
 
-async function saveZipToOrderFolder(orderId: string, zipBuffer: Buffer): Promise<string[]> {
-  const folderPath = folderPathForOrder(orderId);
-  await fs.mkdir(folderPath, { recursive: true });
-  const extracted = unzipSync(new Uint8Array(zipBuffer));
-  const saved: string[] = [];
-  for (const [name, data] of Object.entries(extracted)) {
-    const fileName = safeFileName(name);
-    await fs.writeFile(path.join(folderPath, fileName), Buffer.from(data));
-    saved.push(fileName);
+router.post("/orders/:orderId/documents", (req, res) => {
+  const orderId = req.params.orderId;
+  const body = req.body as UploadOrderDocumentsBody;
+  const record = getStore().orderFiles[orderId];
+
+  if (!record) {
+    res.status(404).json({ error: "Order not found" });
+    return;
   }
-  return saved;
-}
 
-router.post(
-  "/orders/:orderId/documents",
-  express.raw({ type: "application/zip", limit: "200mb" }),
-  (req, res) => {
-    const orderId = req.params.orderId;
-    const record = getStore().orderFiles[orderId];
+  const exportFiles = Array.isArray(body.exportFiles) ? body.exportFiles : [];
+  if (exportFiles.length === 0) {
+    res.status(400).json({ error: "No documents were provided" });
+    return;
+  }
 
-    if (!record) {
-      res.status(404).json({ error: "Order not found" });
-      return;
-    }
-
-    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-      res.status(400).json({ error: "No documents were provided" });
-      return;
-    }
-
-    void saveZipToOrderFolder(orderId, req.body)
-      .then((files) => {
-        registerOrderFolder(orderId, { files });
-        res.json({ orderId, folderPath: displayFolderPathForOrder(orderId), files });
-      })
-      .catch((error) => {
-        logger.error({ err: error, orderId }, "Failed to upload order documents");
-        res.status(500).json({ error: "Failed to save order documents" });
-      });
-  },
-);
+  void saveOrderDocuments(orderId, exportFiles)
+    .then((files) => res.json({ orderId, folderPath: displayFolderPathForOrder(orderId), files }))
+    .catch((error) => {
+      logger.error({ err: error, orderId }, "Failed to upload order documents");
+      res.status(500).json({ error: "Failed to save order documents" });
+    });
+});
 
 router.post("/orders/:orderId/complete", (req, res) => {
   const orderId = req.params.orderId;

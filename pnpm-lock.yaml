@@ -187,9 +187,6 @@ importers:
       express:
         specifier: ^5
         version: 5.2.1
-      fflate:
-        specifier: ^0.8.2
-        version: 0.8.2
       multer:
         specifier: ^2.1.1
         version: 2.1.1
@@ -412,10 +409,6 @@ importers:
         version: 3.25.76
 
   artifacts/wearurway:
-    dependencies:
-      fflate:
-        specifier: ^0.8.2
-        version: 0.8.2
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0
@@ -2565,9 +2558,6 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
-
-  fflate@0.8.2:
-    resolution: {integrity: sha512-cPJU47OaAoCbg0pBvzsgpTPhmhqI5eJjh/JIu8tPj5q+T7iLvW/JAYUqmE7KOB4R1ZyEhzBaIQpQpardBF5z8A==}
 
   figures@6.1.0:
     resolution: {integrity: sha512-d+l3qxjSesT4V7v2fh+QnmFnUWv9lSpjarhShNTgBOfA0ttejbQUAlHLitbjkoRiDulW0OPoQPYIGhIC8ohejg==}
@@ -5335,8 +5325,6 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.3):
     optionalDependencies:
       picomatch: 4.0.3
-
-  fflate@0.8.2: {}
 
   figures@6.1.0:
     dependencies:
