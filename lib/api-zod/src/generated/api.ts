@@ -434,6 +434,8 @@ export const CreateOrderBody = zod.object({
   name: zod.string(),
   phone: zod.string(),
   address: zod.string(),
+  product: zod.string().optional(),
+  fit: zod.string().optional(),
   size: zod.object({
     name: zod.string(),
     realWidth: zod.number().optional(),

@@ -806,6 +806,10 @@ components:
           type: string
         address:
           type: string
+        product:
+          type: string
+        fit:
+          type: string
         size:
           $ref: "#/components/schemas/CreateOrderSize"
         color:

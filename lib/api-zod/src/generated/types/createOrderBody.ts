@@ -15,6 +15,8 @@ export interface CreateOrderBody {
   name: string;
   phone: string;
   address: string;
+  product?: string;
+  fit?: string;
   size: CreateOrderSize;
   color: string;
   paymentMethod: CreateOrderBodyPaymentMethod;

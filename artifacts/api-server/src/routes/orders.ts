@@ -25,6 +25,8 @@ interface CreateOrderBody {
   name?: string;
   phone?: string;
   address?: string;
+  product?: string;
+  fit?: string;
   size?: CreateOrderSize;
   color?: string;
   paymentMethod?: "cod" | "instapay";
@@ -141,24 +143,41 @@ async function sendOrderMessage(orderId: string, body: CreateOrderBody) {
     return;
   }
 
-  const paymentMethod = body.paymentMethod === "instapay" ? "InstaPay" : "Cash on Delivery";
+  const paymentMethod = body.paymentMethod === "instapay" ? "InstaPay 💳" : "Cash on Delivery 💵";
   const productPrice = body.productPrice ?? Math.max(0, (body.total ?? 0) - (body.shippingPrice ?? 0));
   const shippingPrice = body.shippingPrice ?? Math.max(0, (body.total ?? 0) - productPrice);
-  const sizeDetails = `${body.size?.name ?? "-"} (${body.size?.realWidth ?? "-"}x${body.size?.realHeight ?? "-"} cm)`;
+  const sizeDetails = `${body.size?.name ?? "-"} (${body.size?.realWidth ?? "-"} × ${body.size?.realHeight ?? "-"} cm)`;
+  const line = "━━━━━━━━━━━━━━━━━━━━";
   const message = [
-    `Order ID: ${orderId}`,
-    "New Order:",
-    `Name: ${body.name}`,
-    `Phone: ${body.phone}`,
-    `Address: ${body.address}`,
-    `Size: ${sizeDetails}`,
-    `Color: ${body.color}`,
-    `Payment Method: ${paymentMethod}`,
-    `T-shirt Price: ${formatMoney(productPrice)}`,
-    `Shipping: ${formatMoney(shippingPrice)}`,
-    `Total: ${formatMoney(body.total)} (${formatMoney(productPrice)} T-shirt + ${formatMoney(shippingPrice)} Shipping)`,
-    `Documents Folder: ${displayFolderPathForOrder(orderId)}`,
-    "Open Admin Panel > Order Files to copy/delete the documents.",
+    line,
+    "🛍  NEW ORDER",
+    line,
+    "",
+    `🆔  Order ID: ${orderId}`,
+    "",
+    "👤  CUSTOMER INFO",
+    `   Name:     ${body.name ?? "-"}`,
+    `   Phone:    ${body.phone ?? "-"}`,
+    `   Address:  ${body.address ?? "-"}`,
+    "",
+    "👕  PRODUCT DETAILS",
+    `   Product:  ${body.product ?? "-"}`,
+    `   Fit:      ${body.fit ?? "-"}`,
+    `   Color:    ${body.color ?? "-"}`,
+    `   Size:     ${sizeDetails}`,
+    "",
+    "💰  PRICING",
+    `   T-shirt:  ${formatMoney(productPrice)}`,
+    `   Shipping: ${formatMoney(shippingPrice)}`,
+    `   Total:    ${formatMoney(body.total)}`,
+    "",
+    `💳  Payment:  ${paymentMethod}`,
+    "",
+    "📁  DOCUMENTS",
+    `   ${displayFolderPathForOrder(orderId)}`,
+    "   Admin Panel → Order Files",
+    "",
+    line,
   ].join("\n");
 
   await telegramRequest(
@@ -188,6 +207,8 @@ router.post("/create-order", (req, res) => {
     name: body.name,
     phone: body.phone,
     address: body.address,
+    product: body.product,
+    fit: body.fit,
     size: body.size,
     color: body.color,
     paymentMethod: body.paymentMethod,
@@ -257,6 +278,8 @@ router.post("/orders/:orderId/complete", (req, res) => {
         name: order.name,
         phone: order.phone,
         address: order.address,
+        product: order.product,
+        fit: order.fit,
         size: order.size,
         color: order.color,
         paymentMethod: order.paymentMethod as CreateOrderBody["paymentMethod"],

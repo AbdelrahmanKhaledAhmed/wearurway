@@ -124,6 +124,8 @@ export interface OrderRecord {
   name?: string;
   phone?: string;
   address?: string;
+  product?: string;
+  fit?: string;
   size?: { name?: string; realWidth?: number; realHeight?: number };
   color?: string;
   paymentMethod?: string;

@@ -139,6 +139,8 @@ export default function Checkout() {
           name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
           phone: form.phone.trim(),
           address: `${form.building.trim()}, ${form.street.trim()}, ${form.area.trim()}, ${form.city.trim()}`,
+          product: selectedProduct?.name ?? undefined,
+          fit: selectedFit?.name ?? undefined,
           size: {
             name: selectedSize?.name ?? "",
             realWidth: selectedSize?.realWidth,
