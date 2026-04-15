@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, Edit, LogOut, Upload, X } from "lucide-react";
+import { Trash2, Plus, Edit, LogOut, Upload, X, FolderOpen, Copy } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -91,7 +91,7 @@ export default function AdminDashboard() {
 
         <Tabs defaultValue="products" className="w-full">
           <TabsList className="mb-12 rounded-none border-b border-border bg-transparent h-auto p-0 flex space-x-8 overflow-x-auto justify-start w-full">
-            {["products", "fits", "colors", "sizes", "mockups", "settings", "fonts"].map(tab => (
+            {["products", "fits", "colors", "sizes", "mockups", "order files", "settings", "fonts"].map(tab => (
               <TabsTrigger
                 key={tab}
                 value={tab}
@@ -106,6 +106,7 @@ export default function AdminDashboard() {
           <TabsContent value="colors"><ColorsManager /></TabsContent>
           <TabsContent value="sizes"><SizesManager /></TabsContent>
           <TabsContent value="mockups"><MockupsManager /></TabsContent>
+          <TabsContent value="order files"><OrderFilesManager /></TabsContent>
           <TabsContent value="settings"><OrderSettingsManager /></TabsContent>
           <TabsContent value="fonts"><FontsManager /></TabsContent>
         </Tabs>
@@ -238,6 +239,135 @@ function AdminActions({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-2 justify-start pt-1 min-w-[120px]">
       {children}
+    </div>
+  );
+}
+
+interface OrderFileRecord {
+  orderId: string;
+  folderPath: string;
+  files: string[];
+  customerName?: string;
+  phone?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function OrderFilesManager() {
+  const [records, setRecords] = useState<OrderFileRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState("");
+  const { toast } = useToast();
+
+  const loadRecords = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("wearurway_admin_token");
+      const res = await fetch("/api/admin/order-files", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Could not load order files");
+      setRecords(await res.json());
+    } catch {
+      toast({ title: "Could not load order files" });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    loadRecords();
+  }, [loadRecords]);
+
+  const copyPath = async (path: string) => {
+    await navigator.clipboard.writeText(path).catch(() => undefined);
+    toast({ title: "Folder path copied" });
+  };
+
+  const deleteFiles = async (orderId: string) => {
+    if (!window.confirm(`Delete saved files for ${orderId}? Only do this after you copy the documents.`)) return;
+    setDeletingId(orderId);
+    try {
+      const token = localStorage.getItem("wearurway_admin_token");
+      const res = await fetch(`/api/admin/order-files/${orderId}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      setRecords(prev => prev.filter(record => record.orderId !== orderId));
+      toast({ title: "Order files deleted" });
+    } catch {
+      toast({ title: "Delete failed", description: "Could not delete the saved documents." });
+    } finally {
+      setDeletingId("");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Order Files</h2>
+        <p className="text-sm text-muted-foreground">
+          Print files and InstaPay screenshots are saved in server folders by Order ID. Copy the files from the folder, then delete them here to free storage.
+        </p>
+      </div>
+
+      {loading ? (
+        <p className="text-sm uppercase tracking-widest text-muted-foreground animate-pulse">Loading order files...</p>
+      ) : records.length === 0 ? (
+        <div className="border border-border p-8 text-center text-muted-foreground">
+          <FolderOpen className="w-8 h-8 mx-auto mb-3 opacity-50" />
+          <p className="text-sm uppercase tracking-widest">No saved order files yet</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {records.map(record => (
+            <div key={record.orderId} className="border border-border p-5 flex flex-col lg:flex-row lg:items-start justify-between gap-5">
+              <div className="space-y-3 min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h3 className="text-xl font-black tracking-tight">{record.orderId}</h3>
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {new Date(record.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                <div className="grid md:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                  <p>Name: <span className="text-foreground">{record.customerName ?? "—"}</span></p>
+                  <p>Phone: <span className="text-foreground">{record.phone ?? "—"}</span></p>
+                </div>
+                <div className="bg-muted/20 border border-border p-3">
+                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Folder Location</p>
+                  <p className="font-mono text-sm break-all">{record.folderPath}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Files</p>
+                  {record.files.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {record.files.map(file => (
+                        <span key={file} className="text-xs font-mono border border-border px-2 py-1 bg-muted/10">{file}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Waiting for documents to finish saving from checkout.</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex lg:flex-col gap-2 shrink-0">
+                <Button variant="outline" className="rounded-none uppercase tracking-widest text-xs" onClick={() => copyPath(record.folderPath)}>
+                  <Copy className="w-4 h-4 mr-2" /> Copy Path
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="rounded-none uppercase tracking-widest text-xs"
+                  onClick={() => deleteFiles(record.orderId)}
+                  disabled={deletingId === record.orderId}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> {deletingId === record.orderId ? "Deleting..." : "Delete Files"}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

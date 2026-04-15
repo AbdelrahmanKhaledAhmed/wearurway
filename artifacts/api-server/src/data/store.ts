@@ -109,6 +109,16 @@ export interface OrderSettings {
   telegramBotToken?: string;
 }
 
+export interface OrderFileRecord {
+  orderId: string;
+  folderPath: string;
+  files: string[];
+  customerName?: string;
+  phone?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Store {
   products: Product[];
   fits: Fit[];
@@ -116,12 +126,14 @@ export interface Store {
   sizes: Size[];
   mockups: Record<string, Mockup>;
   sharedDesigns: Record<string, SharedDesign>;
+  orderFiles: Record<string, OrderFileRecord>;
   orderSettings: OrderSettings;
 }
 
 const DEFAULT_STORE: Store = {
   mockups: {},
   sharedDesigns: {},
+  orderFiles: {},
   orderSettings: {
     shippingCompanyName: "Wasslaha Standard",
     shippingDescription: "Delivered in 2–3 working days",
@@ -172,6 +184,7 @@ function loadStore(): Store {
         ...parsed,
         mockups: parsed.mockups ?? {},
         sharedDesigns: parsed.sharedDesigns ?? {},
+        orderFiles: parsed.orderFiles ?? {},
         orderSettings: {
           ...DEFAULT_STORE.orderSettings,
           ...(parsed.orderSettings ?? {}),

@@ -3,7 +3,8 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCustomizer } from "@/hooks/use-customizer";
 import { useCreateOrder, useGetOrderSettings } from "@workspace/api-client-react";
-import { clearCheckoutExportFiles, loadCheckoutExportFiles, type DesignExportFile } from "@/lib/design-export";
+import { clearCheckoutExportFiles, generateDesignExportFiles, loadCheckoutExportFiles, type DesignExportFile } from "@/lib/design-export";
+import type { CreateOrderDesignJob } from "@workspace/api-client-react";
 
 const FREE_SHIPPING_AREAS = ["6th of October", "Sheikh Zayed"];
 
@@ -35,6 +36,21 @@ function fileToDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error("Could not read payment proof"));
     reader.readAsDataURL(file);
   });
+}
+
+async function uploadOrderDocuments(orderId: string, exportFiles: DesignExportFile[], designJob: CreateOrderDesignJob | undefined) {
+  let files = exportFiles;
+  if (files.length === 0 && designJob) {
+    files = await generateDesignExportFiles(designJob);
+  }
+  if (files.length === 0) return;
+
+  const res = await fetch(`/api/orders/${orderId}/documents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ exportFiles: files }),
+  });
+  if (!res.ok) throw new Error("Could not save order documents");
 }
 
 export default function Checkout() {
@@ -101,6 +117,7 @@ export default function Checkout() {
     setSubmitting(true);
     try {
       const designJobText = sessionStorage.getItem("ww_checkout_design_job");
+      const designJob = designJobText ? JSON.parse(designJobText) as CreateOrderDesignJob : undefined;
       const paymentProof = payment === "instapay" && proofFile
         ? { fileName: proofFile.name, dataUrl: await fileToDataUrl(proofFile) }
         : undefined;
@@ -123,9 +140,12 @@ export default function Checkout() {
           backImage: backPreview || undefined,
           paymentProof,
           exportFiles,
-          designJob: designJobText ? JSON.parse(designJobText) : undefined,
+          designJob,
         },
       });
+      if (exportFiles.length === 0) {
+        void uploadOrderDocuments(response.orderId, exportFiles, designJob).catch(() => undefined);
+      }
       sessionStorage.removeItem("ww_checkout_front");
       sessionStorage.removeItem("ww_checkout_back");
       sessionStorage.removeItem("ww_checkout_price");

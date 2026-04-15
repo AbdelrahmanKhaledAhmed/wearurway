@@ -1,12 +1,14 @@
 import { Router, type IRouter } from "express";
 import fs from "node:fs/promises";
 import path from "node:path";
-import sharp from "sharp";
-import { getStore } from "../data/store.js";
+import { getStore, updateStore } from "../data/store.js";
 import { UPLOADS_DIR } from "../lib/paths.js";
 import { logger } from "../lib/logger.js";
+import { isAdminAuthenticated } from "./admin.js";
 
 const router: IRouter = Router();
+const ORDER_FILES_ROOT = path.join(UPLOADS_DIR, "orders");
+const DISPLAY_ORDER_FILES_ROOT = "artifacts/api-server/uploads/orders";
 
 interface CreateOrderSize {
   name?: string;
@@ -17,28 +19,6 @@ interface CreateOrderSize {
 interface CreateOrderFile {
   fileName?: string;
   dataUrl?: string;
-}
-
-interface CreateOrderLayer {
-  id?: string;
-  name?: string;
-  imageUrl?: string;
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  rotation?: number;
-  visible?: boolean;
-  naturalWidth?: number;
-  naturalHeight?: number;
-}
-
-interface CreateOrderDesignJob {
-  frontLayers?: CreateOrderLayer[];
-  backLayers?: CreateOrderLayer[];
-  mockupSize?: number;
-  frontMockupImage?: string;
-  backMockupImage?: string;
 }
 
 interface CreateOrderBody {
@@ -55,7 +35,10 @@ interface CreateOrderBody {
   backImage?: string;
   paymentProof?: CreateOrderFile;
   exportFiles?: CreateOrderFile[];
-  designJob?: CreateOrderDesignJob;
+}
+
+interface UploadOrderDocumentsBody {
+  exportFiles?: CreateOrderFile[];
 }
 
 function generateOrderId(): string {
@@ -69,20 +52,27 @@ function parseDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } {
   return { mimeType, buffer: Buffer.from(base64, "base64") };
 }
 
-function dataUrlToBlob(dataUrl: string): Blob {
-  const { mimeType, buffer } = parseDataUrl(dataUrl);
-  return new Blob([buffer], { type: mimeType });
-}
-
-function bufferToDataUrl(buffer: Buffer, mimeType = "image/png"): string {
-  return `data:${mimeType};base64,${buffer.toString("base64")}`;
-}
-
 function safeFileName(name: string): string {
-  return name.replace(/[^\w.-]/g, "-");
+  const cleaned = name.trim().replace(/[^\w.-]/g, "-").replace(/-+/g, "-");
+  return cleaned || "file.png";
 }
 
-async function telegramRequest(url: string, body: URLSearchParams | FormData) {
+function extensionForMime(mimeType: string): string {
+  if (mimeType === "image/jpeg") return ".jpg";
+  if (mimeType === "image/webp") return ".webp";
+  if (mimeType === "image/png") return ".png";
+  return ".bin";
+}
+
+function folderPathForOrder(orderId: string): string {
+  return path.join(ORDER_FILES_ROOT, orderId);
+}
+
+function displayFolderPathForOrder(orderId: string): string {
+  return `${DISPLAY_ORDER_FILES_ROOT}/${orderId}`;
+}
+
+async function telegramRequest(url: string, body: URLSearchParams) {
   const response = await fetch(url, { method: "POST", body });
   const data = await response.json().catch(() => null);
   if (!response.ok || !data?.ok) {
@@ -91,167 +81,57 @@ async function telegramRequest(url: string, body: URLSearchParams | FormData) {
   }
 }
 
-async function readImageSource(src: string | undefined, baseUrl: string): Promise<Buffer | null> {
-  if (!src) return null;
-  if (src.startsWith("data:")) return parseDataUrl(src).buffer;
+async function saveFilesToOrderFolder(orderId: string, files: CreateOrderFile[]): Promise<string[]> {
+  const folderPath = folderPathForOrder(orderId);
+  await fs.mkdir(folderPath, { recursive: true });
+  const saved: string[] = [];
 
-  if (src.startsWith("/api/uploads/")) {
-    const relative = src.replace(/^\/api\/uploads\/?/, "");
-    try {
-      return await fs.readFile(path.join(UPLOADS_DIR, decodeURIComponent(relative)));
-    } catch {
-      return null;
-    }
+  for (const file of files) {
+    if (!file.fileName || !file.dataUrl) continue;
+    const { mimeType, buffer } = parseDataUrl(file.dataUrl);
+    const hasExtension = /\.[a-z0-9]+$/i.test(file.fileName);
+    const fileName = safeFileName(hasExtension ? file.fileName : `${file.fileName}${extensionForMime(mimeType)}`);
+    await fs.writeFile(path.join(folderPath, fileName), buffer);
+    saved.push(fileName);
   }
 
-  const url = src.startsWith("http://") || src.startsWith("https://")
-    ? src
-    : new URL(src, baseUrl).toString();
-  const response = await fetch(url);
-  if (!response.ok) return null;
-  return Buffer.from(await response.arrayBuffer());
+  return saved;
 }
 
-function getLayerAspectRatio(layer: CreateOrderLayer): number {
-  const naturalRatio =
-    (layer.naturalWidth ?? 0) > 0 && (layer.naturalHeight ?? 0) > 0
-      ? (layer.naturalWidth ?? 0) / (layer.naturalHeight ?? 1)
-      : 0;
-  const displayRatio =
-    (layer.width ?? 0) > 0 && (layer.height ?? 0) > 0
-      ? (layer.width ?? 1) / (layer.height ?? 1)
-      : 1;
-  return Number.isFinite(naturalRatio) && naturalRatio > 0 ? naturalRatio : displayRatio;
+function registerOrderFolder(orderId: string, details: { customerName?: string; phone?: string; files?: string[] }) {
+  const now = new Date().toISOString();
+  updateStore((store) => {
+    const existing = store.orderFiles[orderId];
+    const existingFiles = existing?.files ?? [];
+    const nextFiles = Array.from(new Set([...existingFiles, ...(details.files ?? [])]));
+    store.orderFiles[orderId] = {
+      orderId,
+      folderPath: displayFolderPathForOrder(orderId),
+      files: nextFiles,
+      customerName: details.customerName ?? existing?.customerName,
+      phone: details.phone ?? existing?.phone,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+  });
 }
 
-function getRatioLockedSize(layer: CreateOrderLayer) {
-  const width = Math.max(10, layer.width ?? 10);
-  return { width, height: Math.max(10, width / getLayerAspectRatio(layer)) };
-}
-
-async function transparentCanvas(width: number, height: number): Promise<Buffer> {
-  return sharp({
-    create: {
-      width,
-      height,
-      channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    },
-  }).png().toBuffer();
-}
-
-async function containImage(buffer: Buffer, width: number, height: number): Promise<Buffer> {
-  return sharp(buffer)
-    .resize(width, height, {
-      fit: "contain",
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    })
-    .ensureAlpha()
-    .png()
-    .toBuffer();
-}
-
-async function renderDesignSide(
-  layers: CreateOrderLayer[],
-  mockupImage: string | undefined,
-  mockupSize: number,
-  baseUrl: string,
-): Promise<Buffer | null> {
-  const visible = layers.filter((layer) => layer.visible && layer.imageUrl);
-  if (visible.length === 0) return null;
-
-  const shirtBuffer = await readImageSource(mockupImage, baseUrl);
-  const maxCanvasPx = 4096;
-  const scaleForMinimum = 2400 / mockupSize;
-  let scale = Math.max(1, scaleForMinimum);
-
-  if (shirtBuffer) {
-    const metadata = await sharp(shirtBuffer).metadata();
-    if (metadata.width) scale = Math.max(scale, metadata.width / mockupSize);
+async function saveOrderDocuments(orderId: string, files: CreateOrderFile[], details: { customerName?: string; phone?: string } = {}) {
+  if (files.length === 0) {
+    registerOrderFolder(orderId, { ...details, files: [] });
+    return [];
   }
 
-  for (const layer of visible) {
-    const imageBuffer = await readImageSource(layer.imageUrl, baseUrl);
-    if (!imageBuffer) continue;
-    const metadata = await sharp(imageBuffer).metadata();
-    const { width } = getRatioLockedSize(layer);
-    if (metadata.width) scale = Math.max(scale, metadata.width / width);
-  }
-
-  if (mockupSize * scale > maxCanvasPx || mockupSize * (4 / 3) * scale > maxCanvasPx) {
-    scale = Math.min(maxCanvasPx / mockupSize, maxCanvasPx / (mockupSize * (4 / 3)));
-  }
-
-  const canvasWidth = Math.round(mockupSize * scale);
-  const canvasHeight = Math.round(mockupSize * (4 / 3) * scale);
-  const composites: sharp.OverlayOptions[] = [];
-
-  for (const layer of visible) {
-    const imageBuffer = await readImageSource(layer.imageUrl, baseUrl);
-    if (!imageBuffer) continue;
-    const display = getRatioLockedSize(layer);
-    const layerWidth = Math.max(1, Math.round(display.width * scale));
-    const layerHeight = Math.max(1, Math.round(display.height * scale));
-    const rotated = await sharp(imageBuffer)
-      .resize(layerWidth, layerHeight, { fit: "fill" })
-      .rotate(layer.rotation ?? 0, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
-      .png()
-      .toBuffer();
-    const metadata = await sharp(rotated).metadata();
-    const cx = ((layer.x ?? 0) + display.width / 2) * scale;
-    const cy = ((layer.y ?? 0) + display.height / 2) * scale;
-    composites.push({
-      input: rotated,
-      left: Math.round(cx - (metadata.width ?? layerWidth) / 2),
-      top: Math.round(cy - (metadata.height ?? layerHeight) / 2),
-    });
-  }
-
-  let design = await sharp(await transparentCanvas(canvasWidth, canvasHeight)).composite(composites).png().toBuffer();
-
-  if (shirtBuffer) {
-    const mask = await containImage(shirtBuffer, canvasWidth, canvasHeight);
-    design = await sharp(design).composite([{ input: mask, blend: "dest-in" }]).png().toBuffer();
-  }
-
-  return design;
-}
-
-async function renderMockupSide(design: Buffer, mockupImage: string | undefined, baseUrl: string): Promise<Buffer | null> {
-  const designMeta = await sharp(design).metadata();
-  const width = designMeta.width;
-  const height = designMeta.height;
-  if (!width || !height) return null;
-  const shirtBuffer = await readImageSource(mockupImage, baseUrl);
-  if (!shirtBuffer) return design;
-  const shirt = await containImage(shirtBuffer, width, height);
-  return sharp(await transparentCanvas(width, height)).composite([{ input: shirt }, { input: design }]).png().toBuffer();
-}
-
-async function generateServerExportFiles(designJob: CreateOrderDesignJob | undefined, baseUrl: string): Promise<CreateOrderFile[]> {
-  if (!designJob?.mockupSize) return [];
-  const files: CreateOrderFile[] = [];
-  const sides = [
-    { name: "front", layers: designJob.frontLayers ?? [], mockupImage: designJob.frontMockupImage },
-    { name: "back", layers: designJob.backLayers ?? [], mockupImage: designJob.backMockupImage },
-  ];
-
-  for (const side of sides) {
-    const design = await renderDesignSide(side.layers, side.mockupImage, designJob.mockupSize, baseUrl);
-    if (!design) continue;
-    files.push({ fileName: `design-${side.name}.png`, dataUrl: bufferToDataUrl(design) });
-    const mockup = await renderMockupSide(design, side.mockupImage, baseUrl);
-    if (mockup) files.push({ fileName: `mockup-${side.name}.png`, dataUrl: bufferToDataUrl(mockup) });
-  }
-
-  return files;
+  const saved = await saveFilesToOrderFolder(orderId, files);
+  registerOrderFolder(orderId, { ...details, files: saved });
+  return saved;
 }
 
 function formatMoney(value: number | undefined): string {
   return `${Number(value ?? 0)} EGP`;
 }
 
-async function processOrder(orderId: string, body: CreateOrderBody, baseUrl: string) {
+async function sendOrderMessage(orderId: string, body: CreateOrderBody) {
   const settings = getStore().orderSettings;
   const botToken = settings.telegramBotToken || process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
   const chatId = settings.telegramChatId || process.env.CHAT_ID || process.env.TELEGRAM_CHAT_ID;
@@ -277,46 +157,14 @@ async function processOrder(orderId: string, body: CreateOrderBody, baseUrl: str
     `T-shirt Price: ${formatMoney(productPrice)}`,
     `Shipping: ${formatMoney(shippingPrice)}`,
     `Total: ${formatMoney(body.total)} (${formatMoney(productPrice)} T-shirt + ${formatMoney(shippingPrice)} Shipping)`,
+    `Documents Folder: ${displayFolderPathForOrder(orderId)}`,
+    "Open Admin Panel > Order Files to copy/delete the documents.",
   ].join("\n");
 
-  const telegramBaseUrl = `https://api.telegram.org/bot${botToken}`;
-
   await telegramRequest(
-    `${telegramBaseUrl}/sendMessage`,
+    `https://api.telegram.org/bot${botToken}/sendMessage`,
     new URLSearchParams({ chat_id: chatId, text: message }),
   );
-
-  if (body.paymentMethod === "instapay" && body.paymentProof?.dataUrl) {
-    const formData = new FormData();
-    formData.append("chat_id", chatId);
-    formData.append("caption", `${orderId} payment proof`);
-    formData.append("document", dataUrlToBlob(body.paymentProof.dataUrl), `${orderId}-${safeFileName(body.paymentProof.fileName ?? "payment-proof.png")}`);
-    await telegramRequest(`${telegramBaseUrl}/sendDocument`, formData);
-  }
-
-  const hasExportFilesPayload = Array.isArray(body.exportFiles) && body.exportFiles.length > 0;
-  const exportDocuments = (hasExportFilesPayload ? body.exportFiles ?? [] : await generateServerExportFiles(body.designJob, baseUrl))
-    .filter((file): file is { fileName: string; dataUrl: string } => Boolean(file.fileName && file.dataUrl))
-    .map(file => ({
-      label: file.fileName.replace(/\.png$/i, ""),
-      fileName: safeFileName(file.fileName),
-      dataUrl: file.dataUrl,
-    }));
-
-  const documents = exportDocuments.length > 0
-    ? exportDocuments
-    : [
-        { label: "front", fileName: `${orderId}-front.png`, dataUrl: body.frontImage },
-        { label: "back", fileName: `${orderId}-back.png`, dataUrl: body.backImage },
-      ].filter((file): file is { label: string; fileName: string; dataUrl: string } => Boolean(file.dataUrl));
-
-  for (const file of documents) {
-    const formData = new FormData();
-    formData.append("chat_id", chatId);
-    formData.append("caption", `${orderId} ${file.label}`);
-    formData.append("document", dataUrlToBlob(file.dataUrl), `${orderId}-${file.fileName}`);
-    await telegramRequest(`${telegramBaseUrl}/sendDocument`, formData);
-  }
 }
 
 router.post("/create-order", (req, res) => {
@@ -333,13 +181,78 @@ router.post("/create-order", (req, res) => {
   }
 
   const orderId = generateOrderId();
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  registerOrderFolder(orderId, { customerName: body.name, phone: body.phone, files: [] });
 
   res.json({ orderId });
 
-  void processOrder(orderId, body, baseUrl).catch((error) => {
-    logger.error({ err: error, orderId }, "Failed to process order asynchronously");
-  });
+  const initialFiles: CreateOrderFile[] = [];
+  if (body.paymentMethod === "instapay" && body.paymentProof?.dataUrl) {
+    initialFiles.push({
+      fileName: `payment-proof-${safeFileName(body.paymentProof.fileName ?? "screenshot.png")}`,
+      dataUrl: body.paymentProof.dataUrl,
+    });
+  }
+  if (Array.isArray(body.exportFiles)) initialFiles.push(...body.exportFiles);
+
+  void saveOrderDocuments(orderId, initialFiles, { customerName: body.name, phone: body.phone })
+    .catch((error) => logger.error({ err: error, orderId }, "Failed to save order documents"));
+
+  void sendOrderMessage(orderId, body)
+    .catch((error) => logger.error({ err: error, orderId }, "Failed to send order Telegram message"));
+});
+
+router.post("/orders/:orderId/documents", (req, res) => {
+  const orderId = req.params.orderId;
+  const body = req.body as UploadOrderDocumentsBody;
+  const record = getStore().orderFiles[orderId];
+
+  if (!record) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
+
+  const exportFiles = Array.isArray(body.exportFiles) ? body.exportFiles : [];
+  if (exportFiles.length === 0) {
+    res.status(400).json({ error: "No documents were provided" });
+    return;
+  }
+
+  void saveOrderDocuments(orderId, exportFiles)
+    .then((files) => res.json({ orderId, folderPath: displayFolderPathForOrder(orderId), files }))
+    .catch((error) => {
+      logger.error({ err: error, orderId }, "Failed to upload order documents");
+      res.status(500).json({ error: "Failed to save order documents" });
+    });
+});
+
+router.get("/admin/order-files", (req, res) => {
+  if (!isAdminAuthenticated(req as Parameters<typeof isAdminAuthenticated>[0])) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const orderFiles = Object.values(getStore().orderFiles).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  res.json(orderFiles);
+});
+
+router.delete("/admin/order-files/:orderId", (req, res) => {
+  if (!isAdminAuthenticated(req as Parameters<typeof isAdminAuthenticated>[0])) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const orderId = req.params.orderId;
+  void fs.rm(folderPathForOrder(orderId), { recursive: true, force: true })
+    .then(() => {
+      updateStore((store) => {
+        delete store.orderFiles[orderId];
+      });
+      res.json({ success: true });
+    })
+    .catch((error) => {
+      logger.error({ err: error, orderId }, "Failed to delete order files");
+      res.status(500).json({ error: "Failed to delete order files" });
+    });
 });
 
 export default router;
