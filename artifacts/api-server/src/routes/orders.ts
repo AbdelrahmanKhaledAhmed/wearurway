@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { getStore, updateStore } from "../data/store.js";
+import { getStore, updateStore, type OrderRecord } from "../data/store.js";
 import { UPLOADS_DIR } from "../lib/paths.js";
 import { logger } from "../lib/logger.js";
 import { isAdminAuthenticated } from "./admin.js";
@@ -183,6 +183,23 @@ router.post("/create-order", (req, res) => {
   const orderId = generateOrderId();
   registerOrderFolder(orderId, { customerName: body.name, phone: body.phone, files: [] });
 
+  const orderRecord: OrderRecord = {
+    orderId,
+    name: body.name,
+    phone: body.phone,
+    address: body.address,
+    size: body.size,
+    color: body.color,
+    paymentMethod: body.paymentMethod,
+    productPrice: body.productPrice,
+    shippingPrice: body.shippingPrice,
+    total: body.total,
+    createdAt: new Date().toISOString(),
+  };
+  updateStore((store) => {
+    store.orders[orderId] = orderRecord;
+  });
+
   res.json({ orderId });
 
   const initialFiles: CreateOrderFile[] = [];
@@ -196,9 +213,6 @@ router.post("/create-order", (req, res) => {
 
   void saveOrderDocuments(orderId, initialFiles, { customerName: body.name, phone: body.phone })
     .catch((error) => logger.error({ err: error, orderId }, "Failed to save order documents"));
-
-  void sendOrderMessage(orderId, body)
-    .catch((error) => logger.error({ err: error, orderId }, "Failed to send order Telegram message"));
 });
 
 router.post("/orders/:orderId/documents", (req, res) => {
@@ -223,6 +237,36 @@ router.post("/orders/:orderId/documents", (req, res) => {
       logger.error({ err: error, orderId }, "Failed to upload order documents");
       res.status(500).json({ error: "Failed to save order documents" });
     });
+});
+
+router.post("/orders/:orderId/complete", (req, res) => {
+  const orderId = req.params.orderId;
+  const store = getStore();
+  const record = store.orderFiles[orderId];
+  const order = store.orders[orderId];
+
+  if (!record) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
+
+  res.json({ success: true });
+
+  const body: CreateOrderBody = order
+    ? {
+        name: order.name,
+        phone: order.phone,
+        address: order.address,
+        size: order.size,
+        color: order.color,
+        paymentMethod: order.paymentMethod as CreateOrderBody["paymentMethod"],
+        productPrice: order.productPrice,
+        shippingPrice: order.shippingPrice,
+        total: order.total,
+      }
+    : {};
+  void sendOrderMessage(orderId, body)
+    .catch((error) => logger.error({ err: error, orderId }, "Failed to send order Telegram message"));
 });
 
 router.get("/admin/order-files", (req, res) => {

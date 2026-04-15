@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGetOrderSettings } from "@workspace/api-client-react";
-import { generateDesignExportFiles, saveCheckoutExportFiles } from "@/lib/design-export";
 
 interface BBox { x: number; y: number; width: number; height: number }
 
@@ -199,12 +198,6 @@ export default function OrderReviewModal({
       sessionStorage.setItem("ww_checkout_price", String(price));
       setLocation("/checkout");
       onClose();
-
-      void generateDesignExportFiles(designJob)
-        .then(saveCheckoutExportFiles)
-        .catch(() => {
-          console.error("Could not prepare checkout print files");
-        });
     } catch {
       setPrepareError("Could not open checkout. Please try again.");
     }

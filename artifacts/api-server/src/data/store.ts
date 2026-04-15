@@ -119,6 +119,20 @@ export interface OrderFileRecord {
   updatedAt: string;
 }
 
+export interface OrderRecord {
+  orderId: string;
+  name?: string;
+  phone?: string;
+  address?: string;
+  size?: { name?: string; realWidth?: number; realHeight?: number };
+  color?: string;
+  paymentMethod?: string;
+  productPrice?: number;
+  shippingPrice?: number;
+  total?: number;
+  createdAt: string;
+}
+
 export interface Store {
   products: Product[];
   fits: Fit[];
@@ -127,6 +141,7 @@ export interface Store {
   mockups: Record<string, Mockup>;
   sharedDesigns: Record<string, SharedDesign>;
   orderFiles: Record<string, OrderFileRecord>;
+  orders: Record<string, OrderRecord>;
   orderSettings: OrderSettings;
 }
 
@@ -134,6 +149,7 @@ const DEFAULT_STORE: Store = {
   mockups: {},
   sharedDesigns: {},
   orderFiles: {},
+  orders: {},
   orderSettings: {
     shippingCompanyName: "Wasslaha Standard",
     shippingDescription: "Delivered in 2–3 working days",
@@ -185,6 +201,7 @@ function loadStore(): Store {
         mockups: parsed.mockups ?? {},
         sharedDesigns: parsed.sharedDesigns ?? {},
         orderFiles: parsed.orderFiles ?? {},
+        orders: parsed.orders ?? {},
         orderSettings: {
           ...DEFAULT_STORE.orderSettings,
           ...(parsed.orderSettings ?? {}),

@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCustomizer } from "@/hooks/use-customizer";
 import { useCreateOrder, useGetOrderSettings } from "@workspace/api-client-react";
-import { clearCheckoutExportFiles, generateDesignExportFiles, loadCheckoutExportFiles, type DesignExportFile } from "@/lib/design-export";
+import { generateDesignExportFiles, type DesignExportFile } from "@/lib/design-export";
 import type { CreateOrderDesignJob } from "@workspace/api-client-react";
 
 const FREE_SHIPPING_AREAS = ["6th of October", "Sheikh Zayed"];
@@ -38,19 +38,38 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-async function uploadOrderDocuments(orderId: string, exportFiles: DesignExportFile[], designJob: CreateOrderDesignJob | undefined) {
-  let files = exportFiles;
-  if (files.length === 0 && designJob) {
-    files = await generateDesignExportFiles(designJob);
-  }
-  if (files.length === 0) return;
+async function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-  const res = await fetch(`/api/orders/${orderId}/documents`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ exportFiles: files }),
-  });
-  if (!res.ok) throw new Error("Could not save order documents");
+async function uploadFilesWithRetry(orderId: string, files: DesignExportFile[], maxAttempts = 30) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/documents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exportFiles: files }),
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      return;
+    } catch {
+      if (attempt === maxAttempts) throw new Error("Could not upload design files after multiple attempts");
+      await delay(Math.min(2000 * attempt, 30000));
+    }
+  }
+}
+
+async function notifyOrderCompleteWithRetry(orderId: string, maxAttempts = 30) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/complete`, { method: "POST" });
+      if (!res.ok) throw new Error("Notify failed");
+      return;
+    } catch {
+      if (attempt === maxAttempts) throw new Error("Could not send order notification after multiple attempts");
+      await delay(Math.min(2000 * attempt, 30000));
+    }
+  }
 }
 
 export default function Checkout() {
@@ -73,7 +92,7 @@ export default function Checkout() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [orderId, setOrderId] = useState("");
-  const [exportFiles, setExportFiles] = useState<DesignExportFile[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const shippingCost = shipping === "free" ? 0 : (orderSettings?.shippingPrice ?? 85);
@@ -85,12 +104,6 @@ export default function Checkout() {
     setProofPreview(url);
     return () => URL.revokeObjectURL(url);
   }, [proofFile]);
-
-  useEffect(() => {
-    loadCheckoutExportFiles()
-      .then(setExportFiles)
-      .catch(() => setExportFiles([]));
-  }, []);
 
   const setField = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm(prev => ({ ...prev, [key]: e.target.value }));
@@ -139,23 +152,35 @@ export default function Checkout() {
           frontImage: frontPreview || undefined,
           backImage: backPreview || undefined,
           paymentProof,
-          exportFiles,
-          designJob,
         },
       });
-      if (exportFiles.length === 0) {
-        void uploadOrderDocuments(response.orderId, exportFiles, designJob).catch(() => undefined);
-      }
+
+      const newOrderId = response.orderId;
       sessionStorage.removeItem("ww_checkout_front");
       sessionStorage.removeItem("ww_checkout_back");
       sessionStorage.removeItem("ww_checkout_price");
       sessionStorage.removeItem("ww_checkout_design_job");
-      await clearCheckoutExportFiles();
-      setOrderId(response.orderId);
+
+      setOrderId(newOrderId);
+      setSubmitting(false);
+      setUploadingFiles(true);
       setSubmitted(true);
+
+      void (async () => {
+        try {
+          if (designJob) {
+            const exportFiles = await generateDesignExportFiles(designJob);
+            if (exportFiles.length > 0) {
+              await uploadFilesWithRetry(newOrderId, exportFiles);
+            }
+          }
+          await notifyOrderCompleteWithRetry(newOrderId);
+        } finally {
+          setUploadingFiles(false);
+        }
+      })();
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Could not submit order. Please try again.");
-    } finally {
       setSubmitting(false);
     }
   };
@@ -176,15 +201,32 @@ export default function Checkout() {
             className="w-20 h-20 mx-auto mb-8 rounded-full flex items-center justify-center"
             style={{ backgroundColor: "#f5c842" }}
           >
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-              <path d="M8 18L15 25L28 11" stroke="#0d0d0d" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            {uploadingFiles ? (
+              <div className="w-8 h-8 border-4 border-black/30 border-t-black rounded-full animate-spin" />
+            ) : (
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+                <path d="M8 18L15 25L28 11" stroke="#0d0d0d" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
           </motion.div>
           <p className="text-[10px] tracking-[0.3em] text-white/40 uppercase mb-3">Order Confirmed</p>
           <h1 className="text-4xl font-black uppercase mb-4" style={{ fontFamily: "monospace" }}>You're all set.</h1>
-          <p className="text-sm text-white/50 leading-relaxed mb-10">
+          <p className="text-sm text-white/50 leading-relaxed mb-4">
             Your order has been received. Your Order ID is <span className="font-black text-white">{orderId}</span>. Our team will reach out to {form.phone} to confirm delivery details.
           </p>
+          <AnimatePresence>
+            {uploadingFiles && (
+              <motion.p
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="text-[11px] text-white/30 uppercase tracking-widest mb-6"
+              >
+                Preparing your design files…
+              </motion.p>
+            )}
+          </AnimatePresence>
+          <div className="mb-10" />
           <button
             onClick={() => { reset(); setLocation("/products"); }}
             className="w-full py-4 font-black uppercase tracking-[0.2em] text-sm active:scale-[0.98] transition-all"
