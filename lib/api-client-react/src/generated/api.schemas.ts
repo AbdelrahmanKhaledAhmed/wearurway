@@ -154,9 +154,44 @@ export interface CreateOrderSize {
   realHeight?: number;
 }
 
+export type CreateOrderBodyPaymentMethod =
+  (typeof CreateOrderBodyPaymentMethod)[keyof typeof CreateOrderBodyPaymentMethod];
+
+export const CreateOrderBodyPaymentMethod = {
+  cod: "cod",
+  instapay: "instapay",
+} as const;
+
+export interface CreateOrderPaymentProof {
+  fileName: string;
+  dataUrl: string;
+}
+
 export interface CreateOrderExportFile {
   fileName: string;
   dataUrl: string;
+}
+
+export interface CreateOrderDesignLayer {
+  id: string;
+  name?: string;
+  imageUrl: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  visible: boolean;
+  naturalWidth?: number;
+  naturalHeight?: number;
+}
+
+export interface CreateOrderDesignJob {
+  frontLayers: CreateOrderDesignLayer[];
+  backLayers: CreateOrderDesignLayer[];
+  mockupSize: number;
+  frontMockupImage?: string;
+  backMockupImage?: string;
 }
 
 export interface CreateOrderBody {
@@ -165,10 +200,15 @@ export interface CreateOrderBody {
   address: string;
   size: CreateOrderSize;
   color: string;
+  paymentMethod: CreateOrderBodyPaymentMethod;
+  productPrice?: number;
+  shippingPrice?: number;
   total: number;
   frontImage?: string;
   backImage?: string;
+  paymentProof?: CreateOrderPaymentProof;
   exportFiles?: CreateOrderExportFile[];
+  designJob?: CreateOrderDesignJob;
 }
 
 export interface CreateOrderResponse {

@@ -150,7 +150,6 @@ export default function OrderReviewModal({
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
   const [backPreview, setBackPreview] = useState<string | null>(null);
   const [generatingPreviews, setGeneratingPreviews] = useState(false);
-  const [preparingCheckout, setPreparingCheckout] = useState(false);
   const [prepareError, setPrepareError] = useState("");
   const generatedRef = useRef(false);
 
@@ -183,27 +182,31 @@ export default function OrderReviewModal({
     }
   }, [isOpen, generatePreviews]);
 
-  const handleConfirm = async () => {
-    setPreparingCheckout(true);
+  const handleConfirm = () => {
     setPrepareError("");
+    const designJob = {
+      frontLayers,
+      backLayers,
+      mockupSize,
+      frontMockupImage: mockup?.front?.image,
+      backMockupImage: mockup?.back?.image,
+    };
+
     try {
-      const exportFiles = await generateDesignExportFiles({
-        frontLayers,
-        backLayers,
-        mockupSize,
-        frontMockupImage: mockup?.front?.image,
-        backMockupImage: mockup?.back?.image,
-      });
-      await saveCheckoutExportFiles(exportFiles);
+      sessionStorage.setItem("ww_checkout_design_job", JSON.stringify(designJob));
       sessionStorage.setItem("ww_checkout_front", frontPreview ?? "");
       sessionStorage.setItem("ww_checkout_back", backPreview ?? "");
       sessionStorage.setItem("ww_checkout_price", String(price));
       setLocation("/checkout");
       onClose();
+
+      void generateDesignExportFiles(designJob)
+        .then(saveCheckoutExportFiles)
+        .catch(() => {
+          console.error("Could not prepare checkout print files");
+        });
     } catch {
-      setPrepareError("Could not prepare the print files. Please try again.");
-    } finally {
-      setPreparingCheckout(false);
+      setPrepareError("Could not open checkout. Please try again.");
     }
   };
 
@@ -316,16 +319,14 @@ export default function OrderReviewModal({
               <div className="px-8 pt-6 pb-8">
                 <button
                   onClick={handleConfirm}
-                  disabled={generatingPreviews || preparingCheckout}
                   className="w-full py-4 font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-[0.98]"
                   style={{
                     backgroundColor: "#f5c842",
                     color: "#0d0d0d",
                     letterSpacing: "0.25em",
-                    opacity: generatingPreviews || preparingCheckout ? 0.55 : 1,
                   }}
                 >
-                  {preparingCheckout ? "Preparing Print Files…" : "Confirm Order"}
+                  Confirm Order
                 </button>
                 {prepareError && <p className="text-xs text-red-400 mt-3">{prepareError}</p>}
               </div>

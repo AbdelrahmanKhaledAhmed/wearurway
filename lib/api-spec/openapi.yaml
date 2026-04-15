@@ -810,17 +810,28 @@ components:
           $ref: "#/components/schemas/CreateOrderSize"
         color:
           type: string
+        paymentMethod:
+          type: string
+          enum: [cod, instapay]
+        productPrice:
+          type: number
+        shippingPrice:
+          type: number
         total:
           type: number
         frontImage:
           type: string
         backImage:
           type: string
+        paymentProof:
+          $ref: "#/components/schemas/CreateOrderPaymentProof"
         exportFiles:
           type: array
           items:
             $ref: "#/components/schemas/CreateOrderExportFile"
-      required: [name, phone, address, size, color, total]
+        designJob:
+          $ref: "#/components/schemas/CreateOrderDesignJob"
+      required: [name, phone, address, size, color, paymentMethod, total]
 
     CreateOrderExportFile:
       type: object
@@ -830,6 +841,61 @@ components:
         dataUrl:
           type: string
       required: [fileName, dataUrl]
+
+    CreateOrderPaymentProof:
+      type: object
+      properties:
+        fileName:
+          type: string
+        dataUrl:
+          type: string
+      required: [fileName, dataUrl]
+
+    CreateOrderDesignLayer:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        imageUrl:
+          type: string
+        x:
+          type: number
+        y:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+        rotation:
+          type: number
+        visible:
+          type: boolean
+        naturalWidth:
+          type: number
+        naturalHeight:
+          type: number
+      required: [id, imageUrl, x, y, width, height, rotation, visible]
+
+    CreateOrderDesignJob:
+      type: object
+      properties:
+        frontLayers:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateOrderDesignLayer"
+        backLayers:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateOrderDesignLayer"
+        mockupSize:
+          type: number
+        frontMockupImage:
+          type: string
+        backMockupImage:
+          type: string
+      required: [frontLayers, backLayers, mockupSize]
 
     CreateOrderResponse:
       type: object

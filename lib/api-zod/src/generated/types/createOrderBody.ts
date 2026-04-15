@@ -5,7 +5,10 @@
  * wearurway API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CreateOrderBodyPaymentMethod } from "./createOrderBodyPaymentMethod";
+import type { CreateOrderDesignJob } from "./createOrderDesignJob";
 import type { CreateOrderExportFile } from "./createOrderExportFile";
+import type { CreateOrderPaymentProof } from "./createOrderPaymentProof";
 import type { CreateOrderSize } from "./createOrderSize";
 
 export interface CreateOrderBody {
@@ -14,8 +17,13 @@ export interface CreateOrderBody {
   address: string;
   size: CreateOrderSize;
   color: string;
+  paymentMethod: CreateOrderBodyPaymentMethod;
+  productPrice?: number;
+  shippingPrice?: number;
   total: number;
   frontImage?: string;
   backImage?: string;
+  paymentProof?: CreateOrderPaymentProof;
   exportFiles?: CreateOrderExportFile[];
+  designJob?: CreateOrderDesignJob;
 }

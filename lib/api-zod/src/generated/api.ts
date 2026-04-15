@@ -440,9 +440,18 @@ export const CreateOrderBody = zod.object({
     realHeight: zod.number().optional(),
   }),
   color: zod.string(),
+  paymentMethod: zod.enum(["cod", "instapay"]),
+  productPrice: zod.number().optional(),
+  shippingPrice: zod.number().optional(),
   total: zod.number(),
   frontImage: zod.string().optional(),
   backImage: zod.string().optional(),
+  paymentProof: zod
+    .object({
+      fileName: zod.string(),
+      dataUrl: zod.string(),
+    })
+    .optional(),
   exportFiles: zod
     .array(
       zod.object({
@@ -450,6 +459,43 @@ export const CreateOrderBody = zod.object({
         dataUrl: zod.string(),
       }),
     )
+    .optional(),
+  designJob: zod
+    .object({
+      frontLayers: zod.array(
+        zod.object({
+          id: zod.string(),
+          name: zod.string().optional(),
+          imageUrl: zod.string(),
+          x: zod.number(),
+          y: zod.number(),
+          width: zod.number(),
+          height: zod.number(),
+          rotation: zod.number(),
+          visible: zod.boolean(),
+          naturalWidth: zod.number().optional(),
+          naturalHeight: zod.number().optional(),
+        }),
+      ),
+      backLayers: zod.array(
+        zod.object({
+          id: zod.string(),
+          name: zod.string().optional(),
+          imageUrl: zod.string(),
+          x: zod.number(),
+          y: zod.number(),
+          width: zod.number(),
+          height: zod.number(),
+          rotation: zod.number(),
+          visible: zod.boolean(),
+          naturalWidth: zod.number().optional(),
+          naturalHeight: zod.number().optional(),
+        }),
+      ),
+      mockupSize: zod.number(),
+      frontMockupImage: zod.string().optional(),
+      backMockupImage: zod.string().optional(),
+    })
     .optional(),
 });
 
