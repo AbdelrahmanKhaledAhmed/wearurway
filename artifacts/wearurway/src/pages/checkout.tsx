@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useCustomizer } from "@/hooks/use-customizer";
 import { useCreateOrder, useGetOrderSettings } from "@workspace/api-client-react";
 import { generateDesignExportFiles, type DesignExportFile } from "@/lib/design-export";
+import { zipSync } from "fflate";
 import type { CreateOrderDesignJob } from "@workspace/api-client-react";
 
 const FREE_SHIPPING_AREAS = ["6th of October", "Sheikh Zayed"];
@@ -42,13 +43,30 @@ async function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function dataUrlToUint8Array(dataUrl: string): Uint8Array {
+  const base64 = dataUrl.split(",")[1] ?? "";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function buildZip(files: DesignExportFile[]): Uint8Array {
+  const entries: Record<string, [Uint8Array, { level: 0 }]> = {};
+  for (const file of files) {
+    entries[file.fileName] = [dataUrlToUint8Array(file.dataUrl), { level: 0 }];
+  }
+  return zipSync(entries);
+}
+
 async function uploadFilesWithRetry(orderId: string, files: DesignExportFile[], maxAttempts = 30) {
+  const zipped = buildZip(files);
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const res = await fetch(`/api/orders/${orderId}/documents`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ exportFiles: files }),
+        headers: { "Content-Type": "application/zip" },
+        body: zipped,
       });
       if (!res.ok) throw new Error("Upload failed");
       return;
