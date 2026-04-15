@@ -41,7 +41,7 @@ app.use("/api", router);
 
 if (process.env.NODE_ENV === "production" && fs.existsSync(FRONTEND_DIR)) {
   app.use(express.static(FRONTEND_DIR));
-  app.get("*", (_req, res) => {
+  app.get(/.*/, (_req, res) => {
     res.sendFile(`${FRONTEND_DIR}/index.html`);
   });
 }
