@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import ImageEditor, { type ImageEditResult } from "@/components/ImageEditor";
 import TextLayerModal from "@/components/TextLayerModal";
 import OrderReviewModal from "@/components/OrderReviewModal";
+import { generateDesignExportFiles } from "@/lib/design-export";
 
 interface BBox { x: number; y: number; width: number; height: number }
 
@@ -874,276 +875,23 @@ export default function Design() {
   // ── Export ─────────────────────────────────────────────────────────────────
 
   const handleExport = useCallback(async () => {
-    const frontVisible = frontLayers.filter(l => l.visible);
-    const backVisible  = backLayers.filter(l => l.visible);
-    if (frontVisible.length === 0 && backVisible.length === 0) return;
+    if (!frontLayers.some(l => l.visible) && !backLayers.some(l => l.visible)) return;
 
     setExporting(true);
     try {
-      // ── Load an image from a URL via blob (avoids CORS issues) ───────────────
-      const loadImg = async (src: string): Promise<HTMLImageElement | null> => {
-        try {
-          const res = await fetch(src);
-          if (!res.ok) return null;
-          const blob = await res.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          return await new Promise<HTMLImageElement>((resolve, reject) => {
-            const i = new Image();
-            i.onload = () => { URL.revokeObjectURL(blobUrl); resolve(i); };
-            i.onerror = () => { URL.revokeObjectURL(blobUrl); reject(); };
-            i.src = blobUrl;
-          });
-        } catch { return null; }
-      };
-
-      // ── Trim transparent border pixels from a canvas ─────────────────────────
-      // Uses early-exit scanning: finds top/bottom first by scanning full rows,
-      // then finds left/right only within that vertical band — much faster on
-      // large canvases where most content is in the centre.
-      const trimCanvas = (src: HTMLCanvasElement): HTMLCanvasElement => {
-        const ctx = src.getContext("2d");
-        if (!ctx) return src;
-        const { width, height } = src;
-        const { data } = ctx.getImageData(0, 0, width, height);
-        const idx = (x: number, y: number) => (y * width + x) * 4 + 3; // alpha channel
-
-        // Top — first row with any opaque pixel
-        let top = -1;
-        for (let y = 0; y < height && top === -1; y++)
-          for (let x = 0; x < width; x++)
-            if (data[idx(x, y)] > 0) { top = y; break; }
-        if (top === -1) return src; // fully transparent
-
-        // Bottom — last row with any opaque pixel
-        let bottom = top;
-        for (let y = height - 1; y > bottom; y--)
-          for (let x = 0; x < width; x++)
-            if (data[idx(x, y)] > 0) { bottom = y; break; }
-
-        // Left — first column with any opaque pixel (within top‥bottom band)
-        let left = width - 1;
-        for (let x = 0; x < left; x++)
-          for (let y = top; y <= bottom; y++)
-            if (data[idx(x, y)] > 0) { left = x; break; }
-
-        // Right — last column with any opaque pixel (within top‥bottom band)
-        let right = left;
-        for (let x = width - 1; x > right; x--)
-          for (let y = top; y <= bottom; y++)
-            if (data[idx(x, y)] > 0) { right = x; break; }
-
-        const trimW = right  - left + 1;
-        const trimH = bottom - top  + 1;
-        const trimmed = document.createElement("canvas");
-        trimmed.width  = trimW;
-        trimmed.height = trimH;
-        trimmed.getContext("2d")!.drawImage(src, left, top, trimW, trimH, 0, 0, trimW, trimH);
-        return trimmed;
-      };
-
-      // ── Draw image with object-fit:contain behaviour ──────────────────────────
-      const drawContain = (
-        ctx: CanvasRenderingContext2D,
-        img: HTMLImageElement,
-        canvasW: number,
-        canvasH: number,
-      ) => {
-        const scale = Math.min(canvasW / img.naturalWidth, canvasH / img.naturalHeight);
-        const dw = img.naturalWidth  * scale;
-        const dh = img.naturalHeight * scale;
-        const dx = (canvasW - dw) / 2;
-        const dy = (canvasH - dh) / 2;
-        ctx.drawImage(img, dx, dy, dw, dh);
-      };
-
-      // ── Export each layer individually at maximum quality ─────────────────────
-      const exportLayers = async (
-        visibleLayers: DesignLayer[],
-        shirtUrl: string | undefined,
-        side: "front" | "back",
-      ) => {
-        if (visibleLayers.length === 0) return;
-
-        const shirtImg = shirtUrl ? await loadImg(shirtUrl) : null;
-
-        // Hard limits to avoid crashing the browser tab
-        const MAX_CANVAS_PX = 16384;
-
-        for (const layer of visibleLayers) {
-          const img = await loadImg(layer.imageUrl);
-          if (!img) continue;
-
-          const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
-
-          // ── Determine the optimal scale for this layer ──────────────────────
-          // Ideal: the layer fills exactly its native pixel dimensions in the
-          // export canvas → zero upscaling → maximum sharpness.
-          // Also ensure the canvas is at least 4000 px wide.
-          const scaleForNative  = img.naturalWidth  / displayW;   // 1:1 native px
-          const scaleForMinimum = 4000 / mockupSize;               // 4000 px floor
-          const scaleForShirt   = (shirtImg?.naturalWidth ?? 0) / mockupSize;
-
-          let SCALE = Math.max(scaleForNative, scaleForMinimum, scaleForShirt);
-
-          // Clamp so neither dimension exceeds the hard limit
-          const rawW = mockupSize       * SCALE;
-          const rawH = mockupSize * (4/3) * SCALE;
-          if (rawW > MAX_CANVAS_PX || rawH > MAX_CANVAS_PX) {
-            SCALE = Math.min(MAX_CANVAS_PX / mockupSize, MAX_CANVAS_PX / (mockupSize * 4/3));
-          }
-
-          // Export canvas mirrors the mockup's 3:4 coordinate space exactly
-          const exportW = Math.round(mockupSize       * SCALE);
-          const exportH = Math.round(mockupSize * (4/3) * SCALE);
-
-          const canvas = document.createElement("canvas");
-          canvas.width  = exportW;
-          canvas.height = exportH;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) continue;
-
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = "high";
-
-          // ── Draw layer at full native resolution ────────────────────────────
-          const exportLayerW = displayW * SCALE;   // ≈ img.naturalWidth when scaleForNative wins
-          const exportLayerH = displayH * SCALE;
-          const cx    = (layer.x + displayW / 2) * SCALE;
-          const cy    = (layer.y + displayH / 2) * SCALE;
-          const angle = (layer.rotation * Math.PI) / 180;
-
-          ctx.save();
-          ctx.translate(cx, cy);
-          ctx.rotate(angle);
-          ctx.drawImage(img, -exportLayerW / 2, -exportLayerH / 2, exportLayerW, exportLayerH);
-          ctx.restore();
-
-          // ── Clip to the shirt's alpha silhouette ────────────────────────────
-          if (shirtImg) {
-            ctx.globalCompositeOperation = "destination-in";
-            drawContain(ctx, shirtImg, exportW, exportH);
-            ctx.globalCompositeOperation = "source-over";
-          }
-
-          // ── Trim transparent border then download as lossless PNG ──────────────
-          const output = trimCanvas(canvas);
-          const fileName = `${layer.name.replace(/\s+/g, '-').toLowerCase()}-${side}.png`;
-          await new Promise<void>(resolve => {
-            output.toBlob(blob => {
-              if (!blob) { resolve(); return; }
-              const url = URL.createObjectURL(blob);
-              const a   = document.createElement("a");
-              a.href     = url;
-              a.download = fileName;
-              a.click();
-              URL.revokeObjectURL(url);
-              resolve();
-            }, "image/png");
-          });
-        }
-      };
-
-      // ── Helper: download a canvas as a PNG file ───────────────────────────────
-      const downloadCanvas = (canvas: HTMLCanvasElement, fileName: string) =>
-        new Promise<void>(resolve => {
-          canvas.toBlob(blob => {
-            if (!blob) { resolve(); return; }
-            const url = URL.createObjectURL(blob);
-            const a   = document.createElement("a");
-            a.href     = url;
-            a.download = fileName;
-            a.click();
-            URL.revokeObjectURL(url);
-            resolve();
-          }, "image/png");
-        });
-
-      // ── Export composite (mockup + all layers) per side ──────────────────────
-      // Two-canvas approach for maximum quality:
-      //   Canvas A — all design layers rendered at their native resolution
-      //   Mask A   — clipped to shirt's alpha silhouette (destination-in, applied once)
-      //   Canvas B — shirt drawn, then Canvas A composited on top
-      const exportComposite = async (
-        visibleLayers: DesignLayer[],
-        shirtUrl: string | undefined,
-        fileName: string,
-      ) => {
-        if (!shirtUrl) return;
-        const shirtImg = await loadImg(shirtUrl);
-        if (!shirtImg) return;
-
-        // Pre-load all layer images so we can measure native resolutions
-        const loaded = (
-          await Promise.all(visibleLayers.map(async l => ({ l, img: await loadImg(l.imageUrl) })))
-        ).filter((x): x is { l: DesignLayer; img: HTMLImageElement } => x.img !== null);
-
-        // SCALE = max of: shirt native res, 4000 px floor, each layer's native res
-        const MAX_CANVAS_PX  = 16384;
-        const scaleForShirt   = shirtImg.naturalWidth / mockupSize;
-        const scaleForMinimum = 4000 / mockupSize;
-        let SCALE = Math.max(scaleForShirt, scaleForMinimum);
-        for (const { l, img } of loaded) {
-          const { width: dw } = getRatioLockedSize(l, l.width);
-          SCALE = Math.max(SCALE, img.naturalWidth / dw);
-        }
-        // Clamp to browser hard limit
-        if (mockupSize * SCALE > MAX_CANVAS_PX || mockupSize * (4/3) * SCALE > MAX_CANVAS_PX) {
-          SCALE = Math.min(MAX_CANVAS_PX / mockupSize, MAX_CANVAS_PX / (mockupSize * (4/3)));
-        }
-
-        const exportW = Math.round(mockupSize       * SCALE);
-        const exportH = Math.round(mockupSize * (4/3) * SCALE);
-
-        const makeCanvas = () => {
-          const c = document.createElement("canvas");
-          c.width  = exportW;
-          c.height = exportH;
-          return c;
-        };
-        const setupCtx = (c: HTMLCanvasElement) => {
-          const ctx = c.getContext("2d")!;
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = "high";
-          return ctx;
-        };
-
-        // ── Canvas A: all design layers at native resolution ──────────────────
-        const layerCanvas = makeCanvas();
-        const layerCtx    = setupCtx(layerCanvas);
-        for (const { l: layer, img } of loaded) {
-          const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
-          const exportLayerW = displayW * SCALE;
-          const exportLayerH = displayH * SCALE;
-          const cx    = (layer.x + displayW / 2) * SCALE;
-          const cy    = (layer.y + displayH / 2) * SCALE;
-          const angle = (layer.rotation * Math.PI) / 180;
-          layerCtx.save();
-          layerCtx.translate(cx, cy);
-          layerCtx.rotate(angle);
-          layerCtx.drawImage(img, -exportLayerW / 2, -exportLayerH / 2, exportLayerW, exportLayerH);
-          layerCtx.restore();
-        }
-        // Clip layer canvas to shirt silhouette in one pass (sharp, no per-layer artifacts)
-        layerCtx.globalCompositeOperation = "destination-in";
-        drawContain(layerCtx, shirtImg, exportW, exportH);
-
-        // ── Download combined design without mockup (trimmed) ─────────────────
-        const designFileName = fileName.replace(/\.png$/, "").replace(/^mockup-(front|back)$/, "design-$1") + ".png";
-        await downloadCanvas(trimCanvas(layerCanvas), designFileName);
-
-        // ── Canvas B: shirt + clipped layers ─────────────────────────────────
-        const finalCanvas = makeCanvas();
-        const finalCtx    = setupCtx(finalCanvas);
-        drawContain(finalCtx, shirtImg, exportW, exportH);   // shirt at native resolution
-        finalCtx.drawImage(layerCanvas, 0, 0);               // layers already masked
-
-        await downloadCanvas(trimCanvas(finalCanvas), fileName);
-      };
-
-      await exportLayers(frontVisible, mockup?.front?.image, "front");
-      await exportLayers(backVisible,  mockup?.back?.image, "back");
-      await exportComposite(frontVisible, mockup?.front?.image, "mockup-front.png");
-      await exportComposite(backVisible,  mockup?.back?.image, "mockup-back.png");
+      const files = await generateDesignExportFiles({
+        frontLayers,
+        backLayers,
+        mockupSize,
+        frontMockupImage: mockup?.front?.image,
+        backMockupImage: mockup?.back?.image,
+      });
+      for (const file of files) {
+        const a = document.createElement("a");
+        a.href = file.dataUrl;
+        a.download = file.fileName;
+        a.click();
+      }
     } finally {
       setExporting(false);
     }

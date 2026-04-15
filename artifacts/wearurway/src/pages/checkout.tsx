@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCustomizer } from "@/hooks/use-customizer";
 import { useCreateOrder, useGetOrderSettings } from "@workspace/api-client-react";
+import { clearCheckoutExportFiles, loadCheckoutExportFiles, type DesignExportFile } from "@/lib/design-export";
 
 const FREE_SHIPPING_AREAS = ["6th of October", "Sheikh Zayed"];
 
@@ -44,6 +45,8 @@ export default function Checkout() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [orderId, setOrderId] = useState("");
+  const [exportFiles, setExportFiles] = useState<DesignExportFile[]>([]);
+  const [exportFilesLoaded, setExportFilesLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const shippingCost = shipping === "free" ? 0 : (orderSettings?.shippingPrice ?? 85);
@@ -55,6 +58,13 @@ export default function Checkout() {
     setProofPreview(url);
     return () => URL.revokeObjectURL(url);
   }, [proofFile]);
+
+  useEffect(() => {
+    loadCheckoutExportFiles()
+      .then(setExportFiles)
+      .catch(() => setExportFiles([]))
+      .finally(() => setExportFilesLoaded(true));
+  }, []);
 
   const setField = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm(prev => ({ ...prev, [key]: e.target.value }));
@@ -78,6 +88,14 @@ export default function Checkout() {
   const handleSubmit = async () => {
     if (!validate()) return;
     setSubmitError("");
+    if (!exportFilesLoaded) {
+      setSubmitError("Print files are still loading. Please wait a moment and try again.");
+      return;
+    }
+    if (exportFiles.length === 0 && (frontPreview || backPreview)) {
+      setSubmitError("Print files were not found. Please go back to the designer and confirm your order again.");
+      return;
+    }
     setSubmitting(true);
     try {
       const response = await createOrder.mutateAsync({
@@ -94,11 +112,13 @@ export default function Checkout() {
           total,
           frontImage: frontPreview || undefined,
           backImage: backPreview || undefined,
+          exportFiles,
         },
       });
       sessionStorage.removeItem("ww_checkout_front");
       sessionStorage.removeItem("ww_checkout_back");
       sessionStorage.removeItem("ww_checkout_price");
+      await clearCheckoutExportFiles();
       setOrderId(response.orderId);
       setSubmitted(true);
     } catch (error) {

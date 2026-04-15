@@ -154,6 +154,11 @@ export interface CreateOrderSize {
   realHeight?: number;
 }
 
+export interface CreateOrderExportFile {
+  fileName: string;
+  dataUrl: string;
+}
+
 export interface CreateOrderBody {
   name: string;
   phone: string;
@@ -163,6 +168,7 @@ export interface CreateOrderBody {
   total: number;
   frontImage?: string;
   backImage?: string;
+  exportFiles?: CreateOrderExportFile[];
 }
 
 export interface CreateOrderResponse {

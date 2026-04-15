@@ -443,6 +443,14 @@ export const CreateOrderBody = zod.object({
   total: zod.number(),
   frontImage: zod.string().optional(),
   backImage: zod.string().optional(),
+  exportFiles: zod
+    .array(
+      zod.object({
+        fileName: zod.string(),
+        dataUrl: zod.string(),
+      }),
+    )
+    .optional(),
 });
 
 export const CreateOrderResponse = zod.object({

@@ -816,7 +816,20 @@ components:
           type: string
         backImage:
           type: string
+        exportFiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateOrderExportFile"
       required: [name, phone, address, size, color, total]
+
+    CreateOrderExportFile:
+      type: object
+      properties:
+        fileName:
+          type: string
+        dataUrl:
+          type: string
+      required: [fileName, dataUrl]
 
     CreateOrderResponse:
       type: object

@@ -15,6 +15,7 @@ export * from "./boundingBox";
 export * from "./color";
 export * from "./createFitBody";
 export * from "./createOrderBody";
+export * from "./createOrderExportFile";
 export * from "./createOrderResponse";
 export * from "./createOrderSize";
 export * from "./createProductBody";

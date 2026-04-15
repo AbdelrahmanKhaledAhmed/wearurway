@@ -5,6 +5,7 @@
  * wearurway API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CreateOrderExportFile } from "./createOrderExportFile";
 import type { CreateOrderSize } from "./createOrderSize";
 
 export interface CreateOrderBody {
@@ -16,4 +17,5 @@ export interface CreateOrderBody {
   total: number;
   frontImage?: string;
   backImage?: string;
+  exportFiles?: CreateOrderExportFile[];
 }

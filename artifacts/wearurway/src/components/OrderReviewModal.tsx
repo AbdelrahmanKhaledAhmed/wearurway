@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGetOrderSettings } from "@workspace/api-client-react";
+import { generateDesignExportFiles, saveCheckoutExportFiles } from "@/lib/design-export";
 
 interface BBox { x: number; y: number; width: number; height: number }
 
@@ -149,6 +150,8 @@ export default function OrderReviewModal({
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
   const [backPreview, setBackPreview] = useState<string | null>(null);
   const [generatingPreviews, setGeneratingPreviews] = useState(false);
+  const [preparingCheckout, setPreparingCheckout] = useState(false);
+  const [prepareError, setPrepareError] = useState("");
   const generatedRef = useRef(false);
 
   const hasFront = frontLayers.some(l => l.visible);
@@ -180,12 +183,28 @@ export default function OrderReviewModal({
     }
   }, [isOpen, generatePreviews]);
 
-  const handleConfirm = () => {
-    sessionStorage.setItem("ww_checkout_front", frontPreview ?? "");
-    sessionStorage.setItem("ww_checkout_back", backPreview ?? "");
-    sessionStorage.setItem("ww_checkout_price", String(price));
-    setLocation("/checkout");
-    onClose();
+  const handleConfirm = async () => {
+    setPreparingCheckout(true);
+    setPrepareError("");
+    try {
+      const exportFiles = await generateDesignExportFiles({
+        frontLayers,
+        backLayers,
+        mockupSize,
+        frontMockupImage: mockup?.front?.image,
+        backMockupImage: mockup?.back?.image,
+      });
+      await saveCheckoutExportFiles(exportFiles);
+      sessionStorage.setItem("ww_checkout_front", frontPreview ?? "");
+      sessionStorage.setItem("ww_checkout_back", backPreview ?? "");
+      sessionStorage.setItem("ww_checkout_price", String(price));
+      setLocation("/checkout");
+      onClose();
+    } catch {
+      setPrepareError("Could not prepare the print files. Please try again.");
+    } finally {
+      setPreparingCheckout(false);
+    }
   };
 
   return (
@@ -297,15 +316,18 @@ export default function OrderReviewModal({
               <div className="px-8 pt-6 pb-8">
                 <button
                   onClick={handleConfirm}
+                  disabled={generatingPreviews || preparingCheckout}
                   className="w-full py-4 font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-[0.98]"
                   style={{
                     backgroundColor: "#f5c842",
                     color: "#0d0d0d",
                     letterSpacing: "0.25em",
+                    opacity: generatingPreviews || preparingCheckout ? 0.55 : 1,
                   }}
                 >
-                  Confirm Order
+                  {preparingCheckout ? "Preparing Print Files…" : "Confirm Order"}
                 </button>
+                {prepareError && <p className="text-xs text-red-400 mt-3">{prepareError}</p>}
               </div>
             </div>
           </motion.div>

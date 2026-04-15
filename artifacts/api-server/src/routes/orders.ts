@@ -16,6 +16,10 @@ interface CreateOrderBody {
   total?: number;
   frontImage?: string;
   backImage?: string;
+  exportFiles?: {
+    fileName?: string;
+    dataUrl?: string;
+  }[];
 }
 
 function generateOrderId(): string {
@@ -78,16 +82,32 @@ router.post("/create-order", async (req, res) => {
       }),
     );
 
-    const documents = [
-      { label: "front", dataUrl: body.frontImage },
-      { label: "back", dataUrl: body.backImage },
-    ].filter((file): file is { label: string; dataUrl: string } => Boolean(file.dataUrl));
+    const hasExportFilesPayload = Array.isArray(body.exportFiles);
+    const exportDocuments = (body.exportFiles ?? [])
+      .filter((file): file is { fileName: string; dataUrl: string } => Boolean(file.fileName && file.dataUrl))
+      .map(file => ({
+        label: file.fileName.replace(/\.png$/i, ""),
+        fileName: file.fileName.replace(/[^\w.-]/g, "-"),
+        dataUrl: file.dataUrl,
+      }));
+
+    if (hasExportFilesPayload && exportDocuments.length !== body.exportFiles?.length) {
+      res.status(400).json({ error: "One or more export files are missing data" });
+      return;
+    }
+
+    const documents = hasExportFilesPayload
+      ? exportDocuments
+      : [
+          { label: "front", fileName: `${orderId}-front.png`, dataUrl: body.frontImage },
+          { label: "back", fileName: `${orderId}-back.png`, dataUrl: body.backImage },
+        ].filter((file): file is { label: string; fileName: string; dataUrl: string } => Boolean(file.dataUrl));
 
     for (const file of documents) {
       const formData = new FormData();
       formData.append("chat_id", chatId);
       formData.append("caption", `${orderId} ${file.label}`);
-      formData.append("document", dataUrlToBlob(file.dataUrl), `${orderId}-${file.label}.png`);
+      formData.append("document", dataUrlToBlob(file.dataUrl), `${orderId}-${file.fileName}`);
       await telegramRequest(`${baseUrl}/sendDocument`, formData);
     }
 
