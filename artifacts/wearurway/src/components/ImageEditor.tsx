@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import AIAssistPanel, { type ImageAdjustments } from "./AIAssistPanel";
+import FuzzySelectPanel from "./AIAssistPanel";
 
-type RefineMode = "erase" | "restore" | null;
-type BgPreview  = "checker" | "white" | "black";
+type BgPreview = "checker" | "white" | "black";
 
 export interface ImageEditResult {
   originalWidth: number; originalHeight: number;
@@ -69,12 +68,6 @@ function fuzzySelectRegion(id: ImageData, sx: number, sy: number, colorTol: numb
   return mask;
 }
 
-function mergeMasks(a: Uint8Array, b: Uint8Array, size: number): Uint8Array {
-  const r=new Uint8Array(size);
-  for (let i=0;i<size;i++) r[i]=a[i]||b[i]?1:0;
-  return r;
-}
-
 function applyMaskDeletion(id: ImageData, mask: Uint8Array): ImageData {
   const out=new ImageData(new Uint8ClampedArray(id.data),id.width,id.height);
   const w=id.width, h=id.height;
@@ -91,6 +84,19 @@ function applyMaskDeletion(id: ImageData, mask: Uint8Array): ImageData {
   for (let i=0;i<mask.length;i++) {
     if (eroded[i]) out.data[i*4+3]=0;
     else if (mask[i]) out.data[i*4+3]=Math.floor(out.data[i*4+3]*0.25);
+  }
+  return out;
+}
+
+function applyMaskRecolor(id: ImageData, mask: Uint8Array, hexColor: string): ImageData {
+  const out=new ImageData(new Uint8ClampedArray(id.data),id.width,id.height);
+  const r=parseInt(hexColor.slice(1,3),16);
+  const g=parseInt(hexColor.slice(3,5),16);
+  const b=parseInt(hexColor.slice(5,7),16);
+  for (let i=0;i<mask.length;i++) {
+    if (mask[i]&&out.data[i*4+3]>0) {
+      out.data[i*4]=r; out.data[i*4+1]=g; out.data[i*4+2]=b;
+    }
   }
   return out;
 }
@@ -127,45 +133,6 @@ function sharpenImageData(id: ImageData) {
   }
   for (let i=3;i<dst.length;i+=4) dst[i]=Math.max(0,Math.min(255,Math.round(8*(src[i]-128)+128)));
   return new ImageData(dst,w,h);
-}
-
-function applyImageAdjustments(id: ImageData, adj: ImageAdjustments): ImageData {
-  const src = id.data;
-  const dst = new Uint8ClampedArray(src);
-  const { brightness = 0, contrast = 0, saturation = 0, sharpen = false } = adj;
-  const contrastFactor = contrast !== 0 ? (259 * (contrast + 255)) / (255 * (259 - contrast)) : 1;
-
-  for (let i = 0; i < src.length; i += 4) {
-    if (src[i + 3] === 0) { dst[i]=src[i]; dst[i+1]=src[i+1]; dst[i+2]=src[i+2]; dst[i+3]=0; continue; }
-    let r = src[i], g = src[i+1], b = src[i+2];
-
-    if (brightness !== 0) {
-      const delta = brightness * 2.55;
-      r = Math.max(0, Math.min(255, r + delta));
-      g = Math.max(0, Math.min(255, g + delta));
-      b = Math.max(0, Math.min(255, b + delta));
-    }
-
-    if (contrast !== 0) {
-      r = Math.max(0, Math.min(255, contrastFactor * (r - 128) + 128));
-      g = Math.max(0, Math.min(255, contrastFactor * (g - 128) + 128));
-      b = Math.max(0, Math.min(255, contrastFactor * (b - 128) + 128));
-    }
-
-    if (saturation !== 0) {
-      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-      const sat = 1 + saturation / 100;
-      r = Math.max(0, Math.min(255, gray + sat * (r - gray)));
-      g = Math.max(0, Math.min(255, gray + sat * (g - gray)));
-      b = Math.max(0, Math.min(255, gray + sat * (b - gray)));
-    }
-
-    dst[i] = r; dst[i+1] = g; dst[i+2] = b; dst[i+3] = src[i+3];
-  }
-
-  let result = new ImageData(dst, id.width, id.height);
-  if (sharpen) result = sharpenImageData(result);
-  return result;
 }
 
 function enhanceCanvas(src: HTMLCanvasElement, qualityScale=1) {
@@ -205,40 +172,54 @@ const RedoIcon = () => (
 
 export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 }: Props) {
   const canvasRef       = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef= useRef<HTMLCanvasElement>(null);
   const imgRef          = useRef<HTMLImageElement>(null);
   const areaRef         = useRef<HTMLDivElement>(null);
   const originalDataRef = useRef<ImageData|null>(null);
-  const isDrawing       = useRef(false);
   const isMoving        = useRef(false);
-  const lastBrushPoint  = useRef<{x:number;y:number}|null>(null);
   const moveStartRef    = useRef<{pointerX:number;pointerY:number;panX:number;panY:number}|null>(null);
   const undoRef         = useRef<CanvasSnapshot[]>([]);
   const redoRef         = useRef<CanvasSnapshot[]>([]);
   const trimRef         = useRef<ImageEditResult|null>(null);
-  const brushRef        = useRef(28);
-  const brushHardRef    = useRef(0.7);
   const panRef          = useRef({x:0,y:0});
   const zoomRef         = useRef(1);
   const rafRef          = useRef<number|null>(null);
 
-  const [bgPreview,  setBgPreview]  = useState<BgPreview>("checker");
-  const [processing, setProcessing] = useState(false);
-  const [loaded,     setLoaded]     = useState(false);
-  const [zoom,       setZoom]       = useState(1);
-  const [pan,        setPan]        = useState({x:0,y:0});
-  const [dispSize,   setDispSize]   = useState<{w:number;h:number}|null>(null);
-  const [brushSize,  setBrushSize]  = useState(28);
-  const [brushHard,  setBrushHard]  = useState(0.7);
-  const [refineMode, setRefineMode] = useState<RefineMode>(null);
-  const [cursor,     setCursor]     = useState<{x:number;y:number;size:number;visible:boolean}>({x:0,y:0,size:0,visible:false});
-  const [histSig,    setHistSig]    = useState(0);
-  const [displaySrc, setDisplaySrc] = useState("");
+  const [bgPreview,     setBgPreview]     = useState<BgPreview>("checker");
+  const [processing,    setProcessing]    = useState(false);
+  const [loaded,        setLoaded]        = useState(false);
+  const [zoom,          setZoom]          = useState(1);
+  const [pan,           setPan]           = useState({x:0,y:0});
+  const [dispSize,      setDispSize]      = useState<{w:number;h:number}|null>(null);
+  const [histSig,       setHistSig]       = useState(0);
+  const [displaySrc,    setDisplaySrc]    = useState("");
+  const [toolActive,    setToolActive]    = useState(false);
+  const [selectionMask, setSelectionMask] = useState<Uint8Array|null>(null);
   void histSig;
 
-  useEffect(()=>{ brushRef.current=brushSize; },[brushSize]);
-  useEffect(()=>{ brushHardRef.current=brushHard; },[brushHard]);
   useEffect(()=>{ panRef.current=pan; },[pan]);
   useEffect(()=>{ zoomRef.current=zoom; },[zoom]);
+
+  // ── Update overlay canvas when selection changes ─────────────────────────────
+
+  useEffect(()=>{
+    const oc=overlayCanvasRef.current, mc=canvasRef.current;
+    if (!oc||!mc) return;
+    if (!selectionMask) {
+      const ctx=oc.getContext("2d");
+      if (ctx) { oc.width=mc.width; oc.height=mc.height; ctx.clearRect(0,0,oc.width,oc.height); }
+      return;
+    }
+    oc.width=mc.width; oc.height=mc.height;
+    const ctx=oc.getContext("2d"); if (!ctx) return;
+    const id=ctx.createImageData(mc.width,mc.height);
+    for (let i=0;i<selectionMask.length;i++) {
+      if (selectionMask[i]) {
+        id.data[i*4]=100; id.data[i*4+1]=120; id.data[i*4+2]=255; id.data[i*4+3]=110;
+      }
+    }
+    ctx.putImageData(id,0,0);
+  }, [selectionMask]);
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
@@ -251,6 +232,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current=requestAnimationFrame(updateDisplay);
   }, [updateDisplay]);
+  void scheduleRefresh;
 
   useEffect(() => {
     const url=URL.createObjectURL(file);
@@ -297,6 +279,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     const c=canvasRef.current; if (!c) return;
     redoRef.current=[...redoRef.current, {width:c.width,height:c.height,data:c.getContext("2d")!.getImageData(0,0,c.width,c.height),trim:trimRef.current}];
     restoreSnap(snap); setHistSig(h=>h+1);
+    setSelectionMask(null);
   }, [restoreSnap]);
 
   const doRedo = useCallback(() => {
@@ -304,12 +287,14 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     const c=canvasRef.current; if (!c) return;
     undoRef.current=[...undoRef.current, {width:c.width,height:c.height,data:c.getContext("2d")!.getImageData(0,0,c.width,c.height),trim:trimRef.current}];
     restoreSnap(snap); setHistSig(h=>h+1);
+    setSelectionMask(null);
   }, [restoreSnap]);
 
   useEffect(() => {
     const h=(e: KeyboardEvent)=>{
       if ((e.ctrlKey||e.metaKey)&&e.key==="z") { e.preventDefault(); doUndo(); }
       if ((e.ctrlKey||e.metaKey)&&(e.key==="y"||(e.shiftKey&&e.key==="z"))) { e.preventDefault(); doRedo(); }
+      if (e.key==="Escape") setSelectionMask(null);
     };
     window.addEventListener("keydown",h);
     return ()=>window.removeEventListener("keydown",h);
@@ -342,148 +327,90 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     const pz=getPageZoom(), rect=el.getBoundingClientRect();
     const cx=(e.clientX/pz-rect.left/pz)/(rect.width/pz)*dispSize.w;
     const cy=(e.clientY/pz-rect.top/pz)/(rect.height/pz)*dispSize.h;
-    const imageRadius=brushRef.current*(dispSize.w/(rect.width/pz));
-    return {imageX:cx, imageY:cy, imageRadius};
+    return {imageX:cx, imageY:cy};
   }, [dispSize]);
 
-  // ── AI direct apply ─────────────────────────────────────────────────────────
+  // ── Fuzzy select ─────────────────────────────────────────────────────────────
 
-  const handleAIApply = useCallback((seedPoints: {x:number;y:number}[], tol: number, edgeTol: number) => {
+  const handleFuzzySelect = useCallback((imgX: number, imgY: number) => {
+    const c=canvasRef.current; if (!c) return;
+    const ctx=c.getContext("2d"); if (!ctx) return;
+    setProcessing(true);
+    setTimeout(()=>{
+      const id=ctx.getImageData(0,0,c.width,c.height);
+      const px=Math.floor(Math.max(0,Math.min(c.width-1,imgX)));
+      const py=Math.floor(Math.max(0,Math.min(c.height-1,imgY)));
+      const mask=fuzzySelectRegion(id,px,py,42,65);
+      setSelectionMask(mask);
+      setProcessing(false);
+    },0);
+  }, []);
+
+  // ── Selection actions ─────────────────────────────────────────────────────────
+
+  const handleDelete = useCallback(() => {
+    if (!selectionMask) return;
     const c=canvasRef.current; if (!c) return;
     const ctx=c.getContext("2d"); if (!ctx) return;
     setProcessing(true);
     saveUndo();
     setTimeout(()=>{
       const id=ctx.getImageData(0,0,c.width,c.height);
-      let combined=new Uint8Array(c.width*c.height) as Uint8Array<ArrayBuffer>;
-      for (const pt of seedPoints) {
-        const imgX=Math.floor(Math.max(0,Math.min(c.width-1,pt.x*c.width)));
-        const imgY=Math.floor(Math.max(0,Math.min(c.height-1,pt.y*c.height)));
-        const region=fuzzySelectRegion(id,imgX,imgY,tol,edgeTol);
-        combined=mergeMasks(combined,region,c.width*c.height) as Uint8Array<ArrayBuffer>;
-      }
-      const result=applyMaskDeletion(id,combined);
+      const result=applyMaskDeletion(id,selectionMask);
       ctx.putImageData(result,0,0);
       originalDataRef.current=ctx.getImageData(0,0,c.width,c.height);
       updateDisplay();
+      setSelectionMask(null);
       setProcessing(false);
     },0);
-  }, [saveUndo, updateDisplay]);
+  }, [selectionMask, saveUndo, updateDisplay]);
 
-  const handleAIAdjust = useCallback((adjustments: ImageAdjustments) => {
+  const handleChangeColor = useCallback((color: string) => {
+    if (!selectionMask) return;
     const c=canvasRef.current; if (!c) return;
     const ctx=c.getContext("2d"); if (!ctx) return;
     setProcessing(true);
     saveUndo();
     setTimeout(()=>{
       const id=ctx.getImageData(0,0,c.width,c.height);
-      const result=applyImageAdjustments(id,adjustments);
+      const result=applyMaskRecolor(id,selectionMask,color);
       ctx.putImageData(result,0,0);
       originalDataRef.current=ctx.getImageData(0,0,c.width,c.height);
       updateDisplay();
+      setSelectionMask(null);
       setProcessing(false);
     },0);
-  }, [saveUndo, updateDisplay]);
+  }, [selectionMask, saveUndo, updateDisplay]);
 
-  // ── Refine brush ────────────────────────────────────────────────────────────
-
-  const applyEraseBrush = useCallback((imgX: number, imgY: number, radius: number) => {
-    const c=canvasRef.current; if (!c||!dispSize) return;
-    const ctx=c.getContext("2d")!;
-    const r=Math.ceil(radius);
-    const x0=Math.max(0,Math.floor(imgX-r)), y0=Math.max(0,Math.floor(imgY-r));
-    const x1=Math.min(c.width-1,Math.ceil(imgX+r)), y1=Math.min(c.height-1,Math.ceil(imgY+r));
-    const cur=ctx.getImageData(x0,y0,x1-x0+1,y1-y0+1);
-    const hard=Math.max(0.05,Math.min(1,brushHardRef.current));
-    for (let py=y0;py<=y1;py++) for (let px=x0;px<=x1;px++) {
-      const dist=Math.hypot(px-imgX,py-imgY); if (dist>radius) continue;
-      const falloff=dist<=radius*hard*0.5?1:1-(dist-radius*hard*0.5)/Math.max(0.1,radius*(1-hard*0.5));
-      const strength=Math.max(0,Math.min(1,falloff)); if (strength<=0) continue;
-      const ci=((py-y0)*(x1-x0+1)+(px-x0))*4;
-      cur.data[ci+3]=Math.max(0,cur.data[ci+3]-Math.round(255*strength));
-    }
-    ctx.putImageData(cur,x0,y0);
-    scheduleRefresh();
-  }, [dispSize, scheduleRefresh]);
-
-  const applyRestoreBrush = useCallback((imgX: number, imgY: number, radius: number) => {
-    const c=canvasRef.current; if (!c||!dispSize||!originalDataRef.current) return;
-    const ctx=c.getContext("2d")!;
-    const orig=originalDataRef.current, cw=c.width, ch=c.height;
-    const r=Math.ceil(radius);
-    const x0=Math.max(0,Math.floor(imgX-r)), y0=Math.max(0,Math.floor(imgY-r));
-    const x1=Math.min(cw-1,Math.ceil(imgX+r)), y1=Math.min(ch-1,Math.ceil(imgY+r));
-    const cur=ctx.getImageData(x0,y0,x1-x0+1,y1-y0+1);
-    const hard=Math.max(0.05,Math.min(1,brushHardRef.current));
-    for (let py=y0;py<=y1;py++) for (let px=x0;px<=x1;px++) {
-      const dist=Math.hypot(px-imgX,py-imgY); if (dist>radius) continue;
-      const falloff=dist<=radius*hard*0.5?1:1-(dist-radius*hard*0.5)/Math.max(0.1,radius*(1-hard*0.5));
-      const strength=Math.max(0,Math.min(1,falloff)); if (strength<=0) continue;
-      const ci=((py-y0)*(x1-x0+1)+(px-x0))*4, oi=(py*orig.width+px)*4;
-      if (px>=orig.width||py>=orig.height) continue;
-      cur.data[ci]  =cur.data[ci]  +(orig.data[oi]  -cur.data[ci])*strength;
-      cur.data[ci+1]=cur.data[ci+1]+(orig.data[oi+1]-cur.data[ci+1])*strength;
-      cur.data[ci+2]=cur.data[ci+2]+(orig.data[oi+2]-cur.data[ci+2])*strength;
-      cur.data[ci+3]=cur.data[ci+3]+(orig.data[oi+3]-cur.data[ci+3])*strength;
-    }
-    ctx.putImageData(cur,x0,y0);
-    scheduleRefresh();
-  }, [dispSize, scheduleRefresh]);
+  const handleClearSelection = useCallback(()=>{
+    setSelectionMask(null);
+  },[]);
 
   // ── Mouse events ────────────────────────────────────────────────────────────
 
-  const drawCursor = (clientX: number, clientY: number) => {
-    const el=imgRef.current; if (!el||!dispSize) return;
-    const rect=el.getBoundingClientRect(), pz=getPageZoom();
-    setCursor({x:clientX/pz,y:clientY/pz,size:Math.max(4,brushRef.current*(rect.width/pz/dispSize.w)),visible:true});
-  };
-
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLElement>) => {
     if (!loaded||!dispSize) return;
-    if (!refineMode) {
-      isMoving.current=true;
-      moveStartRef.current={pointerX:e.clientX,pointerY:e.clientY,panX:panRef.current.x,panY:panRef.current.y};
+    if (toolActive) {
+      const pt=pointFromEvent(e); if (!pt) return;
+      handleFuzzySelect(pt.imageX, pt.imageY);
       return;
     }
-    const pt=pointFromEvent(e); if (!pt) return;
-    isDrawing.current=true; lastBrushPoint.current=null; saveUndo();
-    if (refineMode==="erase") applyEraseBrush(pt.imageX,pt.imageY,pt.imageRadius);
-    else applyRestoreBrush(pt.imageX,pt.imageY,pt.imageRadius);
-    drawCursor(e.clientX,e.clientY);
-  }, [loaded,dispSize,refineMode,pointFromEvent,saveUndo,applyEraseBrush,applyRestoreBrush]);
+    isMoving.current=true;
+    moveStartRef.current={pointerX:e.clientX,pointerY:e.clientY,panX:panRef.current.x,panY:panRef.current.y};
+  }, [loaded,dispSize,toolActive,pointFromEvent,handleFuzzySelect]);
 
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
     if (isMoving.current&&moveStartRef.current) {
       const s=moveStartRef.current;
-      setPan({x:s.panX+e.clientX-s.pointerX,y:s.panY+e.clientY-s.pointerY}); return;
+      setPan({x:s.panX+e.clientX-s.pointerX,y:s.panY+e.clientY-s.pointerY});
     }
-    const pt=pointFromEvent(e); if (!pt) return;
-    if (refineMode) drawCursor(e.clientX,e.clientY);
-    if (!isDrawing.current) return;
-    const last=lastBrushPoint.current;
-    if (last) {
-      const dx=pt.imageX-last.x, dy=pt.imageY-last.y;
-      const steps=Math.max(1,Math.ceil(Math.hypot(dx,dy)/Math.max(1,pt.imageRadius/2)));
-      for (let i=1;i<=steps;i++) {
-        const t=i/steps;
-        if (refineMode==="erase") applyEraseBrush(last.x+dx*t,last.y+dy*t,pt.imageRadius);
-        else applyRestoreBrush(last.x+dx*t,last.y+dy*t,pt.imageRadius);
-      }
-    } else {
-      if (refineMode==="erase") applyEraseBrush(pt.imageX,pt.imageY,pt.imageRadius);
-      else applyRestoreBrush(pt.imageX,pt.imageY,pt.imageRadius);
-    }
-    lastBrushPoint.current={x:pt.imageX,y:pt.imageY};
-  }, [refineMode,pointFromEvent,applyEraseBrush,applyRestoreBrush]);
-
-  const onMouseUp = useCallback(() => {
-    isDrawing.current=false; isMoving.current=false;
-    lastBrushPoint.current=null; moveStartRef.current=null;
   }, []);
 
-  const onMouseLeave = useCallback(() => {
-    setCursor(c=>({...c,visible:false})); onMouseUp();
-  }, [onMouseUp]);
+  const onMouseUp = useCallback(() => {
+    isMoving.current=false; moveStartRef.current=null;
+  }, []);
+
+  const onMouseLeave = useCallback(() => { onMouseUp(); }, [onMouseUp]);
 
   // ── Confirm ─────────────────────────────────────────────────────────────────
 
@@ -504,6 +431,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const canUndo=undoRef.current.length>0;
   const canRedo=redoRef.current.length>0;
   const bgStyle:React.CSSProperties=bgPreview==="checker"?CHECKER_STYLE:bgPreview==="white"?{backgroundColor:"#fff"}:{backgroundColor:"#111"};
+  const canvasCursor = toolActive ? "crosshair" : (selectionMask ? "default" : "grab");
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col" style={{backgroundColor:"#141414"}}>
@@ -512,8 +440,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       <div className="flex items-center justify-between px-5 h-14 border-b shrink-0" style={{borderColor:"rgba(255,255,255,0.08)"}}>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{backgroundColor:"#a855f7"}}/>
-            <span className="text-[11px] font-black uppercase tracking-[0.25em] text-white">AI Editor</span>
+            <div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor:"#a855f7"}}/>
+            <span className="text-[11px] font-black uppercase tracking-[0.25em] text-white">Image Editor</span>
           </div>
           <div className="flex items-center gap-1">
             <button onClick={doUndo} disabled={!canUndo} title="Undo (Ctrl+Z)"
@@ -539,25 +467,25 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             <span className="text-[10px] text-white/30 ml-1 uppercase tracking-widest">BG</span>
           </div>
           <button onClick={onCancel}
-            className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest border border-white/15 text-white/50 hover:text-white hover:border-white/30 transition-all rounded">
+            className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest text-white/40 hover:text-white/70 hover:bg-white/8 transition-all">
             Cancel
           </button>
           <button onClick={handleConfirm}
-            className="px-5 py-2 text-[11px] font-black uppercase tracking-widest rounded transition-all hover:opacity-90"
-            style={{backgroundColor:"#f5c842",color:"#0d0d0d"}}>
-            Use Image
+            className="px-5 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
+            style={{background:"linear-gradient(135deg,#a855f7,#7c3aed)",color:"#fff"}}>
+            Apply →
           </button>
         </div>
       </div>
 
-      {/* ── Main layout ── */}
+      {/* ── Body ── */}
       <div className="flex flex-1 min-h-0">
 
         {/* ── Canvas area ── */}
         <div
           ref={areaRef}
           className="flex-1 flex items-center justify-center relative overflow-hidden select-none"
-          style={{...bgStyle, cursor:refineMode?"crosshair":"grab"}}
+          style={{...bgStyle, cursor: canvasCursor}}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
@@ -565,15 +493,26 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
           onWheel={onWheel}
         >
           {displaySrc && (
-            <img
-              ref={imgRef}
-              src={displaySrc}
-              alt="editing"
-              draggable={false}
-              style={{maxWidth:"90%",maxHeight:"90%",objectFit:"contain",
-                transform:canTransform,transformOrigin:"0 0",
-                imageRendering:"pixelated",userSelect:"none"}}
-            />
+            <div style={{
+              position:"relative", display:"inline-block",
+              maxWidth:"90%", maxHeight:"90%",
+              transform:canTransform, transformOrigin:"0 0",
+            }}>
+              <img
+                ref={imgRef}
+                src={displaySrc}
+                alt="editing"
+                draggable={false}
+                style={{display:"block",maxWidth:"100%",maxHeight:"100%",
+                  objectFit:"contain",imageRendering:"pixelated",userSelect:"none"}}
+              />
+              {/* Selection overlay */}
+              <canvas
+                ref={overlayCanvasRef}
+                style={{position:"absolute",inset:0,width:"100%",height:"100%",
+                  pointerEvents:"none",imageRendering:"pixelated"}}
+              />
+            </div>
           )}
           {!loaded && (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -581,42 +520,42 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             </div>
           )}
           {processing && (
-            <div className="absolute inset-0 flex items-center justify-center" style={{backgroundColor:"rgba(0,0,0,0.6)"}}>
-              <div className="flex flex-col items-center gap-4">
+            <div className="absolute inset-0 flex items-center justify-center" style={{backgroundColor:"rgba(0,0,0,0.55)"}}>
+              <div className="flex flex-col items-center gap-3">
                 <div className="flex gap-1.5">
                   {[0,1,2].map(i=>(
                     <div key={i} className="w-2.5 h-2.5 rounded-full animate-bounce"
                       style={{backgroundColor:"#a855f7",animationDelay:`${i*0.15}s`}}/>
                   ))}
                 </div>
-                <span className="text-[12px] font-bold uppercase tracking-[0.2em]"
-                  style={{color:"rgba(196,140,255,0.9)"}}>AI is editing…</span>
-                <span className="text-[10px] text-white/30">Analyzing and applying changes</span>
+                <span className="text-[11px] font-bold uppercase tracking-[0.2em]"
+                  style={{color:"rgba(196,140,255,0.9)"}}>
+                  {selectionMask ? "Applying…" : "Selecting…"}
+                </span>
               </div>
             </div>
           )}
-          {cursor.visible && refineMode && (
-            <div style={{position:"fixed",left:cursor.x,top:cursor.y,
-              width:cursor.size,height:cursor.size,boxSizing:"border-box",
-              transform:"translate(-50%,-50%)",borderRadius:"9999px",
-              border:`2px solid ${refineMode==="restore"?"rgba(80,220,120,0.95)":"rgba(255,255,255,0.95)"}`,
-              boxShadow:"0 0 0 1px rgba(0,0,0,0.8)",pointerEvents:"none",zIndex:30}}/>
+          {/* Tool active hint */}
+          {toolActive && !selectionMask && loaded && !processing && (
+            <div className="absolute bottom-5 left-1/2 -translate-x-1/2 pointer-events-none">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-bold"
+                style={{backgroundColor:"rgba(0,0,0,0.7)",border:"1px solid rgba(168,85,247,0.4)",color:"rgba(196,140,255,0.9)",backdropFilter:"blur(8px)"}}>
+                <span style={{color:"#a855f7"}}>✦</span> Click anywhere to select
+              </div>
+            </div>
           )}
           <canvas ref={canvasRef} style={{display:"none"}}/>
         </div>
 
-        {/* ── AI panel ── */}
+        {/* ── Tool panel ── */}
         <div className="w-80 border-l flex flex-col shrink-0" style={{borderColor:"rgba(168,85,247,0.2)"}}>
-          <AIAssistPanel
-            canvasRef={canvasRef}
-            onApplyResult={handleAIApply}
-            onApplyAdjustments={handleAIAdjust}
-            refineMode={refineMode}
-            onRefineMode={setRefineMode}
-            brushSize={brushSize}
-            brushHard={brushHard}
-            onBrushSize={setBrushSize}
-            onBrushHard={setBrushHard}
+          <FuzzySelectPanel
+            toolActive={toolActive}
+            hasSelection={!!selectionMask}
+            onToggleTool={() => { setToolActive(v => !v); setSelectionMask(null); }}
+            onDelete={handleDelete}
+            onChangeColor={handleChangeColor}
+            onClearSelection={handleClearSelection}
           />
         </div>
       </div>
