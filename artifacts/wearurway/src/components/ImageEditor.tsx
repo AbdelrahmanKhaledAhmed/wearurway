@@ -171,19 +171,22 @@ const RedoIcon = () => (
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 }: Props) {
-  const canvasRef       = useRef<HTMLCanvasElement>(null);
-  const overlayCanvasRef= useRef<HTMLCanvasElement>(null);
-  const imgRef          = useRef<HTMLImageElement>(null);
-  const areaRef         = useRef<HTMLDivElement>(null);
-  const originalDataRef = useRef<ImageData|null>(null);
-  const isMoving        = useRef(false);
-  const moveStartRef    = useRef<{pointerX:number;pointerY:number;panX:number;panY:number}|null>(null);
-  const undoRef         = useRef<CanvasSnapshot[]>([]);
-  const redoRef         = useRef<CanvasSnapshot[]>([]);
-  const trimRef         = useRef<ImageEditResult|null>(null);
-  const panRef          = useRef({x:0,y:0});
-  const zoomRef         = useRef(1);
-  const rafRef          = useRef<number|null>(null);
+  const canvasRef        = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef           = useRef<HTMLImageElement>(null);
+  const areaRef          = useRef<HTMLDivElement>(null);
+  const originalDataRef  = useRef<ImageData|null>(null);
+  const isMoving         = useRef(false);
+  const moveStartRef     = useRef<{pointerX:number;pointerY:number;panX:number;panY:number}|null>(null);
+  const undoRef          = useRef<CanvasSnapshot[]>([]);
+  const redoRef          = useRef<CanvasSnapshot[]>([]);
+  const trimRef          = useRef<ImageEditResult|null>(null);
+  const panRef           = useRef({x:0,y:0});
+  const zoomRef          = useRef(1);
+  const rafRef           = useRef<number|null>(null);
+  const baseOverlayRef   = useRef<Uint8ClampedArray|null>(null);
+  const borderPixelsRef  = useRef<{idx:number;x:number;y:number}[]>([]);
+  const animFrameRef     = useRef<number|null>(null);
 
   const [bgPreview,     setBgPreview]     = useState<BgPreview>("checker");
   const [processing,    setProcessing]    = useState(false);
@@ -200,25 +203,86 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   useEffect(()=>{ panRef.current=pan; },[pan]);
   useEffect(()=>{ zoomRef.current=zoom; },[zoom]);
 
-  // ── Update overlay canvas when selection changes ─────────────────────────────
+  // ── Marching ants selection overlay ──────────────────────────────────────────
 
+  // Step 1: Pre-compute base overlay + border pixels whenever selection changes
   useEffect(()=>{
+    if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current=null; }
     const oc=overlayCanvasRef.current, mc=canvasRef.current;
     if (!oc||!mc) return;
+
     if (!selectionMask) {
-      const ctx=oc.getContext("2d");
-      if (ctx) { oc.width=mc.width; oc.height=mc.height; ctx.clearRect(0,0,oc.width,oc.height); }
+      baseOverlayRef.current=null; borderPixelsRef.current=[];
+      oc.width=mc.width; oc.height=mc.height;
+      oc.getContext("2d")?.clearRect(0,0,oc.width,oc.height);
       return;
     }
-    oc.width=mc.width; oc.height=mc.height;
-    const ctx=oc.getContext("2d"); if (!ctx) return;
-    const id=ctx.createImageData(mc.width,mc.height);
-    for (let i=0;i<selectionMask.length;i++) {
-      if (selectionMask[i]) {
-        id.data[i*4]=100; id.data[i*4+1]=120; id.data[i*4+2]=255; id.data[i*4+3]=110;
+
+    const w=mc.width, h=mc.height;
+    oc.width=w; oc.height=h;
+
+    // Build base image (interior fill only, no border yet)
+    const base=new Uint8ClampedArray(w*h*4);
+    const borders:{idx:number;x:number;y:number}[]=[];
+
+    for (let y=0;y<h;y++) {
+      for (let x=0;x<w;x++) {
+        const idx=y*w+x;
+        if (!selectionMask[idx]) continue;
+        const isBorder=(
+          x===0||!selectionMask[idx-1]||
+          x===w-1||!selectionMask[idx+1]||
+          y===0||!selectionMask[idx-w]||
+          y===h-1||!selectionMask[idx+w]
+        );
+        if (isBorder) {
+          borders.push({idx,x,y});
+        } else {
+          // Subtle blue interior tint
+          base[idx*4]=100; base[idx*4+1]=160; base[idx*4+2]=255; base[idx*4+3]=28;
+        }
       }
     }
-    ctx.putImageData(id,0,0);
+
+    baseOverlayRef.current=base;
+    borderPixelsRef.current=borders;
+  }, [selectionMask]);
+
+  // Step 2: Animation loop — throttled to ~20fps, updates border pixels only
+  useEffect(()=>{
+    if (!selectionMask) return;
+    let offset=0;
+    let lastTime=0;
+    const INTERVAL=50; // ~20fps is smooth enough for marching ants
+
+    const tick=(now:number)=>{
+      animFrameRef.current=requestAnimationFrame(tick);
+      if (now-lastTime<INTERVAL) return;
+      lastTime=now;
+
+      const oc=overlayCanvasRef.current, mc=canvasRef.current;
+      const base=baseOverlayRef.current, borders=borderPixelsRef.current;
+      if (!oc||!mc||!base) return;
+
+      const buf=new Uint8ClampedArray(base);
+
+      // Marching ants: alternating black/white 4px dashes that march diagonally
+      for (const {idx,x,y} of borders) {
+        const phase=Math.floor((x+y+offset)/4)%2;
+        buf[idx*4]=phase?255:0;
+        buf[idx*4+1]=phase?255:0;
+        buf[idx*4+2]=phase?255:0;
+        buf[idx*4+3]=255;
+      }
+
+      const ctx=oc.getContext("2d");
+      if (ctx) ctx.putImageData(new ImageData(buf,mc.width,mc.height),0,0);
+
+      offset=(offset+1)%32;
+    };
+
+    animFrameRef.current=requestAnimationFrame(tick);
+    return ()=>{ if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
   }, [selectionMask]);
 
   // ── Load ────────────────────────────────────────────────────────────────────
