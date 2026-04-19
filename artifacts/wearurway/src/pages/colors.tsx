@@ -24,7 +24,7 @@ export default function Colors() {
 
   const handleSelect = (color: any) => {
     setColor(color);
-    setLocation(`/sizes?fit=${fitId}&color=${color.id}`);
+    setLocation(`/design?fit=${fitId}&color=${color.id}`);
   };
 
   return (

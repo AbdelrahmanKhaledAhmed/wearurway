@@ -155,10 +155,10 @@ export default function Design() {
 
   useEffect(() => {
     if (shareLoading) return;
-    if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) {
+    if (!selectedProduct || !selectedFit || !selectedColor) {
       setLocation("/products");
     }
-  }, [shareLoading, selectedProduct, selectedFit, selectedColor, selectedSize, setLocation]);
+  }, [shareLoading, selectedProduct, selectedFit, selectedColor, setLocation]);
 
   const savedDesignLoaded = useRef(false);
   const shareLoadedRef = useRef(false);
@@ -799,7 +799,7 @@ export default function Design() {
   }, []);
 
   const handleShareDesign = useCallback(async () => {
-    if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return;
+    if (!selectedProduct || !selectedFit || !selectedColor) return;
     setSharing(true);
     try {
       const layerFilenames: string[] = [];
@@ -897,7 +897,7 @@ export default function Design() {
     }
   }, [frontLayers, backLayers, mockupSize, mockup]);
 
-  if (!selectedProduct || !selectedFit || !selectedColor || !selectedSize) return null;
+  if (!selectedProduct || !selectedFit || !selectedColor) return null;
 
   return (
     <>
@@ -1286,7 +1286,7 @@ export default function Design() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground uppercase tracking-widest">Size</span>
-                <span className="font-bold uppercase">{selectedSize.name}</span>
+                <span className="font-bold uppercase">{selectedSize?.name ?? '—'}</span>
               </div>
             </div>
           </div>
@@ -1394,7 +1394,6 @@ export default function Design() {
       selectedProduct={selectedProduct}
       selectedFit={selectedFit}
       selectedColor={selectedColor}
-      selectedSize={selectedSize}
     />
 
     <AnimatePresence>

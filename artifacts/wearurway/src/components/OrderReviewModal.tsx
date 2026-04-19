@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useGetOrderSettings } from "@workspace/api-client-react";
+import { useGetOrderSettings, useGetSizes, getGetSizesQueryKey } from "@workspace/api-client-react";
+import { useCustomizer } from "@/hooks/use-customizer";
 
 interface BBox { x: number; y: number; width: number; height: number }
 
@@ -31,7 +32,7 @@ interface Props {
   mockup: Mockup | null | undefined;
   mockupSize: number;
   selectedProduct: { name: string } | null;
-  selectedFit: { name: string } | null;
+  selectedFit: { id: string; name: string } | null;
   selectedColor: { name: string; hex: string } | null;
   selectedSize: { name: string } | null;
 }
@@ -75,13 +76,11 @@ async function generatePreview(
   const W = 600;
   const H = 800;
 
-  // Scale from the on-screen mockup coordinate space to preview canvas size
   const scaleX = W / mockupSize;
   const scaleY = H / (mockupSize * (4 / 3));
 
   const shirtImg = await loadCanvasImage(mockupImage);
 
-  // ── Off-screen canvas: design layers clipped to shirt silhouette ──────────
   const designCanvas = document.createElement("canvas");
   designCanvas.width  = W;
   designCanvas.height = H;
@@ -108,14 +107,12 @@ async function generatePreview(
     dctx.restore();
   }
 
-  // Clip design to shirt alpha silhouette (same as CSS mask-image in designer)
   if (shirtImg) {
     dctx.globalCompositeOperation = "destination-in";
     drawImageContain(dctx, shirtImg, 0, 0, W, H);
     dctx.globalCompositeOperation = "source-over";
   }
 
-  // ── Main canvas: dark background → shirt → design composite ──────────────
   const canvas = document.createElement("canvas");
   canvas.width  = W;
   canvas.height = H;
@@ -124,14 +121,11 @@ async function generatePreview(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  // Background
   ctx.fillStyle = "#111111";
   ctx.fillRect(0, 0, W, H);
 
-  // Shirt image
   if (shirtImg) drawImageContain(ctx, shirtImg, 0, 0, W, H);
 
-  // Design clipped to shirt shape, on top
   ctx.drawImage(designCanvas, 0, 0);
 
   return canvas.toDataURL("image/png");
@@ -142,10 +136,17 @@ export default function OrderReviewModal({
   frontLayers, backLayers,
   localFrontBbox, localBackBbox,
   mockup, mockupSize,
-  selectedProduct, selectedFit, selectedColor, selectedSize,
+  selectedProduct, selectedFit, selectedColor,
 }: Props) {
   const [, setLocation] = useLocation();
+  const { selectedSize, setSize } = useCustomizer();
   const { data: orderSettings } = useGetOrderSettings();
+  const fitId = selectedFit?.id ?? "";
+  const { data: sizes, isLoading: sizesLoading } = useGetSizes(fitId, {
+    query: { enabled: !!fitId, queryKey: getGetSizesQueryKey(fitId) }
+  });
+
+  const [step, setStep] = useState<"size" | "review">("size");
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
   const [backPreview, setBackPreview] = useState<string | null>(null);
   const [generatingPreviews, setGeneratingPreviews] = useState(false);
@@ -174,12 +175,25 @@ export default function OrderReviewModal({
 
   useEffect(() => {
     if (isOpen) {
+      setStep("size");
       generatedRef.current = false;
       setFrontPreview(null);
       setBackPreview(null);
+      setPrepareError("");
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (step === "review") {
       generatePreviews();
     }
-  }, [isOpen, generatePreviews]);
+  }, [step, generatePreviews]);
+
+  const handleSizeSelect = (size: any) => {
+    if (size.available === false) return;
+    setSize(size);
+    setStep("review");
+  };
 
   const handleConfirm = () => {
     setPrepareError("");
@@ -229,8 +243,12 @@ export default function OrderReviewModal({
               {/* Header */}
               <div className="flex items-center justify-between px-8 py-6 border-b border-white/10">
                 <div>
-                  <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase mb-1">Review</p>
-                  <h2 className="text-xl font-black uppercase tracking-[0.1em]" style={{ fontFamily: "monospace" }}>Your Order</h2>
+                  <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase mb-1">
+                    {step === "size" ? "Step 1 of 2" : "Step 2 of 2"}
+                  </p>
+                  <h2 className="text-xl font-black uppercase tracking-[0.1em]" style={{ fontFamily: "monospace" }}>
+                    {step === "size" ? "Select Size" : "Review Order"}
+                  </h2>
                 </div>
                 <button
                   onClick={onClose}
@@ -240,89 +258,149 @@ export default function OrderReviewModal({
                 </button>
               </div>
 
-              {/* Design previews */}
-              <div className="px-8 pt-6">
-                <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase mb-4">Design Preview</p>
-                <div className="grid grid-cols-2 gap-4">
-                  {(["FRONT", "BACK"] as const).map((label) => {
-                    const preview = label === "FRONT" ? frontPreview : backPreview;
-                    return (
-                      <div key={label} className="flex flex-col gap-2">
-                        <div className="aspect-[3/4] bg-[#161616] border border-white/8 overflow-hidden relative flex items-center justify-center">
-                          {generatingPreviews && !preview ? (
-                            <div className="flex flex-col items-center gap-2">
-                              <div className="w-6 h-6 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
-                              <p className="text-[10px] text-white/30 uppercase tracking-widest">Rendering…</p>
-                            </div>
-                          ) : preview ? (
-                            <img src={preview} alt={label} className="w-full h-full object-cover" />
-                          ) : (
-                            <p className="text-[10px] text-white/20 uppercase tracking-widest">No mockup</p>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-white/50 uppercase tracking-[0.2em] text-center font-bold">{label}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Configuration */}
-              <div className="px-8 pt-6">
-                <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase mb-4">Configuration</p>
-                <div className="border border-white/10 divide-y divide-white/10">
-                  {[
-                    { label: "Product", value: selectedProduct?.name },
-                    { label: "Fit", value: selectedFit?.name },
-                    {
-                      label: "Color",
-                      value: selectedColor?.name,
-                      extra: selectedColor?.hex ? (
-                        <div className="w-3.5 h-3.5 border border-white/20 mr-2" style={{ backgroundColor: selectedColor.hex }} />
-                      ) : null,
-                    },
-                    { label: "Size", value: selectedSize?.name },
-                  ].map(row => (
-                    <div key={row.label} className="flex justify-between items-center px-5 py-3.5">
-                      <span className="text-[10px] tracking-[0.2em] text-white/40 uppercase">{row.label}</span>
-                      <div className="flex items-center">
-                        {row.extra}
-                        <span className="text-xs font-bold uppercase tracking-widest">{row.value ?? "—"}</span>
-                      </div>
+              {/* Size Selection Step */}
+              {step === "size" && (
+                <div className="px-8 py-6">
+                  <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase mb-6">Perfect your fit</p>
+                  {sizesLoading ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="h-28 bg-white/5 animate-pulse border border-white/10" />
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      {sizes?.map((size) => (
+                        <motion.button
+                          key={size.id}
+                          whileHover={size.available !== false ? { scale: 1.02 } : {}}
+                          whileTap={size.available !== false ? { scale: 0.97 } : {}}
+                          onClick={() => handleSizeSelect(size)}
+                          disabled={size.available === false}
+                          className={`p-5 border flex flex-col items-center text-center transition-colors ${
+                            size.available !== false
+                              ? "border-white/20 hover:border-[#f5c842] hover:bg-[#f5c842]/5 cursor-pointer"
+                              : "border-white/8 opacity-40 cursor-not-allowed"
+                          }`}
+                        >
+                          <span className="text-xl font-black uppercase tracking-tight mb-2">{size.name}</span>
+                          <span className="text-[11px] font-mono text-white/60 mb-2">
+                            {size.realWidth} × {size.realHeight} cm
+                          </span>
+                          <div className="flex flex-col gap-0.5 text-[10px] text-white/40">
+                            <span>{size.heightMin}–{size.heightMax} cm tall</span>
+                            <span>{size.weightMin}–{size.weightMax} kg</span>
+                          </div>
+                          {size.comingSoon && (
+                            <span className="mt-3 px-2 py-0.5 bg-white/10 text-white/50 text-[10px] tracking-widest uppercase">
+                              Coming Soon
+                            </span>
+                          )}
+                        </motion.button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
-              {/* Price */}
-              <div className="px-8 pt-6 flex items-end justify-between">
-                <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase">Total</p>
-                <div className="flex items-baseline gap-2">
-                  <span
-                    className="text-4xl font-black tracking-tight"
-                    style={{ fontFamily: "monospace", color: "#f5c842" }}
-                  >
-                    {price}
-                  </span>
-                  <span className="text-sm font-bold text-white/50 tracking-widest uppercase">EGP</span>
-                </div>
-              </div>
+              {/* Review Step */}
+              {step === "review" && (
+                <>
+                  {/* Back to size */}
+                  <div className="px-8 pt-5">
+                    <button
+                      onClick={() => setStep("size")}
+                      className="text-[10px] tracking-[0.2em] text-white/40 hover:text-white uppercase transition-colors flex items-center gap-1.5"
+                    >
+                      ← Change Size
+                    </button>
+                  </div>
 
-              {/* Confirm button */}
-              <div className="px-8 pt-6 pb-8">
-                <button
-                  onClick={handleConfirm}
-                  className="w-full py-4 font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-[0.98]"
-                  style={{
-                    backgroundColor: "#f5c842",
-                    color: "#0d0d0d",
-                    letterSpacing: "0.25em",
-                  }}
-                >
-                  Confirm Order
-                </button>
-                {prepareError && <p className="text-xs text-red-400 mt-3">{prepareError}</p>}
-              </div>
+                  {/* Design previews */}
+                  <div className="px-8 pt-4">
+                    <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase mb-4">Design Preview</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      {(["FRONT", "BACK"] as const).map((label) => {
+                        const preview = label === "FRONT" ? frontPreview : backPreview;
+                        return (
+                          <div key={label} className="flex flex-col gap-2">
+                            <div className="aspect-[3/4] bg-[#161616] border border-white/8 overflow-hidden relative flex items-center justify-center">
+                              {generatingPreviews && !preview ? (
+                                <div className="flex flex-col items-center gap-2">
+                                  <div className="w-6 h-6 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
+                                  <p className="text-[10px] text-white/30 uppercase tracking-widest">Rendering…</p>
+                                </div>
+                              ) : preview ? (
+                                <img src={preview} alt={label} className="w-full h-full object-cover" />
+                              ) : (
+                                <p className="text-[10px] text-white/20 uppercase tracking-widest">No mockup</p>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-white/50 uppercase tracking-[0.2em] text-center font-bold">{label}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Configuration */}
+                  <div className="px-8 pt-6">
+                    <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase mb-4">Configuration</p>
+                    <div className="border border-white/10 divide-y divide-white/10">
+                      {[
+                        { label: "Product", value: selectedProduct?.name },
+                        { label: "Fit", value: selectedFit?.name },
+                        {
+                          label: "Color",
+                          value: selectedColor?.name,
+                          extra: selectedColor?.hex ? (
+                            <div className="w-3.5 h-3.5 border border-white/20 mr-2" style={{ backgroundColor: selectedColor.hex }} />
+                          ) : null,
+                        },
+                        { label: "Size", value: selectedSize?.name },
+                      ].map(row => (
+                        <div key={row.label} className="flex justify-between items-center px-5 py-3.5">
+                          <span className="text-[10px] tracking-[0.2em] text-white/40 uppercase">{row.label}</span>
+                          <div className="flex items-center">
+                            {row.extra}
+                            <span className="text-xs font-bold uppercase tracking-widest">{row.value ?? "—"}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Price */}
+                  <div className="px-8 pt-6 flex items-end justify-between">
+                    <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase">Total</p>
+                    <div className="flex items-baseline gap-2">
+                      <span
+                        className="text-4xl font-black tracking-tight"
+                        style={{ fontFamily: "monospace", color: "#f5c842" }}
+                      >
+                        {price}
+                      </span>
+                      <span className="text-sm font-bold text-white/50 tracking-widest uppercase">EGP</span>
+                    </div>
+                  </div>
+
+                  {/* Confirm button */}
+                  <div className="px-8 pt-6 pb-8">
+                    <button
+                      onClick={handleConfirm}
+                      className="w-full py-4 font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-[0.98]"
+                      style={{
+                        backgroundColor: "#f5c842",
+                        color: "#0d0d0d",
+                        letterSpacing: "0.25em",
+                      }}
+                    >
+                      Confirm Order
+                    </button>
+                    {prepareError && <p className="text-xs text-red-400 mt-3">{prepareError}</p>}
+                  </div>
+                </>
+              )}
             </div>
           </motion.div>
         </>
