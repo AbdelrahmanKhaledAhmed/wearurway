@@ -17,33 +17,36 @@ router.post("/ai/select-assist", async (req, res) => {
       return;
     }
 
-    const systemPrompt = `You are an expert AI image editing assistant inside a professional design tool similar to Photoshop.
-The user will describe what they want to select or remove from an image.
-Your job is to analyze the image carefully and return structured JSON data that the selection algorithm will use.
+    const systemPrompt = `You are a world-class AI image editing engine, like Adobe Firefly or Remove.bg, embedded in a professional design tool.
 
-Respond ONLY with valid JSON in this exact format (no markdown, no explanation outside JSON):
+The user uploads an image and tells you what they want to remove or keep. Your job is to identify the EXACT pixel regions to erase, using normalized coordinates (0.0–1.0).
+
+You MUST respond ONLY with valid JSON — no markdown, no code fences, no explanation outside the JSON:
 {
-  "message": "brief friendly explanation of what you found and what you'll select",
+  "message": "Short, confident confirmation of what you found and what action you are taking (1-2 sentences max)",
   "seedPoints": [
-    { "x": 0.12, "y": 0.08 },
-    { "x": 0.95, "y": 0.15 }
+    { "x": 0.05, "y": 0.05 },
+    { "x": 0.50, "y": 0.02 }
   ],
-  "tolerance": 45,
-  "edgeTolerance": 60,
-  "hint": "optional tip for refining the selection"
+  "tolerance": 38,
+  "edgeTolerance": 50,
+  "hint": "Optional short tip for refining edges, or null"
 }
 
-Rules:
-- seedPoints are normalized (0.0-1.0) x,y coordinates of representative pixels in the AREA TO SELECT/REMOVE
-- Provide 1-6 seed points that cover the region the user wants to select
-- tolerance (5-120): lower = more precise color matching, higher = selects wider color range. For uniform backgrounds use 25-45, for complex areas use 50-80
-- edgeTolerance (10-200): lower = stops at sharp edges, higher = crosses softer edges
-- message should be conversational and helpful, max 2 sentences
-- hint should give a useful tip about refining with the manual tools`;
+CRITICAL RULES:
+- seedPoints are normalized (0.0–1.0) x,y coordinates of pixels IN THE AREA TO REMOVE/ERASE
+- Provide 8–15 seed points that cover the full region to remove (more = better coverage)
+- Spread seeds across the entire area — corners, center, edges of the target region
+- tolerance (5–120): lower = precise color match, higher = broader. Uniform bg → 25-45, complex/gradient bg → 55-85, mixed colors → 45-65
+- edgeTolerance (10–250): stops at pixel edges. Use 30-60 for sharp-edged subjects, 80-150 for soft/hair/fur edges
+- If the user says "remove background": identify background pixels far from the subject, spread seeds in all background zones
+- If the user says "keep subject" or "remove everything except X": seeds go on the background areas
+- message should sound confident and modern, like a professional AI tool
+- hint may suggest a refinement action, or null if not needed`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5.2",
-      max_completion_tokens: 512,
+      model: "gpt-4o",
+      max_tokens: 700,
       messages: [
         { role: "system", content: systemPrompt },
         {
@@ -53,12 +56,12 @@ Rules:
               type: "image_url",
               image_url: {
                 url: `data:image/png;base64,${imageBase64}`,
-                detail: "low",
+                detail: "high",
               },
             },
             {
               type: "text",
-              text: `The image is ${width}x${height} pixels. User request: "${prompt}"`,
+              text: `Image dimensions: ${width}×${height}px. User request: "${prompt}"\n\nAnalyze the image carefully and return the JSON with seed points covering the area to be removed/erased.`,
             },
           ],
         },
@@ -76,26 +79,25 @@ Rules:
     } = {};
 
     try {
-      // Strip markdown code fences if present
       const clean = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(clean);
     } catch {
       parsed = {
-        message: "I analyzed the image. Try clicking on the area you want to select, or describe it differently.",
+        message: "I analyzed your image. Try describing the area you want to remove more specifically.",
         seedPoints: [],
-        tolerance: 35,
-        edgeTolerance: 40,
+        tolerance: 40,
+        edgeTolerance: 60,
       };
     }
 
     res.json({
-      message: parsed.message ?? "I found the area. Check the selection and refine as needed.",
+      message: parsed.message ?? "Done — check the result and refine if needed.",
       seedPoints: (parsed.seedPoints ?? []).map((p) => ({
         x: Math.max(0, Math.min(1, p.x)),
         y: Math.max(0, Math.min(1, p.y)),
       })),
-      tolerance: Math.max(5, Math.min(120, parsed.tolerance ?? 35)),
-      edgeTolerance: Math.max(10, Math.min(200, parsed.edgeTolerance ?? 40)),
+      tolerance:     Math.max(5,  Math.min(120, parsed.tolerance     ?? 40)),
+      edgeTolerance: Math.max(10, Math.min(250, parsed.edgeTolerance ?? 60)),
       hint: parsed.hint ?? null,
     });
   } catch (err) {
