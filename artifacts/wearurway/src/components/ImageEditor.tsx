@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import FuzzySelectPanel from "./AIAssistPanel";
 
 type BgPreview = "checker" | "white" | "black";
-type ToolMode  = "select" | "restore" | null;
+type ToolMode  = "select" | "restore" | "erase" | null;
 
 export interface ImageEditResult {
   originalWidth: number; originalHeight: number;
@@ -29,7 +29,6 @@ function getColorAt(d: Uint8ClampedArray, x: number, y: number, w: number): [num
   const i=(y*w+x)*4; return [d[i],d[i+1],d[i+2],d[i+3]];
 }
 
-// Perceptually-weighted color distance (matches human vision sensitivity)
 function perceptualDist(a: [number,number,number,number], b: [number,number,number,number]) {
   const dr=a[0]-b[0], dg=a[1]-b[1], db=a[2]-b[2];
   return Math.sqrt(0.299*dr*dr + 0.587*dg*dg + 0.114*db*db);
@@ -50,7 +49,6 @@ function computeGradientMag(d: Uint8ClampedArray, w: number, h: number): Float32
   return mag;
 }
 
-// Improved fuzzy select: 8-connectivity + gradient tracking + perceptual distance
 function fuzzySelectRegion(id: ImageData, sx: number, sy: number, colorTol: number, edgeTol: number): Uint8Array {
   const {data:d,width:w,height:h}=id;
   const mag=computeGradientMag(d,w,h);
@@ -59,7 +57,6 @@ function fuzzySelectRegion(id: ImageData, sx: number, sy: number, colorTol: numb
   if (seed[3]===0) return mask;
 
   const processed=new Uint8Array(w*h);
-  // Store [pixelIdx, parentR, parentG, parentB, parentA] packed
   const queue: number[]=[];
   const parentColor=new Uint8Array(w*h*4);
 
@@ -69,31 +66,22 @@ function fuzzySelectRegion(id: ImageData, sx: number, sy: number, colorTol: numb
   parentColor[startIdx*4]=seed[0]; parentColor[startIdx*4+1]=seed[1];
   parentColor[startIdx*4+2]=seed[2]; parentColor[startIdx*4+3]=seed[3];
 
-  // 8-connectivity: cardinal + diagonal directions
   const dirs=[1,0,-1,0,0,1,0,-1,1,1,-1,1,1,-1,-1,-1];
 
   while (queue.length) {
     const idx=queue.pop()!;
     const x=idx%w, y=Math.floor(idx/w);
     if (d[idx*4+3]===0) continue;
-
     const col=getColorAt(d,x,y,w);
     const pi=idx*4;
     const par:[number,number,number,number]=[parentColor[pi],parentColor[pi+1],parentColor[pi+2],parentColor[pi+3]];
-
-    // Pass if close to seed OR sufficiently close to parent (enables gradient tracking)
-    const distSeed=perceptualDist(col,seed);
-    const distParent=perceptualDist(col,par);
-    if (distSeed>colorTol && distParent>colorTol*0.55) continue;
-
+    if (perceptualDist(col,seed)>colorTol && perceptualDist(col,par)>colorTol*0.55) continue;
     mask[idx]=1;
-
     for (let di=0;di<16;di+=2) {
       const nx=x+dirs[di], ny=y+dirs[di+1];
       if (nx<0||nx>=w||ny<0||ny>=h) continue;
       const ni=ny*w+nx; if (processed[ni]) continue;
       processed[ni]=1;
-      // Diagonal neighbors: slightly looser edge stop to avoid diagonal artifacts
       const isDiag=(dirs[di]!==0&&dirs[di+1]!==0);
       if (mag[ni]>(isDiag?edgeTol*1.15:edgeTol)) continue;
       queue.push(ni);
@@ -104,16 +92,13 @@ function fuzzySelectRegion(id: ImageData, sx: number, sy: number, colorTol: numb
   return mask;
 }
 
-// Feather the mask edges for smooth blending (box blur near border)
 function featherMask(mask: Uint8Array, w: number, h: number, passes: number): Float32Array {
   const f=new Float32Array(mask.length);
   for (let i=0;i<mask.length;i++) f[i]=mask[i];
-
   for (let p=0;p<passes;p++) {
     const tmp=new Float32Array(f);
     for (let y=1;y<h-1;y++) for (let x=1;x<w-1;x++) {
       const idx=y*w+x;
-      // Only process border zone — skip fully interior or fully exterior pixels
       const isFull=(f[idx]>0.99&&f[idx-1]>0.99&&f[idx+1]>0.99&&f[idx-w]>0.99&&f[idx+w]>0.99);
       const isEmpty=(f[idx]<0.01&&f[idx-1]<0.01&&f[idx+1]<0.01&&f[idx-w]<0.01&&f[idx+w]<0.01);
       if (isFull||isEmpty) continue;
@@ -124,14 +109,11 @@ function featherMask(mask: Uint8Array, w: number, h: number, passes: number): Fl
   return f;
 }
 
-// Smooth deletion using feathered alpha
 function applyMaskDeletion(id: ImageData, mask: Uint8Array): ImageData {
   const out=new ImageData(new Uint8ClampedArray(id.data),id.width,id.height);
   const feathered=featherMask(mask,id.width,id.height,4);
   for (let i=0;i<feathered.length;i++) {
-    if (feathered[i]>0) {
-      out.data[i*4+3]=Math.max(0,Math.round(out.data[i*4+3]*(1-feathered[i])));
-    }
+    if (feathered[i]>0) out.data[i*4+3]=Math.max(0,Math.round(out.data[i*4+3]*(1-feathered[i])));
   }
   return out;
 }
@@ -142,9 +124,7 @@ function applyMaskRecolor(id: ImageData, mask: Uint8Array, hexColor: string): Im
   const g=parseInt(hexColor.slice(3,5),16);
   const b=parseInt(hexColor.slice(5,7),16);
   for (let i=0;i<mask.length;i++) {
-    if (mask[i]&&out.data[i*4+3]>0) {
-      out.data[i*4]=r; out.data[i*4+1]=g; out.data[i*4+2]=b;
-    }
+    if (mask[i]&&out.data[i*4+3]>0) { out.data[i*4]=r; out.data[i*4+1]=g; out.data[i*4+2]=b; }
   }
   return out;
 }
@@ -195,11 +175,6 @@ function enhanceCanvas(src: HTMLCanvasElement, qualityScale=1) {
   return out;
 }
 
-function getPageZoom() {
-  const raw=getComputedStyle(document.documentElement).zoom, z=Number(raw);
-  return Number.isFinite(z)&&z>0?z:1;
-}
-
 const CHECKER_STYLE: React.CSSProperties = {
   backgroundImage:"linear-gradient(45deg,#2a2a2a 25%,transparent 25%),linear-gradient(-45deg,#2a2a2a 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#2a2a2a 75%),linear-gradient(-45deg,transparent 75%,#2a2a2a 75%)",
   backgroundSize:"20px 20px", backgroundPosition:"0 0,0 10px,10px -10px,-10px 0px", backgroundColor:"#1c1c1c",
@@ -223,10 +198,13 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef           = useRef<HTMLImageElement>(null);
   const areaRef          = useRef<HTMLDivElement>(null);
+  // originalDataRef: updated after each edit (used for undo reference)
   const originalDataRef  = useRef<ImageData|null>(null);
+  // trueOriginalRef: set ONCE at load time, NEVER updated — restore brush uses this
+  const trueOriginalRef  = useRef<ImageData|null>(null);
   const isMoving         = useRef(false);
-  const isRestoring      = useRef(false);
-  const lastRestorePoint = useRef<{x:number;y:number}|null>(null);
+  const isPainting       = useRef(false);
+  const lastPaintPoint   = useRef<{x:number;y:number}|null>(null);
   const moveStartRef     = useRef<{pointerX:number;pointerY:number;panX:number;panY:number}|null>(null);
   const undoRef          = useRef<CanvasSnapshot[]>([]);
   const redoRef          = useRef<CanvasSnapshot[]>([]);
@@ -244,18 +222,42 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const [loaded,        setLoaded]        = useState(false);
   const [zoom,          setZoom]          = useState(1);
   const [pan,           setPan]           = useState({x:0,y:0});
-  const [dispSize,      setDispSize]      = useState<{w:number;h:number}|null>(null);
+  const [nativeSize,    setNativeSize]    = useState<{w:number;h:number}|null>(null);
   const [histSig,       setHistSig]       = useState(0);
   const [displaySrc,    setDisplaySrc]    = useState("");
   const [toolMode,      setToolMode]      = useState<ToolMode>(null);
   const [selectionMask, setSelectionMask] = useState<Uint8Array|null>(null);
   const [brushSize,     setBrushSize]     = useState(25);
-  const [cursor,        setCursor]        = useState<{x:number;y:number;visible:boolean}>({x:0,y:0,visible:false});
+  // Available container area (for exact image sizing — eliminates objectFit letterboxing)
+  const [availArea,     setAvailArea]     = useState<{w:number;h:number}|null>(null);
+  const [cursorPos,     setCursorPos]     = useState<{x:number;y:number;visible:boolean}>({x:0,y:0,visible:false});
   void histSig;
 
   useEffect(()=>{ panRef.current=pan; },[pan]);
   useEffect(()=>{ zoomRef.current=zoom; },[zoom]);
   useEffect(()=>{ brushSizeRef.current=brushSize; },[brushSize]);
+
+  // Measure available area so we can size the image EXACTLY (no objectFit letterboxing)
+  useEffect(()=>{
+    const el=areaRef.current; if (!el) return;
+    const ro=new ResizeObserver(entries=>{
+      for (const e of entries) {
+        setAvailArea({w:e.contentRect.width, h:e.contentRect.height});
+      }
+    });
+    ro.observe(el);
+    return ()=>ro.disconnect();
+  },[]);
+
+  // Compute display dimensions that fill the available area while keeping aspect ratio
+  const displayDims = useMemo(()=>{
+    if (!availArea||!nativeSize) return null;
+    const pad=0.92; // slight padding so image doesn't touch edges
+    const scaleX=(availArea.w*pad)/nativeSize.w;
+    const scaleY=(availArea.h*pad)/nativeSize.h;
+    const scale=Math.min(scaleX,scaleY);
+    return {w:Math.round(nativeSize.w*scale), h:Math.round(nativeSize.h*scale)};
+  },[availArea,nativeSize]);
 
   // ── Marching ants selection overlay ──────────────────────────────────────────
 
@@ -277,7 +279,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       const idx=y*w+x;
       if (!selectionMask[idx]) continue;
       const isBorder=(x===0||!selectionMask[idx-1]||x===w-1||!selectionMask[idx+1]||y===0||!selectionMask[idx-w]||y===h-1||!selectionMask[idx+w]);
-      if (isBorder) { borders.push({idx,x,y}); }
+      if (isBorder) borders.push({idx,x,y});
       else { base[idx*4]=100; base[idx*4+1]=160; base[idx*4+2]=255; base[idx*4+3]=25; }
     }
     baseOverlayRef.current=base;
@@ -287,10 +289,9 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   useEffect(()=>{
     if (!selectionMask) return;
     let offset=0, lastTime=0;
-    const INTERVAL=50;
     const tick=(now:number)=>{
       animFrameRef.current=requestAnimationFrame(tick);
-      if (now-lastTime<INTERVAL) return;
+      if (now-lastTime<50) return;
       lastTime=now;
       const oc=overlayCanvasRef.current, mc=canvasRef.current;
       const base=baseOverlayRef.current, borders=borderPixelsRef.current;
@@ -329,8 +330,11 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       const ctx=c.getContext("2d")!;
       ctx.clearRect(0,0,c.width,c.height);
       ctx.drawImage(img,0,0);
-      originalDataRef.current=ctx.getImageData(0,0,c.width,c.height);
-      setDispSize({w:c.width,h:c.height});
+      const imgData=ctx.getImageData(0,0,c.width,c.height);
+      originalDataRef.current=imgData;
+      // Deep copy for restore — NEVER mutated after this
+      trueOriginalRef.current=new ImageData(new Uint8ClampedArray(imgData.data),imgData.width,imgData.height);
+      setNativeSize({w:c.width,h:c.height});
       setLoaded(true);
       updateDisplay();
     };
@@ -356,7 +360,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     c.width=snap.width; c.height=snap.height;
     c.getContext("2d")!.putImageData(snap.data,0,0);
     trimRef.current=snap.trim;
-    setDispSize({w:snap.width,h:snap.height});
+    setNativeSize({w:snap.width,h:snap.height});
     updateDisplay();
   }, [updateDisplay]);
 
@@ -408,14 +412,17 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
 
   // ── Geometry ────────────────────────────────────────────────────────────────
 
+  // Maps a mouse event to image pixel coordinates (corrected: no objectFit letterboxing)
   const pointFromEvent = useCallback((e: React.MouseEvent) => {
-    const el=imgRef.current; if (!el||!dispSize) return null;
-    const pz=getPageZoom(), rect=el.getBoundingClientRect();
-    const cx=(e.clientX/pz-rect.left/pz)/(rect.width/pz)*dispSize.w;
-    const cy=(e.clientY/pz-rect.top/pz)/(rect.height/pz)*dispSize.h;
-    const imageRadius=brushSizeRef.current*(dispSize.w/(rect.width/pz));
-    return {imageX:cx, imageY:cy, imageRadius};
-  }, [dispSize]);
+    const el=imgRef.current; if (!el||!nativeSize) return null;
+    const rect=el.getBoundingClientRect();
+    // rect is exact image dimensions (no letterboxing) so mapping is 1:1
+    const imgX=(e.clientX-rect.left)/rect.width*nativeSize.w;
+    const imgY=(e.clientY-rect.top)/rect.height*nativeSize.h;
+    // Convert CSS brush size to native image pixel radius
+    const imageRadius=brushSizeRef.current*(nativeSize.w/rect.width);
+    return {imgX, imgY, imageRadius};
+  }, [nativeSize]);
 
   // ── Fuzzy select ─────────────────────────────────────────────────────────────
 
@@ -427,19 +434,18 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       const id=ctx.getImageData(0,0,c.width,c.height);
       const px=Math.floor(Math.max(0,Math.min(c.width-1,imgX)));
       const py=Math.floor(Math.max(0,Math.min(c.height-1,imgY)));
-      // Tolerance: 55 color, 70 edge — well-tuned for most images
       const mask=fuzzySelectRegion(id,px,py,55,70);
       setSelectionMask(mask);
       setProcessing(false);
     },0);
   }, []);
 
-  // ── Restore brush ─────────────────────────────────────────────────────────────
+  // ── Restore brush — paints back from the TRUE original (first loaded state) ──
 
   const applyRestoreBrush = useCallback((imgX: number, imgY: number, imageRadius: number) => {
     const c=canvasRef.current;
-    const orig=originalDataRef.current;
-    if (!c||!orig||!dispSize) return;
+    const orig=trueOriginalRef.current; // NEVER the edited state
+    if (!c||!orig||!nativeSize) return;
     const ctx=c.getContext("2d")!;
     const cw=c.width, ch=c.height;
     const r=Math.ceil(imageRadius);
@@ -449,9 +455,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     const cur=ctx.getImageData(x0,y0,x1-x0+1,y1-y0+1);
     for (let py=y0;py<=y1;py++) for (let px=x0;px<=x1;px++) {
       const dist=Math.hypot(px-imgX,py-imgY); if (dist>imageRadius) continue;
-      // Smooth quadratic falloff
       const t=dist/imageRadius;
-      const strength=Math.max(0,Math.min(1,1-t*t));
+      const strength=Math.max(0,Math.min(1,1-t*t)); // smooth quadratic falloff
       const ci=((py-y0)*(x1-x0+1)+(px-x0))*4;
       const oi=(py*orig.width+px)*4;
       if (px>=orig.width||py>=orig.height) continue;
@@ -462,7 +467,28 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     }
     ctx.putImageData(cur,x0,y0);
     scheduleRefresh();
-  }, [dispSize, scheduleRefresh]);
+  }, [nativeSize, scheduleRefresh]);
+
+  // ── Erase brush — paints away pixels with soft falloff ────────────────────────
+
+  const applyEraseBrush = useCallback((imgX: number, imgY: number, imageRadius: number) => {
+    const c=canvasRef.current; if (!c||!nativeSize) return;
+    const ctx=c.getContext("2d")!;
+    const r=Math.ceil(imageRadius);
+    const x0=Math.max(0,Math.floor(imgX-r)), y0=Math.max(0,Math.floor(imgY-r));
+    const x1=Math.min(c.width-1,Math.ceil(imgX+r)), y1=Math.min(c.height-1,Math.ceil(imgY+r));
+    if (x1<x0||y1<y0) return;
+    const cur=ctx.getImageData(x0,y0,x1-x0+1,y1-y0+1);
+    for (let py=y0;py<=y1;py++) for (let px=x0;px<=x1;px++) {
+      const dist=Math.hypot(px-imgX,py-imgY); if (dist>imageRadius) continue;
+      const t=dist/imageRadius;
+      const strength=Math.max(0,Math.min(1,1-t*t));
+      const ci=((py-y0)*(x1-x0+1)+(px-x0))*4;
+      cur.data[ci+3]=Math.max(0,Math.round(cur.data[ci+3]*(1-strength)));
+    }
+    ctx.putImageData(cur,x0,y0);
+    scheduleRefresh();
+  }, [nativeSize, scheduleRefresh]);
 
   // ── Selection actions ─────────────────────────────────────────────────────────
 
@@ -477,6 +503,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       const result=applyMaskDeletion(id,selectionMask);
       ctx.putImageData(result,0,0);
       originalDataRef.current=ctx.getImageData(0,0,c.width,c.height);
+      // NOTE: trueOriginalRef is NOT updated here
       updateDisplay();
       setSelectionMask(null);
       setProcessing(false);
@@ -505,63 +532,68 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   // ── Mouse events ────────────────────────────────────────────────────────────
 
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLElement>) => {
-    if (!loaded||!dispSize) return;
+    if (!loaded||!nativeSize) return;
     const pt=pointFromEvent(e);
 
     if (toolMode==="select") {
       if (!pt) return;
-      handleFuzzySelect(pt.imageX, pt.imageY);
+      handleFuzzySelect(pt.imgX, pt.imgY);
       return;
     }
 
-    if (toolMode==="restore") {
+    if (toolMode==="restore"||toolMode==="erase") {
       if (!pt) return;
-      isRestoring.current=true;
-      lastRestorePoint.current=null;
+      isPainting.current=true;
+      lastPaintPoint.current=null;
       saveUndo();
-      applyRestoreBrush(pt.imageX, pt.imageY, pt.imageRadius);
-      lastRestorePoint.current={x:pt.imageX,y:pt.imageY};
+      if (toolMode==="restore") applyRestoreBrush(pt.imgX, pt.imgY, pt.imageRadius);
+      else                      applyEraseBrush(pt.imgX, pt.imgY, pt.imageRadius);
+      lastPaintPoint.current={x:pt.imgX,y:pt.imgY};
       return;
     }
 
     isMoving.current=true;
     moveStartRef.current={pointerX:e.clientX,pointerY:e.clientY,panX:panRef.current.x,panY:panRef.current.y};
-  }, [loaded,dispSize,toolMode,pointFromEvent,handleFuzzySelect,saveUndo,applyRestoreBrush]);
+  }, [loaded,nativeSize,toolMode,pointFromEvent,handleFuzzySelect,saveUndo,applyRestoreBrush,applyEraseBrush]);
 
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
-    if (toolMode==="restore") {
+    if (toolMode==="restore"||toolMode==="erase") {
       const pt=pointFromEvent(e);
-      if (pt) setCursor({x:e.clientX/getPageZoom(),y:e.clientY/getPageZoom(),visible:true});
-      if (isRestoring.current&&pt) {
-        const last=lastRestorePoint.current;
+      if (pt) setCursorPos({x:e.clientX,y:e.clientY,visible:true});
+      if (isPainting.current&&pt) {
+        const last=lastPaintPoint.current;
+        // Interpolate between last and current to fill gaps when dragging fast
         if (last) {
-          const dx=pt.imageX-last.x, dy=pt.imageY-last.y;
-          const steps=Math.max(1,Math.ceil(Math.hypot(dx,dy)/(pt.imageRadius/2)));
+          const dx=pt.imgX-last.x, dy=pt.imgY-last.y;
+          const steps=Math.max(1,Math.ceil(Math.hypot(dx,dy)/(pt.imageRadius*0.4)));
           for (let i=1;i<=steps;i++) {
             const t=i/steps;
-            applyRestoreBrush(last.x+dx*t, last.y+dy*t, pt.imageRadius);
+            const bx=last.x+dx*t, by=last.y+dy*t;
+            if (toolMode==="restore") applyRestoreBrush(bx, by, pt.imageRadius);
+            else                      applyEraseBrush(bx, by, pt.imageRadius);
           }
         } else {
-          applyRestoreBrush(pt.imageX, pt.imageY, pt.imageRadius);
+          if (toolMode==="restore") applyRestoreBrush(pt.imgX, pt.imgY, pt.imageRadius);
+          else                      applyEraseBrush(pt.imgX, pt.imgY, pt.imageRadius);
         }
-        lastRestorePoint.current={x:pt.imageX,y:pt.imageY};
+        lastPaintPoint.current={x:pt.imgX,y:pt.imgY};
       }
       return;
     }
-    setCursor(c=>({...c,visible:false}));
+    setCursorPos(c=>({...c,visible:false}));
     if (isMoving.current&&moveStartRef.current) {
       const s=moveStartRef.current;
       setPan({x:s.panX+e.clientX-s.pointerX,y:s.panY+e.clientY-s.pointerY});
     }
-  }, [toolMode,pointFromEvent,applyRestoreBrush]);
+  }, [toolMode,pointFromEvent,applyRestoreBrush,applyEraseBrush]);
 
   const onMouseUp = useCallback(() => {
-    isMoving.current=false; isRestoring.current=false;
-    lastRestorePoint.current=null; moveStartRef.current=null;
+    isMoving.current=false; isPainting.current=false;
+    lastPaintPoint.current=null; moveStartRef.current=null;
   }, []);
 
   const onMouseLeave = useCallback(() => {
-    setCursor(c=>({...c,visible:false})); onMouseUp();
+    setCursorPos(c=>({...c,visible:false})); onMouseUp();
   }, [onMouseUp]);
 
   // ── Confirm ─────────────────────────────────────────────────────────────────
@@ -585,15 +617,24 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const bgStyle:React.CSSProperties=bgPreview==="checker"?CHECKER_STYLE:bgPreview==="white"?{backgroundColor:"#fff"}:{backgroundColor:"#111"};
 
   const canvasCursor=
-    toolMode==="select"  ? "crosshair" :
-    toolMode==="restore" ? "none" :
-    selectionMask        ? "default" : "grab";
+    toolMode==="select"            ? "crosshair" :
+    toolMode==="restore"||toolMode==="erase" ? "none" :
+    selectionMask                  ? "default" : "grab";
 
   const handleSetToolMode = useCallback((mode: ToolMode) => {
     setToolMode(prev => prev===mode ? null : mode);
     setSelectionMask(null);
-    setCursor(c=>({...c,visible:false}));
+    setCursorPos(c=>({...c,visible:false}));
   }, []);
+
+  // Compute CSS brush circle diameter from image-space brush radius
+  const brushCirclePx = useMemo(()=>{
+    if (!displayDims||!nativeSize) return 0;
+    return brushSizeRef.current * 2 * (displayDims.w / nativeSize.w);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayDims, nativeSize, brushSize]);
+
+  const brushColor = toolMode==="erase" ? "rgba(239,68,68,0.9)" : "rgba(34,197,94,0.9)";
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col" style={{backgroundColor:"#141414"}}>
@@ -654,18 +695,42 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
           onMouseLeave={onMouseLeave}
           onWheel={onWheel}
         >
-          {displaySrc && (
-            <div style={{position:"relative",display:"inline-block",maxWidth:"90%",maxHeight:"90%",transform:canTransform,transformOrigin:"0 0"}}>
+          {displaySrc && displayDims && (
+            <div
+              style={{
+                position:"relative",
+                width:displayDims.w,
+                height:displayDims.h,
+                transform:canTransform,
+                transformOrigin:"0 0",
+                flexShrink:0,
+              }}
+            >
+              {/* Main image — sized EXACTLY to displayDims, no objectFit trickery */}
               <img
                 ref={imgRef}
                 src={displaySrc}
                 alt="editing"
                 draggable={false}
-                style={{display:"block",maxWidth:"100%",maxHeight:"100%",objectFit:"contain",imageRendering:"pixelated",userSelect:"none"}}
+                style={{
+                  display:"block",
+                  width:displayDims.w,
+                  height:displayDims.h,
+                  userSelect:"none",
+                  imageRendering:"auto",
+                }}
               />
+              {/* Overlay canvas — same exact pixel size as the img */}
               <canvas
                 ref={overlayCanvasRef}
-                style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none",imageRendering:"pixelated"}}
+                style={{
+                  position:"absolute",
+                  top:0, left:0,
+                  width:displayDims.w,
+                  height:displayDims.h,
+                  pointerEvents:"none",
+                  imageRendering:"pixelated",
+                }}
               />
             </div>
           )}
@@ -696,33 +761,38 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             <div className="absolute bottom-5 left-1/2 -translate-x-1/2 pointer-events-none">
               <div className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-bold"
                 style={{backgroundColor:"rgba(0,0,0,0.7)",border:"1px solid rgba(168,85,247,0.4)",color:"rgba(196,140,255,0.9)",backdropFilter:"blur(8px)"}}>
-                <span style={{color:"#a855f7"}}>✦</span> Click anywhere to select
+                <span style={{color:"#a855f7"}}>✦</span> Click anywhere on your image to select
               </div>
             </div>
           )}
-          {toolMode==="restore" && loaded && !processing && (
+          {(toolMode==="restore"||toolMode==="erase") && loaded && !processing && (
             <div className="absolute bottom-5 left-1/2 -translate-x-1/2 pointer-events-none">
               <div className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-bold"
-                style={{backgroundColor:"rgba(0,0,0,0.7)",border:"1px solid rgba(34,197,94,0.4)",color:"rgba(134,239,172,0.9)",backdropFilter:"blur(8px)"}}>
-                <span style={{color:"#22c55e"}}>↩</span> Paint to restore pixels
+                style={{
+                  backgroundColor:"rgba(0,0,0,0.7)",
+                  border:`1px solid ${toolMode==="erase"?"rgba(239,68,68,0.4)":"rgba(34,197,94,0.4)"}`,
+                  color:toolMode==="erase"?"rgba(252,165,165,0.9)":"rgba(134,239,172,0.9)",
+                  backdropFilter:"blur(8px)",
+                }}>
+                {toolMode==="erase" ? "✕ Click and drag to erase" : "↩ Click and drag to restore"}
               </div>
             </div>
           )}
 
-          {/* Restore brush cursor circle */}
-          {cursor.visible && toolMode==="restore" && dispSize && imgRef.current && (
+          {/* Brush cursor ring */}
+          {cursorPos.visible && (toolMode==="restore"||toolMode==="erase") && brushCirclePx>0 && (
             <div style={{
               position:"fixed",
-              left:cursor.x, top:cursor.y,
-              width: brushSizeRef.current * 2 * (imgRef.current.getBoundingClientRect().width / getPageZoom() / dispSize.w),
-              height: brushSizeRef.current * 2 * (imgRef.current.getBoundingClientRect().height / getPageZoom() / dispSize.h),
-              boxSizing:"border-box",
+              left:cursorPos.x,
+              top:cursorPos.y,
+              width:brushCirclePx,
+              height:brushCirclePx,
               transform:"translate(-50%,-50%)",
               borderRadius:"9999px",
-              border:"2px solid rgba(34,197,94,0.9)",
+              border:`2px solid ${brushColor}`,
               boxShadow:"0 0 0 1px rgba(0,0,0,0.8)",
               pointerEvents:"none",
-              zIndex:30,
+              zIndex:9999,
             }}/>
           )}
 

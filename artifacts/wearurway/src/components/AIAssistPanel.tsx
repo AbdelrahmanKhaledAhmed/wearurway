@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 
-type ToolMode = "select" | "restore" | null;
+type ToolMode = "select" | "restore" | "erase" | null;
 
 interface Props {
   toolMode: ToolMode;
@@ -44,6 +44,7 @@ export default function FuzzySelectPanel({
 
   const selectActive  = toolMode === "select";
   const restoreActive = toolMode === "restore";
+  const eraseActive   = toolMode === "erase";
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#0d0d0d" }}>
@@ -123,12 +124,49 @@ export default function FuzzySelectPanel({
           </div>
         </button>
 
-        {/* Brush size (shown only in restore mode) */}
-        {restoreActive && (
-          <div className="px-3 py-3 rounded-xl" style={{ backgroundColor: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.15)" }}>
+        {/* Erase Brush */}
+        <button
+          onClick={() => onSetToolMode("erase")}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl transition-all"
+          style={eraseActive
+            ? { background: "linear-gradient(135deg,rgba(239,68,68,0.18),rgba(185,28,28,0.18))", border: "1px solid rgba(239,68,68,0.45)", color: "#fecaca" }
+            : { backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.45)" }
+          }
+        >
+          <div className="flex items-center gap-2.5">
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${eraseActive ? "opacity-100" : "opacity-40"}`}
+              style={{ backgroundColor: eraseActive ? "rgba(239,68,68,0.25)" : "rgba(255,255,255,0.07)" }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 15, height: 15 }}>
+                <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/>
+                <path d="M22 21H7"/><path d="m5 11 9 9"/>
+              </svg>
+            </div>
+            <div className="text-left">
+              <p className={`text-[11px] font-bold ${eraseActive ? "text-white" : "text-white/45"}`}>Erase Brush</p>
+              <p className="text-[9px] mt-0.5" style={{ color: eraseActive ? "rgba(252,165,165,0.65)" : "rgba(255,255,255,0.22)" }}>
+                {eraseActive ? "Paint to erase pixels" : "Click to activate"}
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0 w-9 h-5 rounded-full relative transition-all"
+            style={{ backgroundColor: eraseActive ? "#ef4444" : "rgba(255,255,255,0.1)" }}>
+            <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
+              style={{ left: eraseActive ? "calc(100% - 1.125rem)" : "0.125rem" }} />
+          </div>
+        </button>
+
+        {/* Brush size (shown for restore or erase mode) */}
+        {(restoreActive || eraseActive) && (
+          <div className="px-3 py-3 rounded-xl"
+            style={eraseActive
+              ? { backgroundColor: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.15)" }
+              : { backgroundColor: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.15)" }
+            }>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(134,239,172,0.8)" }}>Brush Size</p>
-              <p className="text-[10px] font-mono font-bold" style={{ color: "rgba(134,239,172,0.6)" }}>{brushSize}px</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider"
+                style={{ color: eraseActive ? "rgba(252,165,165,0.8)" : "rgba(134,239,172,0.8)" }}>Brush Size</p>
+              <p className="text-[10px] font-mono font-bold"
+                style={{ color: eraseActive ? "rgba(252,165,165,0.6)" : "rgba(134,239,172,0.6)" }}>{brushSize}px</p>
             </div>
             <input
               type="range" min={5} max={80} value={brushSize}
@@ -181,6 +219,22 @@ export default function FuzzySelectPanel({
           <p className="text-[13px] font-bold text-white mb-1.5">Paint to restore</p>
           <p className="text-[10px] leading-relaxed" style={{ color: "rgba(255,255,255,0.3)" }}>
             Click and drag over removed areas to bring the original pixels back. Adjust the brush size above.
+          </p>
+        </div>
+      )}
+
+      {eraseActive && !hasSelection && (
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+            style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(252,165,165,0.8)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 26, height: 26 }}>
+              <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/>
+              <path d="M22 21H7"/><path d="m5 11 9 9"/>
+            </svg>
+          </div>
+          <p className="text-[13px] font-bold text-white mb-1.5">Paint to erase</p>
+          <p className="text-[10px] leading-relaxed" style={{ color: "rgba(255,255,255,0.3)" }}>
+            Click and drag over areas to precisely erase them. Soft edges for clean results. Adjust the brush size above.
           </p>
         </div>
       )}
