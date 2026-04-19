@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { removeBackground } from "@imgly/background-removal";
 
 type Tool = "auto-remove" | "erase" | "restore" | "magic-wand" | "move";
 type BgPreview = "checker" | "white" | "black";
@@ -235,6 +236,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const [tolerance,  setTolerance]  = useState(38);
   const [bgPreview,  setBgPreview]  = useState<BgPreview>("checker");
   const [processing, setProcessing] = useState(false);
+  const [aiProgress, setAiProgress] = useState(0);
   const [loaded,     setLoaded]     = useState(false);
   const [zoom,       setZoom]       = useState(1);
   const [pan,        setPan]        = useState({ x:0, y:0 });
@@ -557,19 +559,35 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     if (was) trimCanvasToVisible();
   };
 
-  // ── Auto remove BG ────────────────────────────────────────────────────────────
+  // ── Auto remove BG (AI) ───────────────────────────────────────────────────────
 
-  const handleAutoRemove = () => {
+  const handleAutoRemove = async () => {
     const c=canvasRef.current; if (!c) return;
     const ctx=c.getContext("2d"); if (!ctx) return;
-    saveUndo(); setProcessing(true);
-    setTimeout(()=>{
-      const id=ctx.getImageData(0,0,c.width,c.height);
-      smartAutoRemove(id,tolRef.current);
-      ctx.putImageData(id,0,0);
+    saveUndo();
+    setProcessing(true);
+    setAiProgress(0);
+    try {
+      const resultBlob = await removeBackground(file, {
+        progress: (_key: string, current: number, total: number) => {
+          if (total > 0) setAiProgress(Math.round((current / total) * 100));
+        },
+        output: { format: "image/png" as const, quality: 1 },
+      });
+      const bmp = await createImageBitmap(resultBlob);
+      c.width = bmp.width;
+      c.height = bmp.height;
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.drawImage(bmp, 0, 0);
+      bmp.close();
+      updateDisplaySize();
       trimCanvasToVisible();
+    } catch (err) {
+      console.error("AI background removal failed:", err);
+    } finally {
       setProcessing(false);
-    },0);
+      setAiProgress(0);
+    }
   };
 
   // ── Confirm ───────────────────────────────────────────────────────────────────
@@ -670,10 +688,23 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
           )}
 
           {processing && (
-            <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/30 backdrop-blur-sm">
-              <div className="flex items-center gap-3 px-5 py-3 rounded" style={{ backgroundColor:"rgba(13,13,13,0.9)", border:"1px solid rgba(255,255,255,0.1)" }}>
-                <div className="w-5 h-5 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
-                <p className="text-[11px] uppercase tracking-widest text-white/70">Processing…</p>
+            <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/40 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-4 px-8 py-6 rounded-xl" style={{ backgroundColor:"rgba(13,13,13,0.96)", border:"1px solid rgba(255,255,255,0.1)" }}>
+                <div className="w-8 h-8 border-2 border-white/15 border-t-[#f5c842] rounded-full animate-spin" />
+                <div className="text-center space-y-2">
+                  <p className="text-[11px] uppercase tracking-widest font-bold text-white/80">
+                    {aiProgress < 5 ? "Loading AI model…" : aiProgress < 85 ? `Analyzing image…` : "Finishing up…"}
+                  </p>
+                  {aiProgress > 0 && (
+                    <>
+                      <div className="w-52 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor:"rgba(255,255,255,0.08)" }}>
+                        <div className="h-full rounded-full transition-all duration-200" style={{ width:`${aiProgress}%`, backgroundColor:"#f5c842" }} />
+                      </div>
+                      <p className="text-[10px] font-mono text-white/30">{aiProgress}%</p>
+                    </>
+                  )}
+                </div>
+                <p className="text-[10px] text-white/20 text-center max-w-[200px] leading-relaxed">First use downloads the AI model — subsequent uses are instant</p>
               </div>
             </div>
           )}
@@ -714,27 +745,14 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
 
           {/* Auto Remove BG — always visible at top */}
           <div className="p-5 border-b" style={{ borderColor:"rgba(255,255,255,0.08)" }}>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-white/30 mb-3">One-Click</p>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-white/30 mb-3">AI Background Removal</p>
             <button onClick={handleAutoRemove} disabled={processing||!loaded}
               className="w-full flex items-center justify-center gap-2 py-3 rounded font-black uppercase text-xs tracking-widest transition-all hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
               style={{ backgroundColor:"#f5c842", color:"#0d0d0d" }}>
               <Icons.AutoRemove />
               Remove Background
             </button>
-            <p className="text-[10px] text-white/25 mt-2 leading-relaxed">Automatically detects and removes the background. Use brush tools to refine.</p>
-          </div>
-
-          {/* Tolerance — always visible */}
-          <div className="p-5 border-b" style={{ borderColor:"rgba(255,255,255,0.08)" }}>
-            <div className="flex justify-between items-center mb-3">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-white/30">Detection Range</p>
-              <span className="text-[11px] font-mono font-bold text-white/60">{tolerance}</span>
-            </div>
-            <input type="range" min={5} max={120} value={tolerance} onChange={e=>setTolerance(Number(e.target.value))} className="w-full accent-[#f5c842]" />
-            <div className="flex justify-between mt-1">
-              <span className="text-[10px] text-white/20">Precise</span>
-              <span className="text-[10px] text-white/20">Aggressive</span>
-            </div>
+            <p className="text-[10px] text-white/25 mt-2 leading-relaxed">AI detects and isolates the main subject. Use Erase/Restore brushes to refine edges.</p>
           </div>
 
           {/* Brush settings — only for brush tools */}
@@ -765,10 +783,21 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             </div>
           )}
 
-          {/* Wand info */}
+          {/* Wand settings */}
           {isPointTool && (
-            <div className="p-5">
-              <p className="text-[10px] text-white/30 leading-relaxed">Click anywhere on the image to remove all connected pixels of similar color. Adjust Detection Range to control how aggressively similar colors are selected.</p>
+            <div className="p-5 space-y-5">
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-white/30">Color Tolerance</p>
+                  <span className="text-[11px] font-mono font-bold text-white/60">{tolerance}</span>
+                </div>
+                <input type="range" min={5} max={120} value={tolerance} onChange={e=>setTolerance(Number(e.target.value))} className="w-full accent-[#f5c842]" />
+                <div className="flex justify-between mt-1">
+                  <span className="text-[10px] text-white/20">Precise</span>
+                  <span className="text-[10px] text-white/20">Aggressive</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-white/25 leading-relaxed">Click any area to remove connected pixels of similar color.</p>
             </div>
           )}
 
