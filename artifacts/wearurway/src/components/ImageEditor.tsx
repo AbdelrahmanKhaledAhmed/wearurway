@@ -395,7 +395,10 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const applyZoom = useCallback((newZ: number, fx=0.5, fy=0.5) => {
     const el=areaRef.current; if (!el) return;
     const rect=el.getBoundingClientRect();
-    const cx=rect.left+rect.width*fx, cy=rect.top+rect.height*fy;
+    // Use AREA-RELATIVE focal point (not raw viewport coords).
+    // pan is stored in the area's coordinate space; mixing viewport coords
+    // for cy would introduce a fixed Y-offset equal to rect.top (top-bar height).
+    const cx=rect.width*fx, cy=rect.height*fy;
     const clamped=Math.max(0.1,Math.min(10,newZ));
     const scale=clamped/zoomRef.current;
     setPan(p=>({x:cx+(p.x-cx)*scale, y:cy+(p.y-cy)*scale}));
@@ -412,17 +415,30 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
 
   // ── Geometry ────────────────────────────────────────────────────────────────
 
-  // Maps a mouse event to image pixel coordinates (corrected: no objectFit letterboxing)
+  // Maps a mouse event to image pixel coordinates.
+  // Uses areaRef (no CSS transform) + explicit pan/zoom inversion to avoid
+  // any getBoundingClientRect() inaccuracies on transformed child elements.
   const pointFromEvent = useCallback((e: React.MouseEvent) => {
-    const el=imgRef.current; if (!el||!nativeSize) return null;
-    const rect=el.getBoundingClientRect();
-    // rect is exact image dimensions (no letterboxing) so mapping is 1:1
-    const imgX=(e.clientX-rect.left)/rect.width*nativeSize.w;
-    const imgY=(e.clientY-rect.top)/rect.height*nativeSize.h;
-    // Convert CSS brush size to native image pixel radius
-    const imageRadius=brushSizeRef.current*(nativeSize.w/rect.width);
+    if (!nativeSize||!displayDims||!areaRef.current) return null;
+    const areaRect=areaRef.current.getBoundingClientRect();
+    // Natural (untransformed) image top-left in area-relative coords
+    const natLeft=(areaRect.width -displayDims.w)/2;
+    const natTop =(areaRect.height-displayDims.h)/2;
+    // Mouse in area-relative coords
+    const mx=e.clientX-areaRect.left;
+    const my=e.clientY-areaRect.top;
+    // Invert CSS transform: matrix(z,0,0,z,pan.x,pan.y) → local pixel
+    // area_x = natLeft + z*localX + pan.x  =>  localX = (mx - natLeft - pan.x) / z
+    const z=zoomRef.current;
+    const p=panRef.current;
+    const localX=(mx-natLeft-p.x)/z;
+    const localY=(my-natTop -p.y)/z;
+    const imgX=localX/displayDims.w*nativeSize.w;
+    const imgY=localY/displayDims.h*nativeSize.h;
+    // imageRadius is zoom-independent: same canvas pixels regardless of view zoom
+    const imageRadius=brushSizeRef.current*(nativeSize.w/displayDims.w);
     return {imgX, imgY, imageRadius};
-  }, [nativeSize]);
+  }, [nativeSize, displayDims]);
 
   // ── Fuzzy select ─────────────────────────────────────────────────────────────
 
@@ -627,12 +643,14 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     setCursorPos(c=>({...c,visible:false}));
   }, []);
 
-  // Compute CSS brush circle diameter from image-space brush radius
+  // Brush circle diameter on screen:
+  //   imageRadius = brushSize * (nativeW / displayW)  [canvas pixels]
+  //   1 canvas pixel appears as (displayW / nativeW) * zoom  screen CSS pixels
+  //   => diameter = 2 * brushSize * zoom
   const brushCirclePx = useMemo(()=>{
-    if (!displayDims||!nativeSize) return 0;
-    return brushSizeRef.current * 2 * (displayDims.w / nativeSize.w);
+    return brushSizeRef.current * 2 * zoom;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayDims, nativeSize, brushSize]);
+  }, [brushSize, zoom]);
 
   const brushColor = toolMode==="erase" ? "rgba(239,68,68,0.9)" : "rgba(34,197,94,0.9)";
 
