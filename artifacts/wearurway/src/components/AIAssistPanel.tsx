@@ -1,12 +1,16 @@
 import { useState, useRef } from "react";
 
+type ToolMode = "select" | "restore" | null;
+
 interface Props {
-  toolActive: boolean;
+  toolMode: ToolMode;
   hasSelection: boolean;
-  onToggleTool: () => void;
+  onSetToolMode: (mode: ToolMode) => void;
   onDelete: () => void;
   onChangeColor: (color: string) => void;
   onClearSelection: () => void;
+  brushSize: number;
+  onBrushSize: (v: number) => void;
 }
 
 const WandIcon = () => (
@@ -17,9 +21,17 @@ const WandIcon = () => (
   </svg>
 );
 
+const RestoreIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+    <path d="M3 3v5h5"/>
+  </svg>
+);
+
 export default function FuzzySelectPanel({
-  toolActive, hasSelection,
-  onToggleTool, onDelete, onChangeColor, onClearSelection,
+  toolMode, hasSelection,
+  onSetToolMode, onDelete, onChangeColor, onClearSelection,
+  brushSize, onBrushSize,
 }: Props) {
   const [pickedColor, setPickedColor]   = useState("#ff0000");
   const [showPicker,  setShowPicker]    = useState(false);
@@ -29,6 +41,9 @@ export default function FuzzySelectPanel({
     onChangeColor(pickedColor);
     setShowPicker(false);
   };
+
+  const selectActive  = toolMode === "select";
+  const restoreActive = toolMode === "restore";
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#0d0d0d" }}>
@@ -41,105 +56,138 @@ export default function FuzzySelectPanel({
             <WandIcon />
           </div>
           <div>
-            <p className="text-[12px] font-black uppercase tracking-[0.2em] text-white">Magic Select</p>
+            <p className="text-[12px] font-black uppercase tracking-[0.2em] text-white">Tools</p>
             <p className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(196,140,255,0.45)" }}>
-              Fuzzy Selection Tool
+              Select · Restore · Recolor
             </p>
           </div>
         </div>
-        <p className="text-[10px] leading-relaxed mt-3" style={{ color: "rgba(255,255,255,0.35)" }}>
-          Click any area of your image to instantly select similar pixels — then delete or recolor them.
-        </p>
       </div>
 
-      {/* ── Tool toggle ── */}
-      <div className="px-4 pt-5 shrink-0">
+      {/* ── Tool toggles ── */}
+      <div className="px-4 pt-4 flex flex-col gap-2.5 shrink-0">
+
+        {/* Magic Select */}
         <button
-          onClick={onToggleTool}
-          className="w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl transition-all"
-          style={toolActive
-            ? { background: "linear-gradient(135deg,rgba(168,85,247,0.25),rgba(124,58,237,0.25))", border: "1px solid rgba(168,85,247,0.55)", color: "#e2c9ff" }
-            : { backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }
+          onClick={() => onSetToolMode("select")}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl transition-all"
+          style={selectActive
+            ? { background: "linear-gradient(135deg,rgba(168,85,247,0.22),rgba(124,58,237,0.22))", border: "1px solid rgba(168,85,247,0.5)", color: "#e2c9ff" }
+            : { backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.45)" }
           }
         >
           <div className="flex items-center gap-2.5">
-            <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${toolActive ? "opacity-100" : "opacity-50"}`}
-              style={{ backgroundColor: toolActive ? "rgba(168,85,247,0.3)" : "rgba(255,255,255,0.08)" }}>
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${selectActive ? "opacity-100" : "opacity-40"}`}
+              style={{ backgroundColor: selectActive ? "rgba(168,85,247,0.3)" : "rgba(255,255,255,0.07)" }}>
               <WandIcon />
             </div>
             <div className="text-left">
-              <p className={`text-[11px] font-bold ${toolActive ? "text-white" : "text-white/50"}`}>
-                Magic Select
-              </p>
-              <p className="text-[9px] mt-0.5" style={{ color: toolActive ? "rgba(196,140,255,0.7)" : "rgba(255,255,255,0.25)" }}>
-                {toolActive ? "Click image to select" : "Tap to activate"}
+              <p className={`text-[11px] font-bold ${selectActive ? "text-white" : "text-white/45"}`}>Magic Select</p>
+              <p className="text-[9px] mt-0.5" style={{ color: selectActive ? "rgba(196,140,255,0.65)" : "rgba(255,255,255,0.22)" }}>
+                {selectActive ? "Click image to select area" : "Click to activate"}
               </p>
             </div>
           </div>
-          <div className="shrink-0 w-10 h-5 rounded-full relative transition-all"
-            style={{ backgroundColor: toolActive ? "#a855f7" : "rgba(255,255,255,0.1)" }}>
+          <div className="shrink-0 w-9 h-5 rounded-full relative transition-all"
+            style={{ backgroundColor: selectActive ? "#a855f7" : "rgba(255,255,255,0.1)" }}>
             <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
-              style={{ left: toolActive ? "calc(100% - 1.125rem)" : "0.125rem" }} />
+              style={{ left: selectActive ? "calc(100% - 1.125rem)" : "0.125rem" }} />
           </div>
         </button>
+
+        {/* Restore Brush */}
+        <button
+          onClick={() => onSetToolMode("restore")}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl transition-all"
+          style={restoreActive
+            ? { background: "linear-gradient(135deg,rgba(34,197,94,0.18),rgba(21,128,61,0.18))", border: "1px solid rgba(34,197,94,0.45)", color: "#bbf7d0" }
+            : { backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.45)" }
+          }
+        >
+          <div className="flex items-center gap-2.5">
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${restoreActive ? "opacity-100" : "opacity-40"}`}
+              style={{ backgroundColor: restoreActive ? "rgba(34,197,94,0.25)" : "rgba(255,255,255,0.07)" }}>
+              <RestoreIcon />
+            </div>
+            <div className="text-left">
+              <p className={`text-[11px] font-bold ${restoreActive ? "text-white" : "text-white/45"}`}>Restore Brush</p>
+              <p className="text-[9px] mt-0.5" style={{ color: restoreActive ? "rgba(134,239,172,0.65)" : "rgba(255,255,255,0.22)" }}>
+                {restoreActive ? "Paint to bring pixels back" : "Click to activate"}
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0 w-9 h-5 rounded-full relative transition-all"
+            style={{ backgroundColor: restoreActive ? "#22c55e" : "rgba(255,255,255,0.1)" }}>
+            <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
+              style={{ left: restoreActive ? "calc(100% - 1.125rem)" : "0.125rem" }} />
+          </div>
+        </button>
+
+        {/* Brush size (shown only in restore mode) */}
+        {restoreActive && (
+          <div className="px-3 py-3 rounded-xl" style={{ backgroundColor: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.15)" }}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(134,239,172,0.8)" }}>Brush Size</p>
+              <p className="text-[10px] font-mono font-bold" style={{ color: "rgba(134,239,172,0.6)" }}>{brushSize}px</p>
+            </div>
+            <input
+              type="range" min={5} max={80} value={brushSize}
+              onChange={e => onBrushSize(Number(e.target.value))}
+              className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+              style={{ accentColor: "#22c55e", backgroundColor: "rgba(34,197,94,0.2)" }}
+            />
+            <div className="flex justify-between mt-1">
+              <span className="text-[8px]" style={{ color: "rgba(255,255,255,0.2)" }}>Small</span>
+              <span className="text-[8px]" style={{ color: "rgba(255,255,255,0.2)" }}>Large</span>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ── Instructions ── */}
-      {toolActive && !hasSelection && (
+      {/* ── Waiting state ── */}
+      {selectActive && !hasSelection && (
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 relative"
-            style={{ background: "linear-gradient(135deg,rgba(168,85,247,0.15),rgba(124,58,237,0.1))", border: "1px solid rgba(168,85,247,0.2)" }}>
-            <div className="absolute inset-0 rounded-2xl animate-ping opacity-20"
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 relative"
+            style={{ background: "linear-gradient(135deg,rgba(168,85,247,0.13),rgba(124,58,237,0.08))", border: "1px solid rgba(168,85,247,0.2)" }}>
+            <div className="absolute inset-0 rounded-2xl animate-ping opacity-15"
               style={{ backgroundColor: "rgba(168,85,247,0.4)" }} />
-            <svg viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 28, height: 28 }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 26, height: 26 }}>
               <path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/>
               <path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/>
               <path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/>
             </svg>
           </div>
-          <p className="text-[13px] font-bold text-white mb-1.5">Click on the image</p>
-          <p className="text-[11px] leading-relaxed" style={{ color: "rgba(255,255,255,0.35)" }}>
-            Tap any area to instantly select similar pixels in that region.
+          <p className="text-[13px] font-bold text-white mb-1.5">Click the image</p>
+          <p className="text-[10px] leading-relaxed" style={{ color: "rgba(255,255,255,0.3)" }}>
+            Tap any part of your image to select similar pixels. Works best on solid colors and backgrounds.
           </p>
-          <div className="mt-5 px-4 py-3 rounded-xl w-full text-left"
-            style={{ backgroundColor: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.12)" }}>
-            <p className="text-[9px] uppercase tracking-[0.25em] mb-2" style={{ color: "rgba(196,140,255,0.5)" }}>Tips</p>
-            <div className="space-y-1.5">
-              {[
-                "Click on solid color areas for best results",
-                "Works great on backgrounds & clothing",
-                "Try clicking different spots to re-select",
-              ].map((tip, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <span className="text-[8px] mt-0.5 shrink-0" style={{ color: "#a855f7" }}>•</span>
-                  <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.35)" }}>{tip}</p>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
 
-      {/* ── No tool active, no selection ── */}
-      {!toolActive && !hasSelection && (
+      {!toolMode && !hasSelection && (
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3"
-            style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24 }}>
-              <path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/>
-              <path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/>
-              <path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/>
-            </svg>
+          <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.2)" }}>
+            Pick a tool above,<br/>then interact with your image.
+          </p>
+        </div>
+      )}
+
+      {restoreActive && !hasSelection && (
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+            style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}>
+            <RestoreIcon />
           </div>
-          <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.25)" }}>
-            Activate the tool above,<br />then click on your image.
+          <p className="text-[13px] font-bold text-white mb-1.5">Paint to restore</p>
+          <p className="text-[10px] leading-relaxed" style={{ color: "rgba(255,255,255,0.3)" }}>
+            Click and drag over removed areas to bring the original pixels back. Adjust the brush size above.
           </p>
         </div>
       )}
 
       {/* ── Selection actions ── */}
       {hasSelection && (
-        <div className="flex-1 px-4 pt-5 flex flex-col gap-3">
+        <div className="flex-1 px-4 pt-4 flex flex-col gap-3 overflow-y-auto">
 
           {/* Selection indicator */}
           <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl"
@@ -154,10 +202,10 @@ export default function FuzzySelectPanel({
           {/* Delete */}
           <button
             onClick={onDelete}
-            className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl font-black text-[13px] uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
-            style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)", color: "#fff", boxShadow: "0 4px 20px rgba(239,68,68,0.3)" }}
+            className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl font-black text-[13px] uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)", color: "#fff", boxShadow: "0 4px 18px rgba(239,68,68,0.28)" }}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 15, height: 15 }}>
               <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
               <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
             </svg>
@@ -201,7 +249,6 @@ export default function FuzzySelectPanel({
                     <p className="text-[9px]" style={{ color: "rgba(255,255,255,0.3)" }}>Selected color</p>
                   </div>
                 </div>
-                {/* Preset swatches */}
                 <div className="grid grid-cols-8 gap-1.5 mb-3">
                   {["#ffffff","#000000","#ef4444","#f97316","#eab308","#22c55e","#3b82f6","#a855f7",
                     "#ec4899","#14b8a6","#8b5cf6","#f59e0b","#10b981","#6366f1","#64748b","#1e293b"].map(c => (
@@ -231,7 +278,7 @@ export default function FuzzySelectPanel({
       {/* ── Footer ── */}
       <div className="px-4 py-3 border-t shrink-0" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
         <p className="text-[9px] text-center tracking-wide" style={{ color: "rgba(255,255,255,0.15)" }}>
-          Click a new spot to re-select · Scroll to zoom
+          Ctrl+Z to undo · Esc to deselect · Scroll to zoom
         </p>
       </div>
     </div>
