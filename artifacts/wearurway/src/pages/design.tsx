@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import ImageEditor, { type ImageEditResult } from "@/components/ImageEditor";
 import TextLayerModal from "@/components/TextLayerModal";
 import OrderReviewModal from "@/components/OrderReviewModal";
+import PinterestImportButton from "@/components/PinterestImportButton";
 import { generateDesignExportFiles } from "@/lib/design-export";
 
 interface BBox { x: number; y: number; width: number; height: number }
@@ -572,6 +573,56 @@ export default function Design() {
         setUploading(false);
       }
     };
+  }, [layers.length]);
+
+  // Called when Pinterest import (or any external source) provides a File directly
+  const handleImportFile = useCallback(async (file: File) => {
+    setUploading(true);
+    try {
+      const objectUrl = URL.createObjectURL(file);
+      const clipEl2 = clipAreaRef.current;
+      const clipW = clipEl2?.offsetWidth ?? 200;
+      const clipH = clipEl2?.offsetHeight ?? 200;
+      const natural = await new Promise<{ w: number; h: number }>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+        img.onerror = () => resolve({ w: 1, h: 1 });
+        img.src = objectUrl;
+      });
+      const maxW = clipW * 0.6;
+      const maxH = clipH * 0.6;
+      const ratio = natural.w / natural.h;
+      let defaultW: number, defaultH: number;
+      if (ratio > maxW / maxH) {
+        defaultW = maxW;
+        defaultH = maxW / ratio;
+      } else {
+        defaultH = maxH;
+        defaultW = maxH * ratio;
+      }
+      defaultW = Math.round(defaultW);
+      defaultH = Math.round(defaultH);
+      const newLayer: DesignLayer = {
+        id: crypto.randomUUID(),
+        name: `Layer ${layers.length + 1}`,
+        imageUrl: objectUrl,
+        x: Math.round((clipW - defaultW) / 2),
+        y: Math.round((clipH - defaultH) / 2),
+        width: defaultW,
+        height: defaultH,
+        rotation: 0,
+        visible: true,
+        naturalWidth: natural.w,
+        naturalHeight: natural.h,
+      };
+      setLayers(prev => [...prev, newLayer]);
+      setSelectedLayerId(newLayer.id);
+      setEditingLayerId(newLayer.id);
+      setNewUploadLayerId(newLayer.id);
+      setEditorFile(file);
+    } finally {
+      setUploading(false);
+    }
   }, [layers.length]);
 
   // Called when user confirms from the editor (passes edited blob)
@@ -1381,6 +1432,8 @@ export default function Design() {
           <div className="flex-1" /></div>
       </div>
     </div>
+
+    <PinterestImportButton onImageReady={handleImportFile} disabled={uploading} />
 
     <OrderReviewModal
       isOpen={showOrderModal}
