@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import AIAssistPanel from "./AIAssistPanel";
 
 type Tool = "fuzzy-select" | "lasso" | "erase" | "restore" | "move";
 type BgPreview = "checker" | "white" | "black";
@@ -314,6 +315,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const [dispSize,     setDispSize]     = useState<{w:number;h:number}|null>(null);
   const [hasSelection, setHasSelection] = useState(false);
   const [selPixelCount,setSelPixelCount]= useState(0);
+  const [showAI,       setShowAI]       = useState(false);
 
   const brushRef     = useRef(brushSize);
   const brushHardRef = useRef(brushHard);
@@ -839,6 +841,28 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     }
   };
 
+  // ── AI suggestion handler ─────────────────────────────────────────────────────
+
+  const handleAISuggestion = useCallback((
+    seedPoints: {x:number;y:number}[],
+    tol: number,
+    edgeTol: number
+  ) => {
+    const c = canvasRef.current; if (!c) return;
+    const ctx = c.getContext("2d"); if (!ctx) return;
+    const id = ctx.getImageData(0, 0, c.width, c.height);
+    let combinedMask: Uint8Array<ArrayBuffer> = new Uint8Array(c.width * c.height);
+    for (const pt of seedPoints) {
+      const imgX = Math.floor(Math.max(0, Math.min(c.width - 1, pt.x * c.width)));
+      const imgY = Math.floor(Math.max(0, Math.min(c.height - 1, pt.y * c.height)));
+      const regionMask = fuzzySelectRegion(id, imgX, imgY, tol, edgeTol);
+      combinedMask = mergeMasks(combinedMask, regionMask, "add", c.width * c.height) as Uint8Array<ArrayBuffer>;
+    }
+    commitSelection(combinedMask, "new", c.width, c.height);
+    // Switch to fuzzy-select tool so user can refine
+    setTool("fuzzy-select");
+  }, [commitSelection]);
+
   // ── Confirm ───────────────────────────────────────────────────────────────────
 
   const handleConfirm=()=>{
@@ -899,6 +923,11 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             ))}
             <span className="text-[10px] text-white/30 ml-1 uppercase tracking-widest">BG</span>
           </div>
+          <button onClick={()=>setShowAI(v=>!v)}
+            className={`flex items-center gap-1.5 px-4 py-2 text-[11px] font-black uppercase tracking-widest rounded transition-all ${showAI?"text-white border-[#a855f7]":"border border-white/15 text-white/50 hover:text-white hover:border-white/30"}`}
+            style={showAI?{backgroundColor:"rgba(168,85,247,0.2)",border:"1px solid rgba(168,85,247,0.5)"}:{}}>
+            <span>✦</span> AI
+          </button>
           <button onClick={onCancel}
             className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest border border-white/15 text-white/50 hover:text-white hover:border-white/30 transition-all rounded">
             Cancel
@@ -1008,6 +1037,17 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             <div style={{position:"fixed",left:cursor.x,top:cursor.y,width:cursor.size,height:cursor.size,boxSizing:"border-box",transform:"translate(-50%,-50%)",borderRadius:"9999px",border:`2px solid ${tool==="restore"?"rgba(80,220,120,0.95)":"rgba(255,255,255,0.95)"}`,boxShadow:"0 0 0 1px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.4)",pointerEvents:"none",zIndex:30}}/>
           )}
         </div>
+
+        {/* ── AI panel ── */}
+        {showAI && (
+          <div className="w-72 border-l flex flex-col shrink-0" style={{borderColor:"rgba(168,85,247,0.25)"}}>
+            <AIAssistPanel
+              canvasRef={canvasRef}
+              onApplySuggestion={handleAISuggestion}
+              onClose={()=>setShowAI(false)}
+            />
+          </div>
+        )}
 
         {/* ── Right panel ── */}
         <div className="w-64 border-l flex flex-col shrink-0 overflow-y-auto" style={{borderColor:"rgba(255,255,255,0.08)",scrollbarWidth:"none"}}>

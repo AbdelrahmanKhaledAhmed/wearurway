@@ -13,6 +13,7 @@ import sharedLayersRouter from "./shared-layers.js";
 import orderSettingsRouter from "./order-settings.js";
 import ordersRouter from "./orders.js";
 import proxyImageRouter from "./proxy-image.js";
+import aiSelectRouter from "./ai-select.js";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(sharedLayersRouter);
 router.use(orderSettingsRouter);
 router.use(ordersRouter);
 router.use(proxyImageRouter);
+router.use(aiSelectRouter);
 
 export default router;
