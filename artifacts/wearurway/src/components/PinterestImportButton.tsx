@@ -213,15 +213,15 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
 
                     {/* Option A — URL */}
                     <div>
-                      <p className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-2">Option A — Paste image URL</p>
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-2">Option A — Paste Pinterest pin or image URL</p>
                       <div className="flex gap-2">
                         <input
                           type="url"
                           value={urlInput}
                           onChange={e => { setUrlInput(e.target.value); setUrlError(""); }}
                           onKeyDown={handleUrlKeyDown}
-                          placeholder="https://i.pinimg.com/…"
-                          className="flex-1 bg-white/5 border border-white/15 px-3 py-2.5 text-xs text-white placeholder:text-white/25 focus:outline-none focus:border-white/40 transition-colors"
+                          placeholder="https://www.pinterest.com/pin/… or direct image URL"
+                          className="flex-1 bg-white/5 border border-white/15 px-3 py-2.5 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-white/40 transition-colors"
                           autoFocus
                         />
                         <button
