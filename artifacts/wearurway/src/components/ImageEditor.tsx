@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import AIAssistPanel from "./AIAssistPanel";
+import AIAssistPanel, { type ImageAdjustments } from "./AIAssistPanel";
 
 type RefineMode = "erase" | "restore" | null;
 type BgPreview  = "checker" | "white" | "black";
@@ -127,6 +127,45 @@ function sharpenImageData(id: ImageData) {
   }
   for (let i=3;i<dst.length;i+=4) dst[i]=Math.max(0,Math.min(255,Math.round(8*(src[i]-128)+128)));
   return new ImageData(dst,w,h);
+}
+
+function applyImageAdjustments(id: ImageData, adj: ImageAdjustments): ImageData {
+  const src = id.data;
+  const dst = new Uint8ClampedArray(src);
+  const { brightness = 0, contrast = 0, saturation = 0, sharpen = false } = adj;
+  const contrastFactor = contrast !== 0 ? (259 * (contrast + 255)) / (255 * (259 - contrast)) : 1;
+
+  for (let i = 0; i < src.length; i += 4) {
+    if (src[i + 3] === 0) { dst[i]=src[i]; dst[i+1]=src[i+1]; dst[i+2]=src[i+2]; dst[i+3]=0; continue; }
+    let r = src[i], g = src[i+1], b = src[i+2];
+
+    if (brightness !== 0) {
+      const delta = brightness * 2.55;
+      r = Math.max(0, Math.min(255, r + delta));
+      g = Math.max(0, Math.min(255, g + delta));
+      b = Math.max(0, Math.min(255, b + delta));
+    }
+
+    if (contrast !== 0) {
+      r = Math.max(0, Math.min(255, contrastFactor * (r - 128) + 128));
+      g = Math.max(0, Math.min(255, contrastFactor * (g - 128) + 128));
+      b = Math.max(0, Math.min(255, contrastFactor * (b - 128) + 128));
+    }
+
+    if (saturation !== 0) {
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      const sat = 1 + saturation / 100;
+      r = Math.max(0, Math.min(255, gray + sat * (r - gray)));
+      g = Math.max(0, Math.min(255, gray + sat * (g - gray)));
+      b = Math.max(0, Math.min(255, gray + sat * (b - gray)));
+    }
+
+    dst[i] = r; dst[i+1] = g; dst[i+2] = b; dst[i+3] = src[i+3];
+  }
+
+  let result = new ImageData(dst, id.width, id.height);
+  if (sharpen) result = sharpenImageData(result);
+  return result;
 }
 
 function enhanceCanvas(src: HTMLCanvasElement, qualityScale=1) {
@@ -324,6 +363,21 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
         combined=mergeMasks(combined,region,c.width*c.height) as Uint8Array<ArrayBuffer>;
       }
       const result=applyMaskDeletion(id,combined);
+      ctx.putImageData(result,0,0);
+      originalDataRef.current=ctx.getImageData(0,0,c.width,c.height);
+      updateDisplay();
+      setProcessing(false);
+    },0);
+  }, [saveUndo, updateDisplay]);
+
+  const handleAIAdjust = useCallback((adjustments: ImageAdjustments) => {
+    const c=canvasRef.current; if (!c) return;
+    const ctx=c.getContext("2d"); if (!ctx) return;
+    setProcessing(true);
+    saveUndo();
+    setTimeout(()=>{
+      const id=ctx.getImageData(0,0,c.width,c.height);
+      const result=applyImageAdjustments(id,adjustments);
       ctx.putImageData(result,0,0);
       originalDataRef.current=ctx.getImageData(0,0,c.width,c.height);
       updateDisplay();
@@ -556,6 +610,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
           <AIAssistPanel
             canvasRef={canvasRef}
             onApplyResult={handleAIApply}
+            onApplyAdjustments={handleAIAdjust}
             refineMode={refineMode}
             onRefineMode={setRefineMode}
             brushSize={brushSize}
