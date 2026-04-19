@@ -71,6 +71,48 @@ function erodeAlpha(id: ImageData, r=1) {
   }
 }
 
+function computeGradientMag(d: Uint8ClampedArray, w: number, h: number): Float32Array {
+  const mag = new Float32Array(w*h);
+  for (let y=1;y<h-1;y++) for (let x=1;x<w-1;x++) {
+    let gx=0,gy=0;
+    for (let c=0;c<3;c++) {
+      const p=(dy:number,dx:number) => d[((y+dy)*w+(x+dx))*4+c];
+      const gxc = -p(-1,-1)-2*p(0,-1)-p(1,-1)+p(-1,1)+2*p(0,1)+p(1,1);
+      const gyc = -p(-1,-1)-2*p(-1,0)-p(-1,1)+p(1,-1)+2*p(1,0)+p(1,1);
+      gx=Math.max(gx,Math.abs(gxc)); gy=Math.max(gy,Math.abs(gyc));
+    }
+    mag[y*w+x]=Math.sqrt(gx*gx+gy*gy);
+  }
+  return mag;
+}
+
+function edgeAwareFloodFill(id: ImageData, sx: number, sy: number, colorTol: number, edgeTol: number) {
+  const {data:d,width:w,height:h}=id;
+  const mag=computeGradientMag(d,w,h);
+  const seed=getColorAt(d,sx,sy,w);
+  if (seed[3]===0) return;
+  const processed=new Uint8Array(w*h);
+  const queue=[sy*w+sx];
+  processed[sy*w+sx]=1;
+  while (queue.length) {
+    const idx=queue.pop()!;
+    const x=idx%w, y=Math.floor(idx/w);
+    const i=idx*4;
+    if (d[i+3]===0) continue;
+    if (colorDist(getColorAt(d,x,y,w),seed)>colorTol) continue;
+    d[i+3]=0;
+    for (const [nx,ny] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]] as [number,number][]) {
+      if (nx<0||nx>=w||ny<0||ny>=h) continue;
+      const ni=ny*w+nx;
+      if (processed[ni]) continue;
+      processed[ni]=1;
+      if (mag[ni]>edgeTol) continue;
+      queue.push(ni);
+    }
+  }
+  erodeAlpha(id,1);
+}
+
 function smartAutoRemove(id: ImageData, tol: number) {
   const { width: w, height: h } = id;
   const SAMPLE_EDGE = 3;
@@ -233,7 +275,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const [tool,       setTool]       = useState<Tool>("erase");
   const [brushSize,  setBrushSize]  = useState(28);
   const [brushHard,  setBrushHard]  = useState(0.7);
-  const [tolerance,  setTolerance]  = useState(38);
+  const [tolerance,  setTolerance]  = useState(35);
+  const [edgeTol,    setEdgeTol]    = useState(40);
   const [bgPreview,  setBgPreview]  = useState<BgPreview>("checker");
   const [processing, setProcessing] = useState(false);
   const [aiProgress, setAiProgress] = useState(0);
@@ -245,15 +288,17 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const [displaySrc, setDisplaySrc] = useState("");
   const [dispSize,   setDispSize]   = useState<{w:number;h:number}|null>(null);
 
-  const brushRef   = useRef(brushSize);
+  const brushRef    = useRef(brushSize);
   const brushHardRef = useRef(brushHard);
-  const tolRef     = useRef(tolerance);
-  const toolRef    = useRef<Tool>("erase");
+  const tolRef      = useRef(tolerance);
+  const edgeTolRef  = useRef(edgeTol);
+  const toolRef     = useRef<Tool>("erase");
   const zoomRef    = useRef(1);
   const panRef     = useRef({ x:0, y:0 });
   useEffect(() => { brushRef.current    = brushSize;  }, [brushSize]);
   useEffect(() => { brushHardRef.current = brushHard; }, [brushHard]);
   useEffect(() => { tolRef.current      = tolerance;  }, [tolerance]);
+  useEffect(() => { edgeTolRef.current  = edgeTol;    }, [edgeTol]);
   useEffect(() => { toolRef.current     = tool;       }, [tool]);
   useEffect(() => { zoomRef.current     = zoom;       }, [zoom]);
   useEffect(() => { panRef.current      = pan;        }, [pan]);
@@ -524,8 +569,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       saveUndo(); setProcessing(true);
       setTimeout(()=>{
         const id=ctx.getImageData(0,0,c.width,c.height);
-        floodFill(id,Math.floor(imageX),Math.floor(imageY),tolRef.current);
-        erodeAlpha(id,2);
+        edgeAwareFloodFill(id,Math.floor(imageX),Math.floor(imageY),tolRef.current,edgeTolRef.current);
         ctx.putImageData(id,0,0);
         trimCanvasToVisible();
         setProcessing(false);
@@ -666,7 +710,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
           {([
             { id:"erase",      Icon:Icons.Erase,   label:"Erase"   },
             { id:"restore",    Icon:Icons.Restore,  label:"Restore" },
-            { id:"magic-wand", Icon:Icons.Wand,     label:"Wand"    },
+            { id:"magic-wand", Icon:Icons.Wand,     label:"Click Remove" },
             { id:"move",       Icon:Icons.Move,     label:"Move"    },
           ] as const).map(({ id, Icon, label }) => (
             <button key={id} onClick={()=>setTool(id)} title={label}
@@ -783,21 +827,33 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             </div>
           )}
 
-          {/* Wand settings */}
+          {/* Click Remove settings */}
           {isPointTool && (
             <div className="p-5 space-y-5">
+              <p className="text-[10px] text-white/40 leading-relaxed">Click anywhere on the background to remove it. Edges of the subject are automatically preserved.</p>
               <div>
                 <div className="flex justify-between items-center mb-3">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-white/30">Color Tolerance</p>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-white/30">Color Spread</p>
                   <span className="text-[11px] font-mono font-bold text-white/60">{tolerance}</span>
                 </div>
                 <input type="range" min={5} max={120} value={tolerance} onChange={e=>setTolerance(Number(e.target.value))} className="w-full accent-[#f5c842]" />
                 <div className="flex justify-between mt-1">
-                  <span className="text-[10px] text-white/20">Precise</span>
-                  <span className="text-[10px] text-white/20">Aggressive</span>
+                  <span className="text-[10px] text-white/20">Tight</span>
+                  <span className="text-[10px] text-white/20">Wide</span>
                 </div>
               </div>
-              <p className="text-[10px] text-white/25 leading-relaxed">Click any area to remove connected pixels of similar color.</p>
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-white/30">Edge Protection</p>
+                  <span className="text-[11px] font-mono font-bold text-white/60">{edgeTol}</span>
+                </div>
+                <input type="range" min={10} max={200} value={edgeTol} onChange={e=>setEdgeTol(Number(e.target.value))} className="w-full accent-[#f5c842]" />
+                <div className="flex justify-between mt-1">
+                  <span className="text-[10px] text-white/20">Strict</span>
+                  <span className="text-[10px] text-white/20">Relaxed</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-white/25 leading-relaxed">Lower Edge Protection = more precise. Higher = allows crossing softer edges.</p>
             </div>
           )}
 
