@@ -6,10 +6,11 @@ import {
   GetAdminMeResponse,
 } from "@workspace/api-zod";
 import { getStore, updateStore } from "../data/store.js";
+import config from "../config.js";
 
 const router: IRouter = Router();
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "admin123";
+const ADMIN_PASSWORD = config.admin.password;
 
 function generateSessionToken(): string {
   return crypto.randomBytes(32).toString("base64url");

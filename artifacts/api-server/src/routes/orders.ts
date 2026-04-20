@@ -125,8 +125,8 @@ function formatMoney(value: number | undefined): string {
 
 async function sendOrderMessage(orderId: string, body: CreateOrderBody) {
   const settings = getStore().orderSettings;
-  const botToken = settings.telegramBotToken || process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = settings.telegramChatId || process.env.CHAT_ID || process.env.TELEGRAM_CHAT_ID;
+  const botToken = settings.telegramBotToken;
+  const chatId = settings.telegramChatId;
 
   if (!botToken || !chatId) {
     logger.error({ orderId }, "Telegram bot token or chat ID is not configured");

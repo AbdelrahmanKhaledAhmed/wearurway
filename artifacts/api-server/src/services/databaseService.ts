@@ -1,4 +1,5 @@
 import pg from "pg";
+import config from "../config.js";
 
 const { Pool } = pg;
 
@@ -7,18 +8,16 @@ let activeProvider = "Unknown";
 
 function getPool(): InstanceType<typeof Pool> {
   if (!pool) {
-    const supabaseUrl = process.env.SUPABASE_DATABASE_URL;
-    const replitUrl = process.env.DATABASE_URL;
-    const connectionString = supabaseUrl || replitUrl;
+    const connectionString = config.database.url || process.env.DATABASE_URL;
 
     if (!connectionString) {
       throw new Error(
-        "No database connection string found. Set SUPABASE_DATABASE_URL (Supabase pooler URL) or DATABASE_URL."
+        "No database connection string found. Set config.database.url in src/config.ts."
       );
     }
 
-    const isSupabase = !!supabaseUrl;
-    activeProvider = isSupabase ? "Supabase (PostgreSQL)" : "Replit PostgreSQL";
+    const isSupabase = connectionString.includes("supabase");
+    activeProvider = isSupabase ? "Supabase (PostgreSQL)" : "PostgreSQL";
 
     pool = new Pool({
       connectionString,

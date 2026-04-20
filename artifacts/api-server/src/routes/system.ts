@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { isAdminAuthenticated } from "./admin.js";
 import { checkDatabaseHealth } from "../services/databaseService.js";
 import { checkStorageHealth } from "../services/storageService.js";
+import config from "../config.js";
 
 const router: IRouter = Router();
 
@@ -32,32 +33,28 @@ router.get("/admin/system/config", (req, res) => {
     return;
   }
 
-  const isSupabase = !!process.env.SUPABASE_DATABASE_URL;
-  const hasR2 =
-    !!process.env.R2_ACCOUNT_ID &&
-    !!process.env.R2_ACCESS_KEY_ID &&
-    !!process.env.R2_SECRET_ACCESS_KEY &&
-    !!process.env.R2_BUCKET_NAME;
+  const dbUrl = config.database.url;
+  const isSupabase = dbUrl.includes("supabase");
+  const hasR2 = !!(config.r2.accountId && config.r2.accessKeyId && config.r2.secretAccessKey && config.r2.bucketName);
 
   res.json({
     database: {
-      provider: isSupabase ? "Supabase (PostgreSQL)" : "Replit PostgreSQL",
-      configured: isSupabase || !!process.env.DATABASE_URL,
-      connectionVariable: isSupabase ? "SUPABASE_DATABASE_URL" : "DATABASE_URL",
+      provider: isSupabase ? "Supabase (PostgreSQL)" : "PostgreSQL",
+      configured: !!dbUrl,
+      connectionVariable: "config.database.url (src/config.ts)",
     },
     storage: {
       provider: "Cloudflare R2",
       configured: hasR2,
-      bucket: process.env.R2_BUCKET_NAME ?? "(not set)",
-      publicUrl: process.env.R2_PUBLIC_URL ?? "(not set)",
-      accountId: process.env.R2_ACCOUNT_ID
-        ? `${process.env.R2_ACCOUNT_ID.slice(0, 6)}...`
+      bucket: config.r2.bucketName || "(not set)",
+      publicUrl: config.r2.publicUrl || "(not set)",
+      accountId: config.r2.accountId
+        ? `${config.r2.accountId.slice(0, 6)}...`
         : "(not set)",
     },
     telegram: {
-      configured:
-        !!(process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN),
-      note: "Bot token and chat ID are also configurable via the Settings tab in Admin Panel",
+      configured: false,
+      note: "Bot token and chat ID are configurable via the Settings tab in Admin Panel",
     },
     environment: process.env.NODE_ENV ?? "development",
   });

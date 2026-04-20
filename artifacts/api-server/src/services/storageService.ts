@@ -7,17 +7,14 @@ import {
 } from "@aws-sdk/client-s3";
 import type { Response as ExpressResponse } from "express";
 import { Readable } from "stream";
+import config from "../config.js";
 
 function getR2Config() {
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-  const bucketName = process.env.R2_BUCKET_NAME;
-  const publicUrl = process.env.R2_PUBLIC_URL;
+  const { accountId, accessKeyId, secretAccessKey, bucketName, publicUrl } = config.r2;
 
   if (!accountId || !accessKeyId || !secretAccessKey || !bucketName) {
     throw new Error(
-      "Missing Cloudflare R2 configuration. Required: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME"
+      "Missing Cloudflare R2 configuration. Set values in src/config.ts under config.r2"
     );
   }
 
