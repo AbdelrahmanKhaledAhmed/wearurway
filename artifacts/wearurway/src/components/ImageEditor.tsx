@@ -425,8 +425,11 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   // ── Geometry ────────────────────────────────────────────────────────────────
 
   // Maps a mouse event to image pixel coordinates.
-  // Uses areaRef (no CSS transform) + explicit pan/zoom inversion to avoid
-  // any getBoundingClientRect() inaccuracies on transformed child elements.
+  // Uses areaRef (no CSS transform) + explicit pan/zoom inversion.
+  // IMPORTANT: uses `zoom` and `pan` from React state (not refs) so that the
+  // values are guaranteed to match the CSS transform that was last rendered —
+  // refs are updated via useEffect (after paint) and would be stale on the
+  // first click after a zoom before the effect fires.
   const pointFromEvent = useCallback((e: React.MouseEvent) => {
     if (!nativeSize||!displayDims||!areaRef.current) return null;
     const areaRect=areaRef.current.getBoundingClientRect();
@@ -436,18 +439,16 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     // Mouse in area-relative coords
     const mx=e.clientX-areaRect.left;
     const my=e.clientY-areaRect.top;
-    // Invert CSS transform: matrix(z,0,0,z,pan.x,pan.y) → local pixel
-    // area_x = natLeft + z*localX + pan.x  =>  localX = (mx - natLeft - pan.x) / z
-    const z=zoomRef.current;
-    const p=panRef.current;
-    const localX=(mx-natLeft-p.x)/z;
-    const localY=(my-natTop -p.y)/z;
+    // Invert CSS transform: matrix(zoom,0,0,zoom,pan.x,pan.y) → local pixel
+    // area_x = natLeft + zoom*localX + pan.x  =>  localX = (mx - natLeft - pan.x) / zoom
+    const localX=(mx-natLeft-pan.x)/zoom;
+    const localY=(my-natTop -pan.y)/zoom;
     const imgX=localX/displayDims.w*nativeSize.w;
     const imgY=localY/displayDims.h*nativeSize.h;
     // imageRadius is zoom-independent: same canvas pixels regardless of view zoom
     const imageRadius=brushSizeRef.current*(nativeSize.w/displayDims.w);
     return {imgX, imgY, imageRadius};
-  }, [nativeSize, displayDims]);
+  }, [nativeSize, displayDims, zoom, pan]);
 
   // ── Fuzzy select ─────────────────────────────────────────────────────────────
 
