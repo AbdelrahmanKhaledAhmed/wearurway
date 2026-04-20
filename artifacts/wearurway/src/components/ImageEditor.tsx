@@ -674,10 +674,10 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   //   imageRadius = brushSize * (nativeW / displayW)  [canvas pixels]
   //   1 canvas pixel appears as (displayW / nativeW) * zoom  screen CSS pixels
   //   => diameter = 2 * brushSize * zoom
-  const brushCirclePx = useMemo(()=>{
-    return brushSizeRef.current * 2 * zoom;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [brushSize, zoom]);
+  // Use brushSize state (not the ref) so the cursor ring always matches what the
+  // brush will actually paint — the ref is updated in a useEffect (after render)
+  // which would make the ring lag one frame behind the true brush size.
+  const brushCirclePx = brushSize * 2 * zoom;
 
   const brushColor = toolMode==="erase" ? "rgba(239,68,68,0.9)" : "rgba(34,197,94,0.9)";
 
