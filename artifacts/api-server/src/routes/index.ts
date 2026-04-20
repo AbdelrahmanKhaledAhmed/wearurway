@@ -14,6 +14,7 @@ import orderSettingsRouter from "./order-settings.js";
 import ordersRouter from "./orders.js";
 import proxyImageRouter from "./proxy-image.js";
 import aiSelectRouter from "./ai-select.js";
+import systemRouter from "./system.js";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(orderSettingsRouter);
 router.use(ordersRouter);
 router.use(proxyImageRouter);
 router.use(aiSelectRouter);
+router.use(systemRouter);
 
 export default router;

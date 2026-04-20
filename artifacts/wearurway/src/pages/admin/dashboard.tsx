@@ -91,7 +91,7 @@ export default function AdminDashboard() {
 
         <Tabs defaultValue="products" className="w-full">
           <TabsList className="mb-12 rounded-none border-b border-border bg-transparent h-auto p-0 flex space-x-8 overflow-x-auto justify-start w-full">
-            {["products", "fits", "colors", "sizes", "mockups", "order files", "settings", "fonts"].map(tab => (
+            {["products", "fits", "colors", "sizes", "mockups", "order files", "settings", "fonts", "system"].map(tab => (
               <TabsTrigger
                 key={tab}
                 value={tab}
@@ -109,6 +109,7 @@ export default function AdminDashboard() {
           <TabsContent value="order files"><OrderFilesManager /></TabsContent>
           <TabsContent value="settings"><OrderSettingsManager /></TabsContent>
           <TabsContent value="fonts"><FontsManager /></TabsContent>
+          <TabsContent value="system"><SystemManager /></TabsContent>
         </Tabs>
       </motion.div>
     </div>
@@ -1632,6 +1633,182 @@ function FontsManager() {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── System Manager ──────────────────────────────────────────────────────────
+
+interface SystemHealth {
+  database: { ok: boolean; provider: string; error?: string };
+  storage: { ok: boolean; provider: string; bucket: string; error?: string };
+  environment: string;
+  timestamp: string;
+}
+
+interface SystemConfig {
+  database: { provider: string; configured: boolean; connectionVariable: string };
+  storage: { provider: string; configured: boolean; bucket: string; publicUrl: string; accountId: string };
+  telegram: { configured: boolean; note: string };
+  environment: string;
+}
+
+function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest border ${ok ? "border-emerald-500/40 text-emerald-500 bg-emerald-500/5" : "border-red-500/40 text-red-500 bg-red-500/5"}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${ok ? "bg-emerald-500" : "bg-red-500"}`} />
+      {label}
+    </span>
+  );
+}
+
+function SystemManager() {
+  const [health, setHealth] = useState<SystemHealth | null>(null);
+  const [config, setConfig] = useState<SystemConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const { toast } = useToast();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("wearurway_admin_token");
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const [healthRes, configRes] = await Promise.all([
+        fetch("/api/admin/system/health", { headers }),
+        fetch("/api/admin/system/config", { headers }),
+      ]);
+      if (!healthRes.ok || !configRes.ok) throw new Error("Failed to load system info");
+      const [h, c] = await Promise.all([healthRes.json(), configRes.json()]);
+      setHealth(h as SystemHealth);
+      setConfig(c as SystemConfig);
+    } catch (err) {
+      setError(String(err));
+      toast({ title: "Could not load system status" });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div className="space-y-10 max-w-3xl">
+      <div>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">System Status</h2>
+        <p className="text-sm text-muted-foreground mb-6">Live health check for all connected services.</p>
+
+        {loading ? (
+          <p className="text-xs uppercase tracking-widest text-muted-foreground animate-pulse">Checking services...</p>
+        ) : error ? (
+          <p className="text-sm text-destructive">{error}</p>
+        ) : health ? (
+          <div className="space-y-4">
+            <div className="border border-border p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-widest">Database</p>
+                <StatusBadge ok={health.database.ok} label={health.database.ok ? "Connected" : "Error"} />
+              </div>
+              <p className="text-sm text-muted-foreground">{health.database.provider}</p>
+              {health.database.error && (
+                <p className="text-xs font-mono text-destructive bg-destructive/5 border border-destructive/20 px-3 py-2 break-all">{health.database.error}</p>
+              )}
+            </div>
+
+            <div className="border border-border p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-widest">File Storage</p>
+                <StatusBadge ok={health.storage.ok} label={health.storage.ok ? "Connected" : "Error"} />
+              </div>
+              <p className="text-sm text-muted-foreground">{health.storage.provider}</p>
+              {health.storage.bucket && (
+                <p className="text-xs font-mono text-muted-foreground">Bucket: <span className="text-foreground">{health.storage.bucket}</span></p>
+              )}
+              {health.storage.error && (
+                <p className="text-xs font-mono text-destructive bg-destructive/5 border border-destructive/20 px-3 py-2 break-all">{health.storage.error}</p>
+              )}
+            </div>
+
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
+              Last checked: {new Date(health.timestamp).toLocaleString()}
+            </p>
+            <button onClick={load} className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors">
+              ↻ Refresh
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {config && (
+        <>
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Configuration</h2>
+            <p className="text-sm text-muted-foreground mb-6">Read-only view of your current service configuration.</p>
+            <div className="space-y-4">
+              <div className="border border-border p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-widest">Database Provider</p>
+                  <StatusBadge ok={config.database.configured} label={config.database.configured ? "Configured" : "Missing"} />
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
+                  <div>
+                    <p className="text-muted-foreground uppercase tracking-widest mb-1">Provider</p>
+                    <p className="font-mono">{config.database.provider}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground uppercase tracking-widest mb-1">Env Variable</p>
+                    <p className="font-mono">{config.database.connectionVariable}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-border p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-widest">File Storage Provider</p>
+                  <StatusBadge ok={config.storage.configured} label={config.storage.configured ? "Configured" : "Missing"} />
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
+                  <div>
+                    <p className="text-muted-foreground uppercase tracking-widest mb-1">Provider</p>
+                    <p className="font-mono">{config.storage.provider}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground uppercase tracking-widest mb-1">Bucket</p>
+                    <p className="font-mono">{config.storage.bucket}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground uppercase tracking-widest mb-1">Account ID</p>
+                    <p className="font-mono">{config.storage.accountId}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground uppercase tracking-widest mb-1">Public URL</p>
+                    <p className="font-mono break-all">{config.storage.publicUrl}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-border p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-widest">Telegram Notifications</p>
+                  <StatusBadge ok={config.telegram.configured} label={config.telegram.configured ? "Configured" : "Not set"} />
+                </div>
+                <p className="text-xs text-muted-foreground">{config.telegram.note}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border border-border p-5 space-y-3 bg-muted/5">
+            <p className="text-xs font-bold uppercase tracking-widest">Architecture Notes</p>
+            <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
+              <li>All admin changes are saved to <span className="text-foreground font-medium">{config.database.provider}</span> instantly and survive restarts and redeployments</li>
+              <li>All uploaded files go to <span className="text-foreground font-medium">{config.storage.provider}</span> — never stored locally</li>
+              <li>To switch database: update the <span className="font-mono text-foreground">SUPABASE_DATABASE_URL</span> secret and <span className="font-mono text-foreground">databaseService.ts</span></li>
+              <li>To switch storage: update the <span className="font-mono text-foreground">R2_*</span> secrets and <span className="font-mono text-foreground">storageService.ts</span></li>
+            </ul>
+          </div>
+        </>
+      )}
     </div>
   );
 }

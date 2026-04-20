@@ -1,8 +1,4 @@
-import pg from "pg";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const { Pool } = pg;
+import { query, ensureSchema } from "../services/databaseService.js";
 
 export interface Product {
   id: string;
@@ -191,21 +187,7 @@ const DEFAULT_STORE: Store = {
   ],
 };
 
-// ── PostgreSQL pool ──────────────────────────────────────────────────────────
-
-let pool: InstanceType<typeof Pool> | null = null;
-
-function getPool(): InstanceType<typeof Pool> {
-  if (!pool) {
-    if (!process.env.DATABASE_URL) {
-      throw new Error("DATABASE_URL is not set. Provision the Replit database first.");
-    }
-    pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  }
-  return pool;
-}
-
-// ── In-memory store (cache) ──────────────────────────────────────────────────
+// ── In-memory store (cache layer) ────────────────────────────────────────────
 
 let store: Store = JSON.parse(JSON.stringify(DEFAULT_STORE));
 
@@ -213,8 +195,8 @@ let store: Store = JSON.parse(JSON.stringify(DEFAULT_STORE));
 
 async function loadFromDB(): Promise<Store> {
   try {
-    const result = await getPool().query<{ value: Partial<Store> }>(
-      "SELECT value FROM store_data WHERE key = 'main'",
+    const result = await query<{ value: Partial<Store> }>(
+      "SELECT value FROM store_data WHERE key = 'main'"
     );
     if (result.rows.length > 0) {
       const parsed = result.rows[0].value;
@@ -238,21 +220,27 @@ async function loadFromDB(): Promise<Store> {
 }
 
 async function saveToDB(s: Store): Promise<void> {
-  await getPool().query(
+  await query(
     `INSERT INTO store_data (key, value, updated_at)
      VALUES ('main', $1::jsonb, NOW())
      ON CONFLICT (key)
      DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [JSON.stringify(s)],
+    [JSON.stringify(s)]
   );
 }
 
-// ── Public API ───────────────────────────────────────────────────────────────
+// ── Public API ────────────────────────────────────────────────────────────────
 
 /** Must be called once before handling any requests. */
 export async function initStore(): Promise<void> {
-  store = await loadFromDB();
-  console.log("[store] Loaded from PostgreSQL");
+  try {
+    await ensureSchema();
+    store = await loadFromDB();
+    console.log("[store] Loaded from database");
+  } catch (err) {
+    console.error("[store] Could not connect to database on startup, using defaults:", err);
+    store = JSON.parse(JSON.stringify(DEFAULT_STORE));
+  }
 }
 
 export function getStore(): Store {
@@ -262,7 +250,7 @@ export function getStore(): Store {
 export function updateStore(updater: (s: Store) => void): void {
   updater(store);
   saveToDB(store).catch((err) =>
-    console.error("[store] Failed to persist to DB:", err),
+    console.error("[store] Failed to persist to DB:", err)
   );
 }
 
