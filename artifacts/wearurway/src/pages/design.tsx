@@ -145,6 +145,8 @@ export default function Design() {
   const drawingCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingActiveRef = useRef(false);
   const lastDrawPosRef = useRef<{ x: number; y: number } | null>(null);
+  const strokePointsRef = useRef<{ x: number; y: number }[]>([]);
+  const drawingCssSizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const brushColorRef = useRef(brushColor);
   const brushSizeRef = useRef(brushSize);
   brushColorRef.current = brushColor;
@@ -360,16 +362,19 @@ export default function Design() {
     const canvas = drawingCanvasRef.current;
     const clip = clipAreaRef.current;
     if (!canvas || !clip) return;
-    canvas.width = clip.clientWidth;
-    canvas.height = clip.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = clip.clientWidth;
+    const cssH = clip.clientHeight;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    drawingCssSizeRef.current = { w: cssW, h: cssH };
+    const ctx = canvas.getContext("2d");
+    if (ctx) ctx.scale(dpr, dpr);
   }, [drawingMode]);
 
   const getDrawPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = e.currentTarget;
-    const rect = canvas.getBoundingClientRect();
-    const sx = canvas.width / rect.width;
-    const sy = canvas.height / rect.height;
-    return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
+    const rect = e.currentTarget.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
   const handleDrawDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -377,6 +382,7 @@ export default function Design() {
     e.currentTarget.setPointerCapture(e.pointerId);
     drawingActiveRef.current = true;
     const pos = getDrawPos(e);
+    strokePointsRef.current = [pos];
     lastDrawPosRef.current = pos;
     const ctx = e.currentTarget.getContext("2d");
     if (!ctx) return;
@@ -387,18 +393,30 @@ export default function Design() {
   };
 
   const handleDrawMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drawingActiveRef.current || !lastDrawPosRef.current) return;
+    if (!drawingActiveRef.current) return;
     e.preventDefault();
     const pos = getDrawPos(e);
+    const pts = strokePointsRef.current;
+    pts.push(pos);
     const ctx = e.currentTarget.getContext("2d");
-    if (!ctx) return;
+    if (!ctx || pts.length < 2) return;
     ctx.beginPath();
-    ctx.moveTo(lastDrawPosRef.current.x, lastDrawPosRef.current.y);
-    ctx.lineTo(pos.x, pos.y);
     ctx.strokeStyle = brushColorRef.current;
     ctx.lineWidth = brushSizeRef.current;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    const i = pts.length - 1;
+    if (pts.length === 2) {
+      ctx.moveTo(pts[0].x, pts[0].y);
+      ctx.lineTo(pts[1].x, pts[1].y);
+    } else {
+      const mid1x = (pts[i - 2].x + pts[i - 1].x) / 2;
+      const mid1y = (pts[i - 2].y + pts[i - 1].y) / 2;
+      const mid2x = (pts[i - 1].x + pts[i].x) / 2;
+      const mid2y = (pts[i - 1].y + pts[i].y) / 2;
+      ctx.moveTo(mid1x, mid1y);
+      ctx.quadraticCurveTo(pts[i - 1].x, pts[i - 1].y, mid2x, mid2y);
+    }
     ctx.stroke();
     lastDrawPosRef.current = pos;
   };
@@ -406,13 +424,15 @@ export default function Design() {
   const handleDrawUp = () => {
     drawingActiveRef.current = false;
     lastDrawPosRef.current = null;
+    strokePointsRef.current = [];
   };
 
   const clearDrawingCanvas = () => {
     const canvas = drawingCanvasRef.current;
     if (!canvas) return;
+    const { w, h } = drawingCssSizeRef.current;
     const ctx = canvas.getContext("2d");
-    ctx?.clearRect(0, 0, canvas.width, canvas.height);
+    ctx?.clearRect(0, 0, w || canvas.width, h || canvas.height);
   };
 
   const commitDrawing = useCallback(() => {
@@ -421,8 +441,9 @@ export default function Design() {
     canvas.toBlob(blob => {
       if (!blob) { setDrawingMode(false); return; }
       const blobUrl = URL.createObjectURL(blob);
-      const w = canvas.width;
-      const h = canvas.height;
+      const { w, h } = drawingCssSizeRef.current;
+      const cssW = w || canvas.width;
+      const cssH = h || canvas.height;
       setLayers(prev => [
         ...prev,
         {
@@ -431,12 +452,12 @@ export default function Design() {
           imageUrl: blobUrl,
           x: 0,
           y: 0,
-          width: w,
-          height: h,
+          width: cssW,
+          height: cssH,
           rotation: 0,
           visible: true,
-          naturalWidth: w,
-          naturalHeight: h,
+          naturalWidth: canvas.width,
+          naturalHeight: canvas.height,
         },
       ]);
       setDrawingMode(false);
