@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import FuzzySelectPanel from "./AIAssistPanel";
 
 type BgPreview = "checker" | "white" | "black";
-type ToolMode  = "select" | "restore" | "erase" | null;
+type ToolMode  = "select" | null;
 
 export interface ImageEditResult {
   originalWidth: number; originalHeight: number;
@@ -199,19 +199,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const imgRef           = useRef<HTMLImageElement>(null);
   const areaRef          = useRef<HTMLDivElement>(null);
 
-  // ── Pixel buffers ───────────────────────────────────────────────────────────
-  // workingDataRef: live pixel buffer — always mirrors canvasRef, modified in-memory by brush
-  const workingDataRef   = useRef<ImageData|null>(null);
-  // trueOriginalRef: set ONCE at load, NEVER mutated — used by restore brush
-  const trueOriginalRef  = useRef<ImageData|null>(null);
-
-  // ── Painting state ──────────────────────────────────────────────────────────
-  const isPainting       = useRef(false);
-  const lastStrokePoint  = useRef<{imgX:number;imgY:number}|null>(null);
-  const strokeDirty      = useRef(false);
-  const rafFlushRef      = useRef<number|null>(null);
-
-  // ── Pan / move state ────────────────────────────────────────────────────────
+  // ── Pan state ───────────────────────────────────────────────────────────────
   const isMoving         = useRef(false);
   const moveStartRef     = useRef<{pointerX:number;pointerY:number;panX:number;panY:number}|null>(null);
 
@@ -220,15 +208,12 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const redoRef          = useRef<CanvasSnapshot[]>([]);
   const trimRef          = useRef<ImageEditResult|null>(null);
 
-  // ── Refs for values needed in callbacks without stale closures ──────────────
+  // ── Refs for stale-closure-safe reads ───────────────────────────────────────
   const panRef           = useRef({x:0,y:0});
   const zoomRef          = useRef(1);
   const displayDimsRef   = useRef<{w:number;h:number}|null>(null);
-  const brushSizeRef     = useRef(25);
-  const selectionMaskRef = useRef<Uint8Array|null>(null);
-  const toolModeRef      = useRef<ToolMode>(null);
 
-  // ── Display / animation ─────────────────────────────────────────────────────
+  // ── Marching ants ───────────────────────────────────────────────────────────
   const rafDisplayRef    = useRef<number|null>(null);
   const baseOverlayRef   = useRef<Uint8ClampedArray|null>(null);
   const borderPixelsRef  = useRef<{idx:number;x:number;y:number}[]>([]);
@@ -245,20 +230,14 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const [displaySrc,    setDisplaySrc]    = useState("");
   const [toolMode,      setToolMode]      = useState<ToolMode>(null);
   const [selectionMask, setSelectionMask] = useState<Uint8Array|null>(null);
-  const [brushSize,     setBrushSize]     = useState(25);
   const [availArea,     setAvailArea]     = useState<{w:number;h:number}|null>(null);
-  // Cursor: track raw viewport position for the brush ring overlay
-  const [cursorClient,  setCursorClient]  = useState<{x:number;y:number;visible:boolean}>({x:0,y:0,visible:false});
   void histSig;
 
-  // Keep refs in sync with state
   useEffect(()=>{ panRef.current=pan; },[pan]);
   useEffect(()=>{ zoomRef.current=zoom; },[zoom]);
-  useEffect(()=>{ brushSizeRef.current=brushSize; },[brushSize]);
-  useEffect(()=>{ selectionMaskRef.current=selectionMask; },[selectionMask]);
-  useEffect(()=>{ toolModeRef.current=toolMode; },[toolMode]);
 
-  // Measure available area
+  // ── Measure available area ──────────────────────────────────────────────────
+
   useEffect(()=>{
     const el=areaRef.current; if (!el) return;
     const ro=new ResizeObserver(entries=>{
@@ -268,7 +247,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     return ()=>ro.disconnect();
   },[]);
 
-  // Compute display dimensions that fill available area while keeping aspect ratio
   const displayDims = useMemo(()=>{
     if (!availArea||!nativeSize) return null;
     const pad=0.92;
@@ -277,7 +255,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   },[availArea,nativeSize]);
   useEffect(()=>{ displayDimsRef.current=displayDims; },[displayDims]);
 
-  // ── Marching ants overlay ───────────────────────────────────────────────────
+  // ── Marching ants ───────────────────────────────────────────────────────────
 
   useEffect(()=>{
     if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current=null; }
@@ -327,7 +305,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     return ()=>{ if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
   },[selectionMask]);
 
-  // ── Display update ──────────────────────────────────────────────────────────
+  // ── Display ─────────────────────────────────────────────────────────────────
 
   const updateDisplay = useCallback(()=>{
     const c=canvasRef.current; if (!c) return;
@@ -336,38 +314,9 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
 
   const scheduleDisplay = useCallback(()=>{
     if (rafDisplayRef.current) return;
-    rafDisplayRef.current=requestAnimationFrame(()=>{
-      rafDisplayRef.current=null;
-      updateDisplay();
-    });
+    rafDisplayRef.current=requestAnimationFrame(()=>{ rafDisplayRef.current=null; updateDisplay(); });
   },[updateDisplay]);
-
-  // ── Working buffer management ───────────────────────────────────────────────
-
-  // Pull current canvas pixels into workingDataRef
-  const syncBufferFromCanvas = useCallback(()=>{
-    const c=canvasRef.current; if (!c) return;
-    workingDataRef.current=c.getContext("2d")!.getImageData(0,0,c.width,c.height);
-  },[]);
-
-  // Push workingDataRef back to canvas and refresh display
-  const flushBufferToCanvas = useCallback(()=>{
-    const c=canvasRef.current;
-    const wd=workingDataRef.current;
-    if (!c||!wd) return;
-    c.getContext("2d")!.putImageData(wd,0,0);
-    strokeDirty.current=false;
-    scheduleDisplay();
-  },[scheduleDisplay]);
-
-  // Schedule a flush via rAF — called after every brush stamp
-  const scheduleBrushFlush = useCallback(()=>{
-    if (rafFlushRef.current) return;
-    rafFlushRef.current=requestAnimationFrame(()=>{
-      rafFlushRef.current=null;
-      flushBufferToCanvas();
-    });
-  },[flushBufferToCanvas]);
+  void scheduleDisplay;
 
   // ── Load ────────────────────────────────────────────────────────────────────
 
@@ -380,11 +329,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       const ctx=c.getContext("2d")!;
       ctx.clearRect(0,0,c.width,c.height);
       ctx.drawImage(img,0,0);
-      const imgData=ctx.getImageData(0,0,c.width,c.height);
-      // trueOriginalRef: immutable, set once, never touched again
-      trueOriginalRef.current=new ImageData(new Uint8ClampedArray(imgData.data),imgData.width,imgData.height);
-      // workingDataRef: live copy, modified by brush
-      workingDataRef.current=new ImageData(new Uint8ClampedArray(imgData.data),imgData.width,imgData.height);
       setNativeSize({w:c.width,h:c.height});
       setLoaded(true);
       updateDisplay();
@@ -411,8 +355,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     c.width=snap.width; c.height=snap.height;
     c.getContext("2d")!.putImageData(snap.data,0,0);
     trimRef.current=snap.trim;
-    // Keep workingDataRef in sync after undo/redo
-    workingDataRef.current=new ImageData(new Uint8ClampedArray(snap.data.data),snap.data.width,snap.data.height);
     setNativeSize({w:snap.width,h:snap.height});
     updateDisplay();
   },[updateDisplay]);
@@ -433,10 +375,13 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     setSelectionMask(null);
   },[restoreSnap]);
 
+  // ── Global keyboard shortcuts ───────────────────────────────────────────────
+  // Ctrl+Z → undo, Ctrl+Y / Ctrl+Shift+Z → redo, Escape → clear selection
+
   useEffect(()=>{
     const h=(e: KeyboardEvent)=>{
       if ((e.ctrlKey||e.metaKey)&&e.key==="z") { e.preventDefault(); doUndo(); }
-      if ((e.ctrlKey||e.metaKey)&&(e.key==="y"||(e.shiftKey&&e.key==="z"))) { e.preventDefault(); doRedo(); }
+      if ((e.ctrlKey||e.metaKey)&&(e.key==="y"||(e.shiftKey&&e.key==="Z"))) { e.preventDefault(); doRedo(); }
       if (e.key==="Escape") setSelectionMask(null);
     };
     window.addEventListener("keydown",h);
@@ -467,135 +412,17 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       (e.clientX-rect.left)/rect.width,(e.clientY-rect.top)/rect.height);
   },[applyZoom]);
 
-  // ── NEW BRUSH ENGINE — Coordinate system ────────────────────────────────────
-  //
-  // Single source of truth: imgRef.getBoundingClientRect()
-  //   • getBoundingClientRect() always returns the ACTUAL on-screen pixel position
-  //     and size of the element, including all parent CSS transforms (zoom, pan).
-  //   • No manual reconstruction of (natLeft + pan + zoom) needed.
-  //   • Works correctly at any zoom, pan, window resize, or selection state.
-  //
-  // getImageCoords(clientX, clientY) → {imgX, imgY} in native canvas pixels
-  //   imgX = (clientX - rect.left) / rect.width  * nativeW
-  //   imgY = (clientY - rect.top)  / rect.height * nativeH
-  //
-  // getBrushRadiusInImagePixels() → r
-  //   brushSize is a radius in "screen pixels at zoom=1".
-  //   At any zoom, screen-px radius = brushSize * zoom.
-  //   rect.width = displayDims.w * zoom  (getBoundingClientRect includes transforms)
-  //   r = (brushSize * zoom) * nativeW / rect.width
-  //     = (brushSize * zoom) * nativeW / (displayDims.w * zoom)
-  //     = brushSize * nativeW / displayDims.w   (zoom-invariant image-pixel radius)
-  //
-  // Cursor ring on screen:
-  //   diameter = brushSize * 2 * zoom   (matches exactly what getImageCoords paints)
-  // ────────────────────────────────────────────────────────────────────────────
+  // ── Coordinate mapping (for fuzzy select) ───────────────────────────────────
 
-  // Returns image pixel coordinates + brush radius for a viewport point.
-  // Returns null if the image element is not mounted or has zero size.
-  const getImageCoords = useCallback((clientX: number, clientY: number): {imgX:number;imgY:number;brushRadiusPx:number}|null => {
+  const getImageCoords = useCallback((clientX: number, clientY: number): {imgX:number;imgY:number}|null=>{
     if (!nativeSize||!imgRef.current) return null;
     const rect=imgRef.current.getBoundingClientRect();
     if (rect.width===0||rect.height===0) return null;
-
-    // Map viewport → native canvas coordinates
-    const imgX=(clientX-rect.left)/rect.width *nativeSize.w;
-    const imgY=(clientY-rect.top) /rect.height*nativeSize.h;
-
-    // brushSize (screen-px at zoom=1) → image pixels
-    // rect.width already includes zoom, so dividing by rect.width * (nativeW / nativeW) collapses
-    const brushRadiusPx=brushSizeRef.current*nativeSize.w/displayDimsRef.current!.w;
-
-    return {imgX,imgY,brushRadiusPx};
+    return {
+      imgX:(clientX-rect.left)/rect.width *nativeSize.w,
+      imgY:(clientY-rect.top) /rect.height*nativeSize.h,
+    };
   },[nativeSize]);
-
-  // ── NEW BRUSH ENGINE — Core stamp ───────────────────────────────────────────
-  //
-  // Works ENTIRELY on workingDataRef (in-memory Uint8ClampedArray).
-  // No getImageData / putImageData per stamp — only one putImageData per rAF.
-  //
-  // Brush shape: hard circular mask with a 1-pixel anti-aliased border
-  //   dist ≤ r-0.5        → fully applied (alpha=1)
-  //   r-0.5 < dist ≤ r+0.5 → anti-aliased edge (alpha = r+0.5-dist)
-  //   dist > r+0.5        → not touched
-  //
-  // This gives a crisp, pixel-perfect circle with no soft bloat.
-  // Selection mask is respected: pixels outside the selection are never touched.
-  // ────────────────────────────────────────────────────────────────────────────
-
-  const stampBrush = useCallback((imgX: number, imgY: number, brushRadiusPx: number, mode: "erase"|"restore")=>{
-    const wd=workingDataRef.current;
-    const orig=trueOriginalRef.current;
-    if (!wd||!nativeSize) return;
-    if (mode==="restore"&&!orig) return;
-
-    const cw=nativeSize.w, ch=nativeSize.h;
-    const mask=selectionMaskRef.current;
-    const r=brushRadiusPx;
-    const rOuter=r+0.5;
-
-    // Bounding box of the stamp
-    const x0=Math.max(0,Math.floor(imgX-rOuter));
-    const y0=Math.max(0,Math.floor(imgY-rOuter));
-    const x1=Math.min(cw-1,Math.ceil(imgX+rOuter));
-    const y1=Math.min(ch-1,Math.ceil(imgY+rOuter));
-    if (x1<x0||y1<y0) return;
-
-    const data=wd.data;
-
-    for (let py=y0;py<=y1;py++) {
-      for (let px=x0;px<=x1;px++) {
-        // 1. Selection boundary — never touch pixels outside active selection
-        if (mask&&!mask[py*cw+px]) continue;
-
-        // 2. Circular distance check with anti-aliased 1px border
-        const dx=px-imgX, dy=py-imgY;
-        const dist=Math.sqrt(dx*dx+dy*dy);
-        if (dist>rOuter) continue;
-
-        // Brush opacity: 1 inside (dist ≤ r-0.5), linear falloff in 1px border zone
-        const alpha=Math.min(1,rOuter-dist);
-
-        const i=(py*cw+px)*4;
-
-        if (mode==="erase") {
-          // Reduce alpha channel — blends with existing alpha for smooth repeated strokes
-          const newA=Math.round(data[i+3]*(1-alpha));
-          data[i+3]=Math.max(0,newA);
-        } else {
-          // Restore: blend toward true original pixel
-          if (!orig) continue;
-          const oi=(py*orig.width+px)*4;
-          if (px>=orig.width||py>=orig.height) continue;
-          data[i]  =Math.round(data[i]  +(orig.data[oi]  -data[i]  )*alpha);
-          data[i+1]=Math.round(data[i+1]+(orig.data[oi+1]-data[i+1])*alpha);
-          data[i+2]=Math.round(data[i+2]+(orig.data[oi+2]-data[i+2])*alpha);
-          data[i+3]=Math.round(data[i+3]+(orig.data[oi+3]-data[i+3])*alpha);
-        }
-      }
-    }
-
-    strokeDirty.current=true;
-    scheduleBrushFlush();
-  },[nativeSize,scheduleBrushFlush]);
-
-  // Interpolate strokes so fast drags have no gaps
-  const interpolateStroke = useCallback((
-    fromX: number, fromY: number,
-    toX:   number, toY:   number,
-    brushRadiusPx: number,
-    mode: "erase"|"restore",
-  )=>{
-    const dx=toX-fromX, dy=toY-fromY;
-    const dist=Math.sqrt(dx*dx+dy*dy);
-    // Step spacing: 30% of brush radius (fine-grained fills without over-blending)
-    const step=Math.max(1,brushRadiusPx*0.3);
-    const steps=Math.ceil(dist/step);
-    for (let i=1;i<=steps;i++) {
-      const t=i/steps;
-      stampBrush(fromX+dx*t,fromY+dy*t,brushRadiusPx,mode);
-    }
-  },[stampBrush]);
 
   // ── Fuzzy select ─────────────────────────────────────────────────────────────
 
@@ -625,8 +452,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       const id=ctx.getImageData(0,0,c.width,c.height);
       const result=applyMaskDeletion(id,selectionMask);
       ctx.putImageData(result,0,0);
-      // Sync working buffer after external canvas modification
-      workingDataRef.current=new ImageData(new Uint8ClampedArray(result.data),result.width,result.height);
       updateDisplay();
       setSelectionMask(null);
       setProcessing(false);
@@ -643,90 +468,43 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       const id=ctx.getImageData(0,0,c.width,c.height);
       const result=applyMaskRecolor(id,selectionMask,color);
       ctx.putImageData(result,0,0);
-      workingDataRef.current=new ImageData(new Uint8ClampedArray(result.data),result.width,result.height);
       updateDisplay();
       setSelectionMask(null);
       setProcessing(false);
     },0);
   },[selectionMask,saveUndo,updateDisplay]);
 
-  const handleClearSelection = useCallback(()=>{ setSelectionMask(null); },[]);
+  const handleClearSelection = useCallback(()=>setSelectionMask(null),[]);
 
   // ── Mouse events ────────────────────────────────────────────────────────────
 
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLElement>)=>{
     if (!loaded||!nativeSize) return;
-    const mode=toolModeRef.current;
 
-    if (mode==="select") {
+    if (toolMode==="select") {
       const pt=getImageCoords(e.clientX,e.clientY);
-      if (!pt) return;
-      handleFuzzySelect(pt.imgX,pt.imgY);
+      if (pt) handleFuzzySelect(pt.imgX,pt.imgY);
       return;
     }
 
-    if (mode==="restore"||mode==="erase") {
-      const pt=getImageCoords(e.clientX,e.clientY);
-      if (!pt) return;
-      // Ensure working buffer is fresh before starting stroke
-      syncBufferFromCanvas();
-      saveUndo();
-      isPainting.current=true;
-      lastStrokePoint.current=null;
-      stampBrush(pt.imgX,pt.imgY,pt.brushRadiusPx,mode);
-      lastStrokePoint.current={imgX:pt.imgX,imgY:pt.imgY};
-      return;
-    }
-
+    // Default: pan
     isMoving.current=true;
     moveStartRef.current={pointerX:e.clientX,pointerY:e.clientY,panX:panRef.current.x,panY:panRef.current.y};
-  },[loaded,nativeSize,getImageCoords,handleFuzzySelect,syncBufferFromCanvas,saveUndo,stampBrush]);
+  },[loaded,nativeSize,toolMode,getImageCoords,handleFuzzySelect]);
 
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLElement>)=>{
-    const mode=toolModeRef.current;
-
-    if (mode==="restore"||mode==="erase") {
-      // Always update cursor ring position
-      setCursorClient({x:e.clientX,y:e.clientY,visible:true});
-
-      if (isPainting.current) {
-        const pt=getImageCoords(e.clientX,e.clientY);
-        if (!pt) return;
-        const last=lastStrokePoint.current;
-        if (last) {
-          interpolateStroke(last.imgX,last.imgY,pt.imgX,pt.imgY,pt.brushRadiusPx,mode);
-        } else {
-          stampBrush(pt.imgX,pt.imgY,pt.brushRadiusPx,mode);
-        }
-        lastStrokePoint.current={imgX:pt.imgX,imgY:pt.imgY};
-      }
-      return;
-    }
-
-    setCursorClient(c=>({...c,visible:false}));
-
     if (isMoving.current&&moveStartRef.current) {
       const s=moveStartRef.current;
       setPan({x:s.panX+e.clientX-s.pointerX,y:s.panY+e.clientY-s.pointerY});
     }
-  },[getImageCoords,interpolateStroke,stampBrush]);
+  },[]);
 
   const onMouseUp = useCallback(()=>{
-    if (isPainting.current&&strokeDirty.current) {
-      // Cancel pending rAF flush and do it synchronously so the stroke is committed
-      if (rafFlushRef.current) { cancelAnimationFrame(rafFlushRef.current); rafFlushRef.current=null; }
-      flushBufferToCanvas();
-    }
-    isPainting.current=false;
-    lastStrokePoint.current=null;
     isMoving.current=false;
     moveStartRef.current=null;
-  },[flushBufferToCanvas]);
+  },[]);
 
-  const onMouseLeave = useCallback(()=>{
-    setCursorClient(c=>({...c,visible:false}));
-    onMouseUp();
-  },[onMouseUp]);
+  const onMouseLeave = useCallback(()=>{ onMouseUp(); },[onMouseUp]);
 
   // ── Confirm ─────────────────────────────────────────────────────────────────
 
@@ -747,26 +525,15 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const canUndo=undoRef.current.length>0;
   const canRedo=redoRef.current.length>0;
   const bgStyle:React.CSSProperties=bgPreview==="checker"?CHECKER_STYLE:bgPreview==="white"?{backgroundColor:"#fff"}:{backgroundColor:"#111"};
-
-  const canvasCursor=
-    toolMode==="select"                       ?"crosshair":
-    toolMode==="restore"||toolMode==="erase"  ?"none":
-    selectionMask                             ?"default":"grab";
-
-  // Brush ring diameter in screen pixels:
-  //   brushSize (radius at zoom=1) * zoom * 2
-  // This matches exactly what getImageCoords will paint — verified by algebra above.
-  const brushRingDiameter=brushSize*2*zoom;
-  const brushRingColor=toolMode==="erase"?"rgba(239,68,68,0.95)":"rgba(34,197,94,0.95)";
+  const canvasCursor=toolMode==="select"?"crosshair":selectionMask?"default":"grab";
 
   const handleSetToolMode = useCallback((mode: ToolMode)=>{
     setToolMode(prev=>{
       if (prev===mode) { setSelectionMask(null); return null; }
-      if (mode==="select") { setSelectionMask(null); }
-      if (mode===null) { setSelectionMask(null); }
+      if (mode==="select") setSelectionMask(null);
+      if (mode===null) setSelectionMask(null);
       return mode;
     });
-    setCursorClient(c=>({...c,visible:false}));
   },[]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -786,7 +553,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-white/50 hover:text-white hover:bg-white/8 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest">
               <UndoIcon/> Undo
             </button>
-            <button onClick={doRedo} disabled={!canRedo} title="Redo"
+            <button onClick={doRedo} disabled={!canRedo} title="Redo (Ctrl+Y)"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-white/50 hover:text-white hover:bg-white/8 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest">
               Redo <RedoIcon/>
             </button>
@@ -889,61 +656,12 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             </div>
           )}
 
-          {/* Tool hints */}
           {toolMode==="select" && !selectionMask && loaded && !processing && (
             <div className="absolute bottom-5 left-1/2 -translate-x-1/2 pointer-events-none">
               <div className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-bold"
                 style={{backgroundColor:"rgba(0,0,0,0.7)",border:"1px solid rgba(168,85,247,0.4)",color:"rgba(196,140,255,0.9)",backdropFilter:"blur(8px)"}}>
                 <span style={{color:"#a855f7"}}>✦</span> Click anywhere on your image to select
               </div>
-            </div>
-          )}
-          {(toolMode==="restore"||toolMode==="erase") && loaded && !processing && (
-            <div className="absolute bottom-5 left-1/2 -translate-x-1/2 pointer-events-none">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-bold"
-                style={{
-                  backgroundColor:"rgba(0,0,0,0.7)",
-                  border:`1px solid ${toolMode==="erase"?"rgba(239,68,68,0.4)":"rgba(34,197,94,0.4)"}`,
-                  color:toolMode==="erase"?"rgba(252,165,165,0.9)":"rgba(134,239,172,0.9)",
-                  backdropFilter:"blur(8px)",
-                }}>
-                {toolMode==="erase"?"✕ Click and drag to erase":"↩ Click and drag to restore"}
-              </div>
-            </div>
-          )}
-
-          {/*
-            ── Brush cursor ring ──
-            Positioned at the exact viewport location of the cursor (position:fixed).
-            Diameter = brushSize * 2 * zoom, which matches the image pixels painted
-            by getImageCoords exactly (see coordinate system comment above).
-            A thin inner crosshair indicates the center for sub-pixel precision.
-          */}
-          {cursorClient.visible && (toolMode==="restore"||toolMode==="erase") && brushRingDiameter>0 && (
-            <div
-              style={{
-                position:"fixed",
-                left:cursorClient.x,
-                top:cursorClient.y,
-                width:brushRingDiameter,
-                height:brushRingDiameter,
-                transform:"translate(-50%,-50%)",
-                borderRadius:"9999px",
-                border:`1.5px solid ${brushRingColor}`,
-                boxShadow:"0 0 0 1px rgba(0,0,0,0.7)",
-                pointerEvents:"none",
-                zIndex:9999,
-              }}
-            >
-              {/* Center crosshair dot */}
-              <div style={{
-                position:"absolute",
-                left:"50%",top:"50%",
-                width:2,height:2,
-                transform:"translate(-50%,-50%)",
-                backgroundColor:brushRingColor,
-                borderRadius:"9999px",
-              }}/>
             </div>
           )}
 
@@ -959,8 +677,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             onDelete={handleDelete}
             onChangeColor={handleChangeColor}
             onClearSelection={handleClearSelection}
-            brushSize={brushSize}
-            onBrushSize={setBrushSize}
           />
         </div>
       </div>
