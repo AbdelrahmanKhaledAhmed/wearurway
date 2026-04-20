@@ -237,7 +237,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   useEffect(()=>{ panRef.current=pan; },[pan]);
   useEffect(()=>{ zoomRef.current=zoom; },[zoom]);
   useEffect(()=>{ brushSizeRef.current=brushSize; },[brushSize]);
-  useEffect(()=>{ displayDimsRef.current=displayDims; },[displayDims]);
 
   // Measure available area so we can size the image EXACTLY (no objectFit letterboxing)
   useEffect(()=>{
@@ -260,6 +259,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     const scale=Math.min(scaleX,scaleY);
     return {w:Math.round(nativeSize.w*scale), h:Math.round(nativeSize.h*scale)};
   },[availArea,nativeSize]);
+  // Keep ref in sync so applyZoom can read it without a stale closure
+  useEffect(()=>{ displayDimsRef.current=displayDims; },[displayDims]);
 
   // ── Marching ants selection overlay ──────────────────────────────────────────
 
