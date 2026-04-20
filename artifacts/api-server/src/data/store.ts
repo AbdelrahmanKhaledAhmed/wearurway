@@ -1,9 +1,8 @@
-import fs from "fs";
+import pg from "pg";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_FILE = path.join(__dirname, "db.json");
+const { Pool } = pg;
 
 export interface Product {
   id: string;
@@ -192,11 +191,33 @@ const DEFAULT_STORE: Store = {
   ],
 };
 
-function loadStore(): Store {
+// ── PostgreSQL pool ──────────────────────────────────────────────────────────
+
+let pool: InstanceType<typeof Pool> | null = null;
+
+function getPool(): InstanceType<typeof Pool> {
+  if (!pool) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL is not set. Provision the Replit database first.");
+    }
+    pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  }
+  return pool;
+}
+
+// ── In-memory store (cache) ──────────────────────────────────────────────────
+
+let store: Store = JSON.parse(JSON.stringify(DEFAULT_STORE));
+
+// ── DB persistence ───────────────────────────────────────────────────────────
+
+async function loadFromDB(): Promise<Store> {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const raw = fs.readFileSync(DATA_FILE, "utf-8");
-      const parsed = JSON.parse(raw) as Partial<Store>;
+    const result = await getPool().query<{ value: Partial<Store> }>(
+      "SELECT value FROM store_data WHERE key = 'main'",
+    );
+    if (result.rows.length > 0) {
+      const parsed = result.rows[0].value;
       return {
         ...JSON.parse(JSON.stringify(DEFAULT_STORE)),
         ...parsed,
@@ -210,21 +231,29 @@ function loadStore(): Store {
         },
       };
     }
-  } catch {
-    // fall through to default
+  } catch (err) {
+    console.error("[store] Failed to load from DB, using defaults:", err);
   }
   return JSON.parse(JSON.stringify(DEFAULT_STORE));
 }
 
-function saveStore(store: Store): void {
-  const dir = path.dirname(DATA_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(DATA_FILE, JSON.stringify(store, null, 2), "utf-8");
+async function saveToDB(s: Store): Promise<void> {
+  await getPool().query(
+    `INSERT INTO store_data (key, value, updated_at)
+     VALUES ('main', $1::jsonb, NOW())
+     ON CONFLICT (key)
+     DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+    [JSON.stringify(s)],
+  );
 }
 
-let store = loadStore();
+// ── Public API ───────────────────────────────────────────────────────────────
+
+/** Must be called once before handling any requests. */
+export async function initStore(): Promise<void> {
+  store = await loadFromDB();
+  console.log("[store] Loaded from PostgreSQL");
+}
 
 export function getStore(): Store {
   return store;
@@ -232,7 +261,9 @@ export function getStore(): Store {
 
 export function updateStore(updater: (s: Store) => void): void {
   updater(store);
-  saveStore(store);
+  saveToDB(store).catch((err) =>
+    console.error("[store] Failed to persist to DB:", err),
+  );
 }
 
 export function generateId(): string {

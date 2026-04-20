@@ -1,9 +1,7 @@
 import { Router, type IRouter } from "express";
-import fs from "fs";
-import path from "path";
 import { getStore, updateStore } from "../data/store.js";
 import type { Mockup } from "../data/store.js";
-import { MOCKUPS_DIR } from "../lib/paths.js";
+import { objectExists } from "../lib/objectStorage.js";
 
 const router: IRouter = Router();
 
@@ -29,16 +27,7 @@ function buildMockupFilename(
   return `${parts.join("_")}_${side}.png`;
 }
 
-function fileExistsInMockupsDir(filename: string): boolean {
-  if (!filename) return false;
-  try {
-    return fs.existsSync(path.join(MOCKUPS_DIR, filename));
-  } catch {
-    return false;
-  }
-}
-
-router.get("/mockups", (req, res) => {
+router.get("/mockups", async (req, res) => {
   const { productId, fitId, colorId } = req.query as Record<string, string>;
 
   if (!productId || !fitId || !colorId) {
@@ -62,15 +51,16 @@ router.get("/mockups", (req, res) => {
     ? buildMockupFilename(product.name, fit.name, color.name, "back")
     : "";
 
-  const autoFrontImage = frontFilename && fileExistsInMockupsDir(frontFilename)
-    ? `/api/uploads/mockups/${frontFilename}`
-    : undefined;
-  const autoBackImage = backFilename && fileExistsInMockupsDir(backFilename)
-    ? `/api/uploads/mockups/${backFilename}`
-    : undefined;
+  // Check Object Storage for auto-detection
+  const [frontExists, backExists] = await Promise.all([
+    frontFilename ? objectExists(`uploads/mockups/${frontFilename}`) : Promise.resolve(false),
+    backFilename ? objectExists(`uploads/mockups/${backFilename}`) : Promise.resolve(false),
+  ]);
+
+  const autoFrontImage = frontExists ? `/api/uploads/mockups/${frontFilename}` : undefined;
+  const autoBackImage = backExists ? `/api/uploads/mockups/${backFilename}` : undefined;
 
   if (!saved) {
-    // No saved record — return auto-detected images if files exist on disk
     if (!autoFrontImage && !autoBackImage) {
       res.json({ productId, fitId, colorId });
       return;

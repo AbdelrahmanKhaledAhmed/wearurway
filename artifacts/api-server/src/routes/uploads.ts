@@ -1,11 +1,9 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
 import path from "path";
-import fs from "fs";
 import sharp from "sharp";
-import { MOCKUPS_DIR, ensureDir, toSafeFilename } from "../lib/paths.js";
-
-ensureDir(MOCKUPS_DIR);
+import { toSafeFilename } from "../lib/paths.js";
+import { uploadBuffer, deleteObject, streamObject } from "../lib/objectStorage.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -23,6 +21,14 @@ const upload = multer({
 
 const router: IRouter = Router();
 
+// Serve mockup images from Object Storage
+router.get("/uploads/mockups/:filename", async (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const found = await streamObject(`uploads/mockups/${filename}`, res);
+  if (!found) res.status(404).json({ error: "Not found" });
+});
+
+// Upload a mockup image → Object Storage
 router.post("/uploads", upload.single("file"), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "No file uploaded" });
@@ -38,11 +44,10 @@ router.post("/uploads", upload.single("file"), async (req, res) => {
   }
 
   const filename = `${safeName}.png`;
-  const filePath = path.join(MOCKUPS_DIR, filename);
 
   try {
     const pngBuffer = await sharp(req.file.buffer).png().toBuffer();
-    fs.writeFileSync(filePath, pngBuffer);
+    await uploadBuffer(`uploads/mockups/${filename}`, pngBuffer, "image/png");
   } catch {
     res.status(500).json({ error: "Failed to process image" });
     return;
@@ -54,14 +59,9 @@ router.post("/uploads", upload.single("file"), async (req, res) => {
   });
 });
 
-router.delete("/uploads/mockups/:filename", (req, res) => {
+router.delete("/uploads/mockups/:filename", async (req, res) => {
   const filename = path.basename(req.params.filename);
-  const filePath = path.join(MOCKUPS_DIR, filename);
-  if (!fs.existsSync(filePath)) {
-    res.status(404).json({ error: "File not found" });
-    return;
-  }
-  fs.unlinkSync(filePath);
+  await deleteObject(`uploads/mockups/${filename}`);
   res.status(200).json({ success: true });
 });
 

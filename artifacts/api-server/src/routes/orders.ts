@@ -1,14 +1,10 @@
 import { Router, type IRouter } from "express";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { getStore, updateStore, type OrderRecord } from "../data/store.js";
-import { UPLOADS_DIR } from "../lib/paths.js";
+import { uploadBuffer, deleteObject } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
 import { isAdminAuthenticated } from "./admin.js";
 
 const router: IRouter = Router();
-const ORDER_FILES_ROOT = path.join(UPLOADS_DIR, "orders");
-const DISPLAY_ORDER_FILES_ROOT = "artifacts/api-server/uploads/orders";
 
 interface CreateOrderSize {
   name?: string;
@@ -66,12 +62,8 @@ function extensionForMime(mimeType: string): string {
   return ".bin";
 }
 
-function folderPathForOrder(orderId: string): string {
-  return path.join(ORDER_FILES_ROOT, orderId);
-}
-
-function displayFolderPathForOrder(orderId: string): string {
-  return `${DISPLAY_ORDER_FILES_ROOT}/${orderId}`;
+function gcsOrderPrefix(orderId: string): string {
+  return `orders/${orderId}`;
 }
 
 async function telegramRequest(url: string, body: URLSearchParams) {
@@ -84,8 +76,6 @@ async function telegramRequest(url: string, body: URLSearchParams) {
 }
 
 async function saveFilesToOrderFolder(orderId: string, files: CreateOrderFile[]): Promise<string[]> {
-  const folderPath = folderPathForOrder(orderId);
-  await fs.mkdir(folderPath, { recursive: true });
   const saved: string[] = [];
 
   for (const file of files) {
@@ -93,7 +83,7 @@ async function saveFilesToOrderFolder(orderId: string, files: CreateOrderFile[])
     const { mimeType, buffer } = parseDataUrl(file.dataUrl);
     const hasExtension = /\.[a-z0-9]+$/i.test(file.fileName);
     const fileName = safeFileName(hasExtension ? file.fileName : `${file.fileName}${extensionForMime(mimeType)}`);
-    await fs.writeFile(path.join(folderPath, fileName), buffer);
+    await uploadBuffer(`${gcsOrderPrefix(orderId)}/${fileName}`, buffer, mimeType);
     saved.push(fileName);
   }
 
@@ -108,7 +98,7 @@ function registerOrderFolder(orderId: string, details: { customerName?: string; 
     const nextFiles = Array.from(new Set([...existingFiles, ...(details.files ?? [])]));
     store.orderFiles[orderId] = {
       orderId,
-      folderPath: displayFolderPathForOrder(orderId),
+      folderPath: `Object Storage: orders/${orderId}/`,
       files: nextFiles,
       customerName: details.customerName ?? existing?.customerName,
       phone: details.phone ?? existing?.phone,
@@ -174,7 +164,7 @@ async function sendOrderMessage(orderId: string, body: CreateOrderBody) {
     `💳  Payment:  ${paymentMethod}`,
     "",
     "📁  DOCUMENTS",
-    `   ${displayFolderPathForOrder(orderId)}`,
+    `   Object Storage: orders/${orderId}/`,
     "   Admin Panel → Order Files",
     "",
     line,
@@ -253,7 +243,7 @@ router.post("/orders/:orderId/documents", (req, res) => {
   }
 
   void saveOrderDocuments(orderId, exportFiles)
-    .then((files) => res.json({ orderId, folderPath: displayFolderPathForOrder(orderId), files }))
+    .then((files) => res.json({ orderId, folderPath: `Object Storage: orders/${orderId}/`, files }))
     .catch((error) => {
       logger.error({ err: error, orderId }, "Failed to upload order documents");
       res.status(500).json({ error: "Failed to save order documents" });
@@ -302,24 +292,30 @@ router.get("/admin/order-files", (req, res) => {
   res.json(orderFiles);
 });
 
-router.delete("/admin/order-files/:orderId", (req, res) => {
+router.delete("/admin/order-files/:orderId", async (req, res) => {
   if (!isAdminAuthenticated(req as Parameters<typeof isAdminAuthenticated>[0])) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
 
   const orderId = req.params.orderId;
-  void fs.rm(folderPathForOrder(orderId), { recursive: true, force: true })
-    .then(() => {
-      updateStore((store) => {
-        delete store.orderFiles[orderId];
-      });
-      res.json({ success: true });
-    })
-    .catch((error) => {
-      logger.error({ err: error, orderId }, "Failed to delete order files");
-      res.status(500).json({ error: "Failed to delete order files" });
-    });
+  const record = getStore().orderFiles[orderId];
+
+  if (record) {
+    // Delete all order files from Object Storage
+    const deletePromises = (record.files ?? []).map((f) =>
+      deleteObject(`orders/${orderId}/${f}`).catch((err: unknown) =>
+        logger.warn({ err, orderId, file: f }, "Failed to delete order file from Object Storage")
+      )
+    );
+    await Promise.all(deletePromises);
+  }
+
+  updateStore((store) => {
+    delete store.orderFiles[orderId];
+  });
+
+  res.json({ success: true });
 });
 
 export default router;

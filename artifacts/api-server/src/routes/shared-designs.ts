@@ -1,8 +1,6 @@
 import { Router, type IRouter } from "express";
-import path from "path";
-import fs from "fs";
 import { getStore, updateStore, generateId, type SharedDesign } from "../data/store.js";
-import { SHARED_LAYERS_DIR } from "../lib/paths.js";
+import { deleteObject } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
@@ -70,16 +68,10 @@ export function cleanupExpiredDesigns(): void {
 
   for (const id of expiredIds) {
     const design = store.sharedDesigns[id];
-
     for (const filename of design.layerFilenames ?? []) {
-      const filePath = path.join(SHARED_LAYERS_DIR, filename);
-      try {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      } catch (err) {
-        logger.warn({ err, filename }, "Failed to delete expired layer file");
-      }
+      deleteObject(`uploads/shared-layers/${filename}`).catch((err: unknown) => {
+        logger.warn({ err, filename }, "Failed to delete expired layer file from Object Storage");
+      });
     }
   }
 

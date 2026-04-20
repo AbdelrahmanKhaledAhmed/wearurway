@@ -1,11 +1,9 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
 import path from "path";
-import fs from "fs";
 import sharp from "sharp";
-import { SIZE_CHARTS_DIR, ensureDir, toSafeFilename } from "../lib/paths.js";
-
-ensureDir(SIZE_CHARTS_DIR);
+import { toSafeFilename } from "../lib/paths.js";
+import { uploadBuffer, deleteObject, streamObject } from "../lib/objectStorage.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -23,6 +21,13 @@ const upload = multer({
 
 const router: IRouter = Router();
 
+// Serve size chart images from Object Storage
+router.get("/size-charts/:filename", async (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const found = await streamObject(`size-charts/${filename}`, res);
+  if (!found) res.status(404).json({ error: "Not found" });
+});
+
 router.post("/size-charts", upload.single("file"), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "No file uploaded" });
@@ -38,11 +43,10 @@ router.post("/size-charts", upload.single("file"), async (req, res) => {
   }
 
   const filename = `${safeName}.png`;
-  const filePath = path.join(SIZE_CHARTS_DIR, filename);
 
   try {
     const pngBuffer = await sharp(req.file.buffer).png().toBuffer();
-    fs.writeFileSync(filePath, pngBuffer);
+    await uploadBuffer(`size-charts/${filename}`, pngBuffer, "image/png");
   } catch {
     res.status(500).json({ error: "Failed to process image" });
     return;
@@ -54,14 +58,9 @@ router.post("/size-charts", upload.single("file"), async (req, res) => {
   });
 });
 
-router.delete("/size-charts/:filename", (req, res) => {
+router.delete("/size-charts/:filename", async (req, res) => {
   const filename = path.basename(req.params.filename);
-  const filePath = path.join(SIZE_CHARTS_DIR, filename);
-  if (!fs.existsSync(filePath)) {
-    res.status(404).json({ error: "File not found" });
-    return;
-  }
-  fs.unlinkSync(filePath);
+  await deleteObject(`size-charts/${filename}`);
   res.status(200).json({ success: true });
 });
 

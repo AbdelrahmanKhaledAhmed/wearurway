@@ -3,12 +3,7 @@ import pinoHttp from "pino-http";
 import fs from "fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
-import { UPLOADS_DIR, MOCKUPS_DIR, SIZE_CHARTS_DIR, SHARED_LAYERS_DIR, FRONTEND_DIR, ensureDir } from "./lib/paths";
-
-ensureDir(UPLOADS_DIR);
-ensureDir(MOCKUPS_DIR);
-ensureDir(SIZE_CHARTS_DIR);
-ensureDir(SHARED_LAYERS_DIR);
+import { FRONTEND_DIR } from "./lib/paths";
 
 const app: Express = express();
 
@@ -33,9 +28,6 @@ app.use(
 );
 app.use(express.json({ limit: "500mb" }));
 app.use(express.urlencoded({ extended: true, limit: "500mb" }));
-
-app.use("/api/uploads", express.static(UPLOADS_DIR));
-app.use("/api/size-charts", express.static(SIZE_CHARTS_DIR));
 
 app.use("/api", router);
 
