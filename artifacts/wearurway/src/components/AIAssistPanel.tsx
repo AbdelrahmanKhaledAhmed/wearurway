@@ -239,8 +239,32 @@ export default function FuzzySelectPanel({
         </div>
       )}
 
-      {/* ── Selection actions ── */}
-      {hasSelection && (
+      {/* Brush-mode + active selection: constrained hint */}
+      {(restoreActive || eraseActive) && hasSelection && (
+        <div className="flex-1 px-4 pt-3 flex flex-col gap-3">
+          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl"
+            style={{ backgroundColor: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.25)" }}>
+            <div className="relative shrink-0">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#a855f7" }} />
+              <div className="absolute inset-0 rounded-full animate-ping" style={{ backgroundColor: "rgba(168,85,247,0.5)" }} />
+            </div>
+            <p className="text-[11px] font-bold" style={{ color: "#e2c9ff" }}>Brush limited to selection</p>
+          </div>
+          <p className="text-[10px] leading-relaxed px-1" style={{ color: "rgba(255,255,255,0.3)" }}>
+            {restoreActive
+              ? "Paint within the highlighted area to restore pixels. Only selected pixels are affected."
+              : "Paint within the highlighted area to erase pixels. Only selected pixels are affected."}
+          </p>
+          <button onClick={onClearSelection}
+            className="w-full py-2 text-[10px] uppercase tracking-widest transition-all hover:opacity-70 rounded-xl"
+            style={{ color: "rgba(255,255,255,0.35)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            Clear Selection (paint freely)
+          </button>
+        </div>
+      )}
+
+      {/* ── Selection actions (only when NOT in brush mode) ── */}
+      {hasSelection && !restoreActive && !eraseActive && (
         <div className="flex-1 px-4 pt-4 flex flex-col gap-3 overflow-y-auto">
 
           {/* Selection indicator */}

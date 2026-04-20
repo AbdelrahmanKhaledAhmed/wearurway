@@ -657,8 +657,16 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     selectionMask                  ? "default" : "grab";
 
   const handleSetToolMode = useCallback((mode: ToolMode) => {
-    setToolMode(prev => prev===mode ? null : mode);
-    setSelectionMask(null);
+    setToolMode(prev => {
+      // Switching off a mode (toggle off) always clears selection
+      if (prev === mode) { setSelectionMask(null); return null; }
+      // Switching TO select mode: clear any existing selection so the user starts fresh
+      if (mode === "select") { setSelectionMask(null); }
+      // Switching TO restore/erase: PRESERVE the active selection so the brush is
+      // constrained to the selected area (null mode → brush also clears selection)
+      if (mode === null) { setSelectionMask(null); }
+      return mode;
+    });
     setCursorPos(c=>({...c,visible:false}));
   }, []);
 
