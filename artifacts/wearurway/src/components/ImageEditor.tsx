@@ -211,6 +211,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const trimRef          = useRef<ImageEditResult|null>(null);
   const panRef           = useRef({x:0,y:0});
   const zoomRef          = useRef(1);
+  const displayDimsRef   = useRef<{w:number;h:number}|null>(null);
   const rafRef           = useRef<number|null>(null);
   const baseOverlayRef   = useRef<Uint8ClampedArray|null>(null);
   const borderPixelsRef  = useRef<{idx:number;x:number;y:number}[]>([]);
@@ -236,6 +237,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   useEffect(()=>{ panRef.current=pan; },[pan]);
   useEffect(()=>{ zoomRef.current=zoom; },[zoom]);
   useEffect(()=>{ brushSizeRef.current=brushSize; },[brushSize]);
+  useEffect(()=>{ displayDimsRef.current=displayDims; },[displayDims]);
 
   // Measure available area so we can size the image EXACTLY (no objectFit letterboxing)
   useEffect(()=>{
@@ -395,13 +397,19 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const applyZoom = useCallback((newZ: number, fx=0.5, fy=0.5) => {
     const el=areaRef.current; if (!el) return;
     const rect=el.getBoundingClientRect();
-    // Use AREA-RELATIVE focal point (not raw viewport coords).
-    // pan is stored in the area's coordinate space; mixing viewport coords
-    // for cy would introduce a fixed Y-offset equal to rect.top (top-bar height).
-    const cx=rect.width*fx, cy=rect.height*fy;
+    const dims=displayDimsRef.current;
     const clamped=Math.max(0.1,Math.min(10,newZ));
     const scale=clamped/zoomRef.current;
-    setPan(p=>({x:cx+(p.x-cx)*scale, y:cy+(p.y-cy)*scale}));
+    // The CSS transform pivot must be in image-local coords (pan's coordinate space).
+    // natLeft/natTop is the centered offset of the image within the area container.
+    // Focal point in image-local coords:
+    //   qx = (area_x - natLeft) = area.width*fx - (area.width - displayDims.w)/2
+    // pan_after = qx + (pan_before - qx) * scale  (keeps the image pixel at qx stationary)
+    const natLeft=dims?(rect.width -dims.w)/2:0;
+    const natTop =dims?(rect.height-dims.h)/2:0;
+    const qx=rect.width*fx-natLeft;
+    const qy=rect.height*fy-natTop;
+    setPan(p=>({x:qx+(p.x-qx)*scale, y:qy+(p.y-qy)*scale}));
     setZoom(clamped);
   }, []);
 
