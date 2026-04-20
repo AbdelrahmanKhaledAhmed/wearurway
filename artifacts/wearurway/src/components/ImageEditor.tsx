@@ -427,30 +427,22 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   // ── Geometry ────────────────────────────────────────────────────────────────
 
   // Maps a mouse event to image pixel coordinates.
-  // Uses areaRef (no CSS transform) + explicit pan/zoom inversion.
-  // IMPORTANT: uses `zoom` and `pan` from React state (not refs) so that the
-  // values are guaranteed to match the CSS transform that was last rendered —
-  // refs are updated via useEffect (after paint) and would be stale on the
-  // first click after a zoom before the effect fires.
+  // Reads imgRef.getBoundingClientRect() directly so we get the element's
+  // ACTUAL visual position (after CSS transform, flex centering, sub-pixel
+  // rounding, etc.) instead of recomputing it from natLeft + pan + zoom.
+  // This guarantees the brush always paints at exactly the cursor position.
   const pointFromEvent = useCallback((e: React.MouseEvent) => {
-    if (!nativeSize||!displayDims||!areaRef.current) return null;
-    const areaRect=areaRef.current.getBoundingClientRect();
-    // Natural (untransformed) image top-left in area-relative coords
-    const natLeft=(areaRect.width -displayDims.w)/2;
-    const natTop =(areaRect.height-displayDims.h)/2;
-    // Mouse in area-relative coords
-    const mx=e.clientX-areaRect.left;
-    const my=e.clientY-areaRect.top;
-    // Invert CSS transform: matrix(zoom,0,0,zoom,pan.x,pan.y) → local pixel
-    // area_x = natLeft + zoom*localX + pan.x  =>  localX = (mx - natLeft - pan.x) / zoom
-    const localX=(mx-natLeft-pan.x)/zoom;
-    const localY=(my-natTop -pan.y)/zoom;
-    const imgX=localX/displayDims.w*nativeSize.w;
-    const imgY=localY/displayDims.h*nativeSize.h;
-    // imageRadius is zoom-independent: same canvas pixels regardless of view zoom
-    const imageRadius=brushSizeRef.current*(nativeSize.w/displayDims.w);
+    if (!nativeSize||!imgRef.current) return null;
+    const r=imgRef.current.getBoundingClientRect();
+    if (r.width===0||r.height===0) return null;
+    // Map cursor to native canvas pixel
+    const imgX=(e.clientX-r.left)/r.width *nativeSize.w;
+    const imgY=(e.clientY-r.top) /r.height*nativeSize.h;
+    // imageRadius: brushSize display-px → native px (zoom-independent canvas size)
+    // visual radius on screen = brushSize * zoom; scale to native via r.width/nativeW
+    const imageRadius=brushSizeRef.current*zoom*nativeSize.w/r.width;
     return {imgX, imgY, imageRadius};
-  }, [nativeSize, displayDims, zoom, pan]);
+  }, [nativeSize, zoom]);
 
   // ── Fuzzy select ─────────────────────────────────────────────────────────────
 
