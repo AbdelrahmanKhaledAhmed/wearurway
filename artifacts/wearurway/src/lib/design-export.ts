@@ -133,6 +133,15 @@ function canvasToDataUrl(canvas: HTMLCanvasElement): Promise<string | null> {
   });
 }
 
+/** Returns true for layers that should be excluded from export (e.g. layer-1, Layer 1, layer-*).
+ *  Normalises the name the same way the export filename is generated so both
+ *  "Layer 1" and "layer-1" are caught.
+ */
+function isExcludedLayer(layer: DesignLayerForExport): boolean {
+  const normalized = (layer.name ?? "").replace(/\s+/g, "-").toLowerCase();
+  return /^layer-/.test(normalized);
+}
+
 export async function generateDesignExportFiles({
   frontLayers,
   backLayers,
@@ -141,8 +150,8 @@ export async function generateDesignExportFiles({
   backMockupImage,
 }: GenerateDesignExportFilesOptions): Promise<DesignExportFile[]> {
   const files: DesignExportFile[] = [];
-  const frontVisible = frontLayers.filter(l => l.visible);
-  const backVisible = backLayers.filter(l => l.visible);
+  const frontVisible = frontLayers.filter(l => l.visible && !isExcludedLayer(l));
+  const backVisible = backLayers.filter(l => l.visible && !isExcludedLayer(l));
 
   const exportLayers = async (
     visibleLayers: DesignLayerForExport[],

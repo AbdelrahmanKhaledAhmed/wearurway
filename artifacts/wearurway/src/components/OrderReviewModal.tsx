@@ -8,6 +8,7 @@ interface BBox { x: number; y: number; width: number; height: number }
 
 interface DesignLayer {
   id: string;
+  name?: string;
   imageUrl: string;
   x: number;
   y: number;
@@ -89,7 +90,11 @@ async function generatePreview(
   dctx.imageSmoothingEnabled = true;
   dctx.imageSmoothingQuality = "high";
 
-  for (const layer of sideLayers.filter(l => l.visible)) {
+  for (const layer of sideLayers.filter(l => {
+    if (!l.visible) return false;
+    const normalized = (l.name ?? "").replace(/\s+/g, "-").toLowerCase();
+    return !/^layer-/.test(normalized);
+  })) {
     const img = await loadCanvasImage(layer.imageUrl);
     if (!img) continue;
     const cx    = (layer.x + layer.width  / 2) * scaleX;
