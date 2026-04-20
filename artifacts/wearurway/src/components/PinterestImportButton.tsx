@@ -138,7 +138,7 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
         <PinterestIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
         <span className="text-[11px] font-semibold leading-snug">
           Not sure which design fits your idea?{" "}
-          <span className="underline underline-offset-2 font-black">I'll help you pick the perfect one.</span>
+          <span className="font-black">I'll help you pick the perfect one.</span>
         </span>
       </motion.button>
 
