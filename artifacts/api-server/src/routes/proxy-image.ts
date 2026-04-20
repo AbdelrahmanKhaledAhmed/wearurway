@@ -2,50 +2,22 @@ import { Router, type IRouter } from "express";
 import sharp from "sharp";
 
 const router: IRouter = Router();
-
 const MAX_SIZE = 40 * 1024 * 1024;
 
-// Mimics a real Chrome browser navigating to a page
-const BROWSER_HEADERS: Record<string, string> = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  Accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-  "Accept-Language": "en-US,en;q=0.9",
-  "Cache-Control": "no-cache",
-  "Sec-Fetch-Dest": "document",
-  "Sec-Fetch-Mode": "navigate",
-  "Sec-Fetch-Site": "none",
-  "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-  "Sec-Ch-Ua-Mobile": "?0",
-  "Sec-Ch-Ua-Platform": '"Windows"',
-};
-
-// Headers for fetching images directly from i.pinimg.com / other CDNs
-const IMAGE_HEADERS: Record<string, string> = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-  "Accept-Language": "en-US,en;q=0.9",
-  Referer: "https://www.pinterest.com/",
-  "Sec-Fetch-Dest": "image",
-  "Sec-Fetch-Mode": "no-cors",
-  "Sec-Fetch-Site": "cross-site",
-};
+// ── Fetch helpers ─────────────────────────────────────────────────────────────
 
 async function fetchBuffer(
   url: string,
   headers: Record<string, string>,
   timeoutMs = 20000,
-): Promise<{ buffer: Buffer; contentType: string; status: number }> {
+): Promise<{ buffer: Buffer; contentType: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { signal: controller.signal, headers, redirect: "follow" });
     clearTimeout(timer);
     const contentType = res.headers.get("content-type") ?? "";
-    const status = res.status;
-    if (!res.ok) throw new Error(`HTTP_${status}`);
+    if (!res.ok) throw new Error(`HTTP_${res.status}`);
     const chunks: Buffer[] = [];
     let size = 0;
     for await (const chunk of res.body as AsyncIterable<Uint8Array>) {
@@ -53,123 +25,207 @@ async function fetchBuffer(
       if (size > MAX_SIZE) throw new Error("too_large");
       chunks.push(Buffer.from(chunk));
     }
-    return { buffer: Buffer.concat(chunks), contentType, status };
+    return { buffer: Buffer.concat(chunks), contentType };
   } finally {
     clearTimeout(timer);
   }
 }
 
-// ── URL helpers ──────────────────────────────────────────────────────────────
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-function isPinterestPinUrl(url: string): boolean {
+const BASE_HEADERS: Record<string, string> = {
+  "User-Agent": BROWSER_UA,
+  "Accept-Language": "en-US,en;q=0.9",
+};
+
+// ── URL classifiers ───────────────────────────────────────────────────────────
+
+function getPinId(url: string): string | null {
   try {
-    const u = new URL(url);
-    return (
-      (u.hostname === "www.pinterest.com" || u.hostname === "pinterest.com") &&
-      /^\/pin\/\d+\/?/.test(u.pathname)
-    );
-  } catch { return false; }
+    const match = new URL(url).pathname.match(/\/pin\/(\d+)/);
+    return match?.[1] ?? null;
+  } catch { return null; }
 }
 
-function isPinterestShortUrl(url: string): boolean {
-  try { return new URL(url).hostname === "pin.it"; } catch { return false; }
-}
-
-function isPinterestImageCdn(url: string): boolean {
+function isPinterestDomain(url: string): boolean {
   try {
     const h = new URL(url).hostname;
-    return h === "i.pinimg.com" || h === "pinimg.com";
+    return h === "pinterest.com" || h === "www.pinterest.com" || h === "pin.it";
   } catch { return false; }
 }
 
-/** Upgrade thumbnail-size CDN paths to full originals */
-function upgradeToOriginals(imageUrl: string): string {
-  return imageUrl
-    .replace(/\/\d+x\//, "/originals/")
-    .replace(/\/\d+x\d+\//, "/originals/");
+function isPinImageCdn(url: string): boolean {
+  try { return new URL(url).hostname === "i.pinimg.com"; } catch { return false; }
 }
 
-function extractOgImage(html: string): string | null {
-  return (
-    html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1] ??
-    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)?.[1] ??
-    null
-  );
+function upgradeToOriginals(u: string): string {
+  return u.replace(/\/\d+x\//, "/originals/").replace(/\/\d+x\d+\//, "/originals/");
 }
 
-// ── Pinterest oembed (public, no auth required) ───────────────────────────────
-// Returns a direct i.pinimg.com URL from Pinterest's official oembed endpoint.
+// ── Image resolution strategies ───────────────────────────────────────────────
 
-async function resolveViaOembed(pinUrl: string): Promise<string | null> {
+/**
+ * Pinterest Widget API — used to power pin embeds on external sites.
+ * Does not require authentication and is less bot-restricted than the main site.
+ */
+async function resolveViaWidgetApi(pinId: string): Promise<string | null> {
   try {
-    const oembedEndpoint = `https://www.pinterest.com/oembed.json?url=${encodeURIComponent(pinUrl)}`;
-    const { buffer } = await fetchBuffer(oembedEndpoint, {
-      ...BROWSER_HEADERS,
+    const url = `https://widgets.pinterest.com/v3/pidgets/pins/info/?pin_ids=${pinId}`;
+    const { buffer } = await fetchBuffer(url, {
+      ...BASE_HEADERS,
       Accept: "application/json, */*",
       Referer: "https://www.pinterest.com/",
     }, 12000);
-    const json = JSON.parse(buffer.toString("utf-8")) as { thumbnail_url?: string };
-    if (json.thumbnail_url) return upgradeToOriginals(json.thumbnail_url);
-  } catch { /* fall through */ }
-  return null;
-}
-
-// ── Pinterest HTML scrape (fallback) ─────────────────────────────────────────
-
-async function resolveViaHtmlScrape(pinUrl: string): Promise<string | null> {
-  try {
-    const { buffer } = await fetchBuffer(pinUrl, BROWSER_HEADERS, 18000);
-    const html = buffer.toString("utf-8");
-    const imageUrl = extractOgImage(html);
+    const json = JSON.parse(buffer.toString("utf-8")) as {
+      data?: Array<{ images?: { orig?: { url?: string }; "736x"?: { url?: string } } }>;
+    };
+    const pin = json?.data?.[0];
+    const imageUrl =
+      pin?.images?.orig?.url ??
+      pin?.images?.["736x"]?.url ??
+      null;
     if (imageUrl) return upgradeToOriginals(imageUrl);
   } catch { /* fall through */ }
   return null;
 }
 
-// ── Main Pinterest resolver ───────────────────────────────────────────────────
-
-async function resolvePinterestImage(pinUrl: string): Promise<Buffer> {
-  // Strategy 1: oembed API (fastest, most reliable)
-  const oembedUrl = await resolveViaOembed(pinUrl);
-  if (oembedUrl) {
-    try {
-      const { buffer } = await fetchBuffer(oembedUrl, IMAGE_HEADERS, 20000);
-      return buffer;
-    } catch { /* try next */ }
-  }
-
-  // Strategy 2: HTML scrape for og:image
-  const scrapedUrl = await resolveViaHtmlScrape(pinUrl);
-  if (scrapedUrl) {
-    try {
-      const { buffer } = await fetchBuffer(scrapedUrl, IMAGE_HEADERS, 20000);
-      return buffer;
-    } catch { /* fail below */ }
-  }
-
-  throw new Error(
-    "Could not retrieve the image from this Pinterest pin. " +
-    "Try right-clicking the image on Pinterest, choosing 'Open image in new tab', " +
-    "then paste that URL here instead.",
-  );
+/** Pinterest oembed — public endpoint, returns thumbnail_url */
+async function resolveViaOembed(pinUrl: string): Promise<string | null> {
+  try {
+    const url = `https://www.pinterest.com/oembed.json?url=${encodeURIComponent(pinUrl)}`;
+    const { buffer } = await fetchBuffer(url, {
+      ...BASE_HEADERS,
+      Accept: "application/json, */*",
+      Referer: "https://www.pinterest.com/",
+    }, 12000);
+    const json = JSON.parse(buffer.toString("utf-8")) as { thumbnail_url?: string };
+    if (json?.thumbnail_url) return upgradeToOriginals(json.thumbnail_url);
+  } catch { /* fall through */ }
+  return null;
 }
 
+/** Pinterest HTML og:image scrape — last resort */
+async function resolveViaHtmlScrape(pinUrl: string): Promise<string | null> {
+  try {
+    const { buffer } = await fetchBuffer(pinUrl, {
+      ...BASE_HEADERS,
+      Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+      "Cache-Control": "no-cache",
+    }, 18000);
+    const html = buffer.toString("utf-8");
+    const match =
+      html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ??
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    if (match?.[1]) return upgradeToOriginals(match[1]);
+  } catch { /* fall through */ }
+  return null;
+}
+
+/**
+ * Resolve short URL (pin.it/…) via redirect follow.
+ */
 async function resolveShortUrl(url: string): Promise<string> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
+  const t = setTimeout(() => controller.abort(), 10000);
   try {
-    const res = await fetch(url, { redirect: "follow", signal: controller.signal, headers: BROWSER_HEADERS });
-    clearTimeout(timer);
+    const res = await fetch(url, { redirect: "follow", signal: controller.signal, headers: BASE_HEADERS });
+    clearTimeout(t);
     return res.url;
-  } finally {
-    clearTimeout(timer);
-  }
+  } finally { clearTimeout(t); }
+}
+
+/**
+ * Fetch an image URL through wsrv.nl — a public image-proxy CDN that
+ * fetches on our behalf, bypassing Pinterest CDN IP restrictions.
+ */
+async function fetchViaWsrv(imageUrl: string): Promise<Buffer> {
+  // wsrv.nl accepts URL without protocol prefix
+  const bare = imageUrl.replace(/^https?:\/\//, "");
+  const wsrvUrl = `https://wsrv.nl/?url=${encodeURIComponent(bare)}&output=jpg&q=95&maxage=1d`;
+  const { buffer } = await fetchBuffer(wsrvUrl, {
+    ...BASE_HEADERS,
+    Accept: "image/*,*/*;q=0.8",
+  }, 30000);
+  return buffer;
+}
+
+/** Try to fetch an i.pinimg.com URL directly, then fall back to wsrv.nl proxy. */
+async function fetchPinImage(imageUrl: string): Promise<Buffer> {
+  // First: direct fetch (fast, no third-party)
+  try {
+    const { buffer } = await fetchBuffer(imageUrl, {
+      ...BASE_HEADERS,
+      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      Referer: "https://www.pinterest.com/",
+    }, 20000);
+    return buffer;
+  } catch { /* fall through to proxy */ }
+
+  // Second: route through wsrv.nl proxy
+  return fetchViaWsrv(imageUrl);
 }
 
 async function convertToPng(buffer: Buffer): Promise<Buffer> {
   return sharp(buffer)
     .png({ quality: 100, compressionLevel: 1, adaptiveFiltering: false })
     .toBuffer();
+}
+
+// ── Main resolver ─────────────────────────────────────────────────────────────
+
+async function resolveAndFetch(rawUrl: string): Promise<Buffer> {
+  let targetUrl = rawUrl;
+
+  // Resolve short URLs first
+  if (new URL(targetUrl).hostname === "pin.it") {
+    targetUrl = await resolveShortUrl(targetUrl);
+  }
+
+  // Direct CDN URL — fetch it
+  if (isPinImageCdn(targetUrl)) {
+    return fetchPinImage(upgradeToOriginals(targetUrl));
+  }
+
+  // Pin page URL — extract image URL through multiple strategies
+  const pinId = getPinId(targetUrl);
+
+  if (pinId) {
+    // Strategy 1: Widget API (returns direct CDN URL, low bot detection)
+    const widgetUrl = await resolveViaWidgetApi(pinId);
+    if (widgetUrl) return fetchPinImage(widgetUrl);
+
+    // Strategy 2: oembed
+    const oembedUrl = await resolveViaOembed(targetUrl);
+    if (oembedUrl) return fetchPinImage(oembedUrl);
+
+    // Strategy 3: HTML scrape
+    const scrapedUrl = await resolveViaHtmlScrape(targetUrl);
+    if (scrapedUrl) return fetchPinImage(scrapedUrl);
+
+    // Strategy 4: Construct likely CDN URL from pin ID and proxy it
+    // Pinterest CDN path format: /originals/<xx>/<yy>/<zz>/<filename>
+    // We can't guess the path but we can try wsrv.nl with the pin page URL itself
+    // which sometimes resolves for image-type responses
+    try {
+      return await fetchViaWsrv(targetUrl);
+    } catch { /* fall through */ }
+  }
+
+  // Non-Pinterest URL — fetch directly
+  if (!isPinterestDomain(targetUrl)) {
+    const { buffer, contentType } = await fetchBuffer(targetUrl, {
+      ...BASE_HEADERS,
+      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    }, 20000);
+    const mime = contentType.split(";")[0].trim().toLowerCase();
+    if (mime && mime !== "application/octet-stream" && !mime.startsWith("image/")) {
+      throw new Error("not_image");
+    }
+    return buffer;
+  }
+
+  throw new Error("unresolvable");
 }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
@@ -182,7 +238,7 @@ router.post("/proxy-image", async (req, res) => {
     return;
   }
 
-  let targetUrl = url.trim();
+  const targetUrl = url.trim();
 
   try { new URL(targetUrl); } catch {
     res.status(400).json({ error: "Invalid URL" });
@@ -195,39 +251,7 @@ router.post("/proxy-image", async (req, res) => {
   }
 
   try {
-    // Resolve short URLs (pin.it/…)
-    if (isPinterestShortUrl(targetUrl)) {
-      targetUrl = await resolveShortUrl(targetUrl);
-    }
-
-    let imageBuffer: Buffer;
-
-    if (isPinterestPinUrl(targetUrl)) {
-      // Pin page URL — extract actual image via oembed + fallback scrape
-      imageBuffer = await resolvePinterestImage(targetUrl);
-    } else if (isPinterestImageCdn(targetUrl)) {
-      // Direct CDN URL — upgrade to originals and fetch
-      const upgraded = upgradeToOriginals(targetUrl);
-      const { buffer } = await fetchBuffer(upgraded, IMAGE_HEADERS, 20000);
-      imageBuffer = buffer;
-    } else {
-      // Any other URL (e.g. direct image URL from another site)
-      const { buffer, contentType } = await fetchBuffer(targetUrl, IMAGE_HEADERS, 20000);
-      const mime = contentType.split(";")[0].trim().toLowerCase();
-      if (
-        mime !== "" &&
-        mime !== "application/octet-stream" &&
-        !mime.startsWith("image/")
-      ) {
-        res.status(415).json({
-          error:
-            "That URL doesn't appear to point to an image. For Pinterest, paste the pin URL (pinterest.com/pin/…) or right-click the image on Pinterest and paste the direct image address.",
-        });
-        return;
-      }
-      imageBuffer = buffer;
-    }
-
+    const imageBuffer = await resolveAndFetch(targetUrl);
     const pngBuffer = await convertToPng(imageBuffer);
 
     res.set("Content-Type", "image/png");
@@ -237,17 +261,13 @@ router.post("/proxy-image", async (req, res) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("abort") || msg.includes("timed out")) {
-      res.status(504).json({ error: "Pinterest took too long to respond. Please try again." });
+      res.status(504).json({ error: "Timed out fetching image." });
     } else if (msg.includes("too_large")) {
-      res.status(413).json({ error: "Image is too large (max 40 MB)." });
-    } else if (msg.includes("Could not retrieve")) {
-      res.status(422).json({ error: msg });
+      res.status(413).json({ error: "Image too large (max 40 MB)." });
+    } else if (msg.includes("not_image")) {
+      res.status(415).json({ error: "URL does not point to an image." });
     } else {
-      res.status(502).json({
-        error:
-          "Could not download the image from this URL. Try right-clicking the image on Pinterest, " +
-          "selecting 'Open image in new tab', and pasting that URL here instead.",
-      });
+      res.status(502).json({ error: "Could not fetch image." });
     }
   }
 });

@@ -83,7 +83,12 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
     if (!isImageUrl(trimmed)) { setUrlError("Please enter a valid http/https URL."); return; }
 
     setStep("loading");
-    setLoadingMsg("Fetching image…");
+    setLoadingMsg("Finding your image…");
+
+    // Cycle through friendly loading messages while waiting
+    const msgs = ["Finding your image…", "Downloading from Pinterest…", "Almost there…"];
+    let mi = 0;
+    const ticker = setInterval(() => { mi = (mi + 1) % msgs.length; setLoadingMsg(msgs[mi]); }, 2500);
 
     try {
       const res = await fetch("/api/proxy-image", {
@@ -91,12 +96,11 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: trimmed }),
       });
+      clearInterval(ticker);
 
       if (!res.ok) {
-        let msg = "Failed to fetch image.";
-        try { const json = await res.json() as { error?: string }; if (json.error) msg = json.error; } catch {}
         setStep("import");
-        setUrlError(msg);
+        setUrlError("Couldn't grab that image — try pasting the link again or upload the image directly.");
         return;
       }
 
@@ -106,8 +110,9 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
       triggerDownload(png, "pinterest-design.png");
       setStep("done");
     } catch {
+      clearInterval(ticker);
       setStep("import");
-      setUrlError("Network error. Please try again.");
+      setUrlError("Something went wrong. Please try again.");
     }
   };
 
