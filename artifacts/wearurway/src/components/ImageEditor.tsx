@@ -216,7 +216,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const baseOverlayRef   = useRef<Uint8ClampedArray|null>(null);
   const borderPixelsRef  = useRef<{idx:number;x:number;y:number}[]>([]);
   const animFrameRef     = useRef<number|null>(null);
-  const brushSizeRef     = useRef(25);
+  const brushSizeRef       = useRef(25);
+  const selectionMaskRef   = useRef<Uint8Array|null>(null);
 
   const [bgPreview,     setBgPreview]     = useState<BgPreview>("checker");
   const [processing,    setProcessing]    = useState(false);
@@ -237,6 +238,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   useEffect(()=>{ panRef.current=pan; },[pan]);
   useEffect(()=>{ zoomRef.current=zoom; },[zoom]);
   useEffect(()=>{ brushSizeRef.current=brushSize; },[brushSize]);
+  useEffect(()=>{ selectionMaskRef.current=selectionMask; },[selectionMask]);
 
   // Measure available area so we can size the image EXACTLY (no objectFit letterboxing)
   useEffect(()=>{
@@ -474,12 +476,15 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     if (!c||!orig||!nativeSize) return;
     const ctx=c.getContext("2d")!;
     const cw=c.width, ch=c.height;
+    const mask=selectionMaskRef.current;
     const r=Math.ceil(imageRadius);
     const x0=Math.max(0,Math.floor(imgX-r)), y0=Math.max(0,Math.floor(imgY-r));
     const x1=Math.min(cw-1,Math.ceil(imgX+r)), y1=Math.min(ch-1,Math.ceil(imgY+r));
     if (x1<x0||y1<y0) return;
     const cur=ctx.getImageData(x0,y0,x1-x0+1,y1-y0+1);
     for (let py=y0;py<=y1;py++) for (let px=x0;px<=x1;px++) {
+      // Respect active selection — skip pixels outside the mask
+      if (mask&&!mask[py*cw+px]) continue;
       const dist=Math.hypot(px-imgX,py-imgY); if (dist>imageRadius) continue;
       const t=dist/imageRadius;
       const strength=Math.max(0,Math.min(1,1-t*t)); // smooth quadratic falloff
@@ -500,12 +505,16 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const applyEraseBrush = useCallback((imgX: number, imgY: number, imageRadius: number) => {
     const c=canvasRef.current; if (!c||!nativeSize) return;
     const ctx=c.getContext("2d")!;
+    const cw=c.width;
+    const mask=selectionMaskRef.current;
     const r=Math.ceil(imageRadius);
     const x0=Math.max(0,Math.floor(imgX-r)), y0=Math.max(0,Math.floor(imgY-r));
     const x1=Math.min(c.width-1,Math.ceil(imgX+r)), y1=Math.min(c.height-1,Math.ceil(imgY+r));
     if (x1<x0||y1<y0) return;
     const cur=ctx.getImageData(x0,y0,x1-x0+1,y1-y0+1);
     for (let py=y0;py<=y1;py++) for (let px=x0;px<=x1;px++) {
+      // Respect active selection — skip pixels outside the mask
+      if (mask&&!mask[py*cw+px]) continue;
       const dist=Math.hypot(px-imgX,py-imgY); if (dist>imageRadius) continue;
       const t=dist/imageRadius;
       const strength=Math.max(0,Math.min(1,1-t*t));
