@@ -787,7 +787,7 @@ export default function Design() {
       if (idx >= prev.length - 1) return prev;
       const next = [...prev];
       [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-      return next.map((l, i) => ({ ...l, name: `Layer ${i + 1}` }));
+      return next;
     });
   };
 
@@ -797,7 +797,7 @@ export default function Design() {
       if (idx <= 0) return prev;
       const next = [...prev];
       [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
-      return next.map((l, i) => ({ ...l, name: `Layer ${i + 1}` }));
+      return next;
     });
   };
 
