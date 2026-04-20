@@ -1,0 +1,72 @@
+Please refactor the project to match a simple, production-ready architecture with full persistence and proper configuration management.
+
+🎯 Core Requirements:
+1. Admin Panel Data Persistence
+
+Ensure that every change made in the admin panel is permanently saved.
+
+All admin changes must be stored in a real database:
+Supabase (PostgreSQL)
+Remove any usage of:
+local JSON files
+in-memory state
+temporary storage
+All updates must persist after:
+server restart
+redeployment
+hosting migration
+2. File Storage System
+
+Use cloud object storage for all files:
+
+Cloudflare R2
+
+Store all uploaded images and exported design files
+Never store files locally on the server
+Return downloadable URLs after upload
+3. Order Export Flow (DO NOT CHANGE BUSINESS LOGIC)
+
+There is already a working “EXPORT DESIGN” function.
+
+Keep it exactly as it is, but ensure:
+
+It takes generated images
+Converts them into downloadable links via storage system
+Sends the links to Telegram (already implemented — do NOT modify logic)
+
+Only ensure that file handling uses cloud storage instead of local filesystem.
+
+4. Admin Panel Improvements (VERY IMPORTANT)
+
+Add proper configuration sections in the admin panel for:
+
+Database Configuration:
+API keys / connection settings (if needed)
+Environment configuration view (read-only or editable depending on safety)
+Storage Configuration:
+Storage provider settings (R2 / Supabase / etc.)
+Upload configuration settings
+System Settings:
+Global toggles
+Product settings
+UI behavior settings
+
+👉 The goal is to make the system fully configurable without touching code.
+
+5. Architecture Requirements
+
+Split the system into clean modules:
+
+databaseService → handles all database operations
+storageService → handles all file uploads/downloads
+
+No business logic should depend directly on Replit or any hosting provider.
+
+🚀 Final Goal:
+
+The system must behave like a real production SaaS:
+
+All admin changes are permanently stored in a database
+All files are handled via cloud storage
+All configuration is manageable from the admin panel
+The system can be deployed anywhere without breaking
