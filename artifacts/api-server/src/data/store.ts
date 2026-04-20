@@ -141,6 +141,7 @@ export interface Store {
   orderFiles: Record<string, OrderFileRecord>;
   orders: Record<string, OrderRecord>;
   orderSettings: OrderSettings;
+  adminSessions?: string[];
 }
 
 const DEFAULT_STORE: Store = {

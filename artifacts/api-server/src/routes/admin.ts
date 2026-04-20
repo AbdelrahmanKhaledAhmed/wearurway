@@ -5,22 +5,31 @@ import {
   AdminLoginResponse,
   GetAdminMeResponse,
 } from "@workspace/api-zod";
+import { getStore, updateStore } from "../data/store.js";
 
 const router: IRouter = Router();
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "admin123";
 
-const sessions = new Set<string>();
-
 function generateSessionToken(): string {
   return crypto.randomBytes(32).toString("base64url");
+}
+
+function getSessions(): Set<string> {
+  return new Set(getStore().adminSessions ?? []);
+}
+
+function persistSessions(sessions: Set<string>): void {
+  updateStore((store) => {
+    store.adminSessions = Array.from(sessions);
+  });
 }
 
 export function isAdminAuthenticated(req: { headers: Record<string, string | string[] | undefined> }): boolean {
   const auth = req.headers["authorization"];
   if (!auth || typeof auth !== "string") return false;
   const token = auth.replace("Bearer ", "").trim();
-  return sessions.has(token);
+  return getSessions().has(token);
 }
 
 router.post("/admin/login", (req, res) => {
@@ -36,7 +45,9 @@ router.post("/admin/login", (req, res) => {
   }
 
   const token = generateSessionToken();
+  const sessions = getSessions();
   sessions.add(token);
+  persistSessions(sessions);
 
   const data = AdminLoginResponse.parse({ success: true, message: "Logged in" });
   res.json({ ...data, token });
@@ -46,7 +57,9 @@ router.post("/admin/logout", (req, res) => {
   const auth = req.headers["authorization"];
   if (auth && typeof auth === "string") {
     const token = auth.replace("Bearer ", "").trim();
+    const sessions = getSessions();
     sessions.delete(token);
+    persistSessions(sessions);
   }
   res.json({ success: true });
 });

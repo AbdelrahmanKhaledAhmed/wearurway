@@ -1751,6 +1751,7 @@ function SystemManager() {
         fetch("/api/admin/system/health", { headers }),
         fetch("/api/admin/system/config", { headers }),
       ]);
+      if (healthRes.status === 401 || configRes.status === 401) throw new Error("Session expired. Please log out and log in again.");
       if (!healthRes.ok || !configRes.ok) throw new Error("Failed to load system info");
       const [h, c] = await Promise.all([healthRes.json(), configRes.json()]);
       setHealth(h as SystemHealth);
