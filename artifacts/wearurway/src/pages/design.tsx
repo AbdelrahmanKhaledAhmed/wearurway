@@ -1421,7 +1421,7 @@ export default function Design() {
             <div className="px-4 pb-4 pt-2">
               <button
                 onClick={handleExport}
-                disabled={exporting || !layers.some(l => l.visible) || realWidth <= 0}
+                disabled={exporting || (!frontLayers.some(l => l.visible) && !backLayers.some(l => l.visible)) || realWidth <= 0}
                 className="w-full text-xs uppercase tracking-widest font-bold px-5 py-3 bg-foreground text-background hover:opacity-80 transition-opacity disabled:opacity-40"
               >
                 {exporting ? "Exporting…" : "Export Design"}
