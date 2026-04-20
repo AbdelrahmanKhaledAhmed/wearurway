@@ -135,6 +135,7 @@ export interface PublicOrderSettings {
   frontOnlyPrice: number;
   frontBackPrice: number;
   instaPayPhone: string;
+  showExportButton?: boolean;
 }
 
 export interface OrderSettings {
@@ -146,6 +147,7 @@ export interface OrderSettings {
   instaPayPhone: string;
   telegramChatId?: string;
   telegramBotToken?: string;
+  showExportButton?: boolean;
 }
 
 export interface CreateOrderSize {

@@ -1061,11 +1061,19 @@ function MockupsManager() {
   const [selectedFitId, setSelectedFitId] = useState<string>("");
   const [selectedColorId, setSelectedColorId] = useState<string>("");
   const [activeSide, setActiveSide] = useState<"front" | "back">("front");
-  const [showExportButton, setShowExportButton] = useState(() => localStorage.getItem("wearurway_show_export_button") !== "false");
+  const [showExportButton, setShowExportButton] = useState(false);
   const [showSaveDesignButtonGlobal, setShowSaveDesignButtonGlobal] = useState(() => localStorage.getItem("wearurway_show_save_design_button") !== "false");
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { data: adminSettings } = useGetAdminOrderSettings();
+  const updateAdminSettings = useUpdateAdminOrderSettings();
+
+  useEffect(() => {
+    if (adminSettings?.showExportButton !== undefined) {
+      setShowExportButton(adminSettings.showExportButton);
+    }
+  }, [adminSettings]);
   const [, setLocation] = useLocation();
   const { setProduct, setFit, setColor, setSize } = useCustomizer();
 
@@ -1291,7 +1299,16 @@ function MockupsManager() {
                     checked={showExportButton}
                     onCheckedChange={v => {
                       setShowExportButton(v);
-                      localStorage.setItem("wearurway_show_export_button", v ? "true" : "false");
+                      updateAdminSettings.mutate(
+                        { data: { ...adminSettings!, showExportButton: v } },
+                        {
+                          onSuccess: () => {
+                            queryClient.invalidateQueries({ queryKey: getGetAdminOrderSettingsQueryKey() });
+                            toast({ title: v ? "Export button enabled" : "Export button disabled" });
+                          },
+                          onError: () => toast({ title: "Failed to save setting", variant: "destructive" }),
+                        }
+                      );
                     }}
                   />
                 </div>

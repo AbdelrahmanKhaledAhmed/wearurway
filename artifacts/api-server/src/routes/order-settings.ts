@@ -10,6 +10,7 @@ function publicSettings(settings: OrderSettings) {
   return safe;
 }
 
+
 router.get("/order-settings", (_req, res) => {
   res.json(publicSettings(getStore().orderSettings));
 });
@@ -43,6 +44,7 @@ router.put("/admin/order-settings", (req, res) => {
       instaPayPhone: body.instaPayPhone ?? store.orderSettings.instaPayPhone,
       telegramChatId: body.telegramChatId ?? store.orderSettings.telegramChatId,
       telegramBotToken: body.telegramBotToken ?? store.orderSettings.telegramBotToken,
+      showExportButton: body.showExportButton !== undefined ? body.showExportButton : store.orderSettings.showExportButton,
     };
     saved = store.orderSettings;
   });

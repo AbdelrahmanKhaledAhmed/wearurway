@@ -763,6 +763,8 @@ components:
           type: number
         instaPayPhone:
           type: string
+        showExportButton:
+          type: boolean
       required: [shippingCompanyName, shippingDescription, shippingPrice, frontOnlyPrice, frontBackPrice, instaPayPhone]
 
     OrderSettings:
@@ -784,6 +786,8 @@ components:
           type: string
         telegramBotToken:
           type: string
+        showExportButton:
+          type: boolean
       required: [shippingCompanyName, shippingDescription, shippingPrice, frontOnlyPrice, frontBackPrice, instaPayPhone]
 
     CreateOrderSize:

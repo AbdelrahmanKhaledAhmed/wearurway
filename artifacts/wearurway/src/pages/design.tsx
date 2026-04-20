@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useGetMockup, useSaveMockup, getGetMockupQueryKey } from "@workspace/api-client-react";
+import { useGetMockup, useSaveMockup, getGetMockupQueryKey, useGetOrderSettings } from "@workspace/api-client-react";
 import { useCustomizer } from "@/hooks/use-customizer";
 import { useToast } from "@/hooks/use-toast";
 import ImageEditor, { type ImageEditResult } from "@/components/ImageEditor";
@@ -138,15 +138,8 @@ export default function Design() {
   const [newUploadLayerId, setNewUploadLayerId] = useState<string | null>(null);
   const [showTextModal, setShowTextModal] = useState(false);
 
-  const [showExportButton, setShowExportButton] = useState(() => localStorage.getItem("wearurway_show_export_button") !== "false");
-
-  useEffect(() => {
-    const handler = (e: StorageEvent) => {
-      if (e.key === "wearurway_show_export_button") setShowExportButton(e.newValue !== "false");
-    };
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
-  }, []);
+  const { data: orderSettings } = useGetOrderSettings();
+  const showExportButton = orderSettings?.showExportButton === true;
 
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);

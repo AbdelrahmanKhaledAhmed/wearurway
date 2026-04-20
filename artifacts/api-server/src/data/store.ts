@@ -102,6 +102,7 @@ export interface OrderSettings {
   instaPayPhone: string;
   telegramChatId?: string;
   telegramBotToken?: string;
+  showExportButton?: boolean;
 }
 
 export interface OrderFileRecord {
