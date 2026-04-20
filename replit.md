@@ -57,6 +57,7 @@ A premium streetwear customization website with a multi-step product configurato
 - Admin password: set via `ADMIN_PASSWORD` env var (default: `admin123`)
 - API is served under `/api`; frontend calls remain same-origin through the Vite proxy in development and shared host routing in Replit.
 - Admin session tokens are generated with Node crypto and stored in process memory.
+- AI image-assist routes load the OpenAI integration lazily per request so the API server can start without AI credentials; if the integration is not configured, those endpoints return 503 instead of crashing startup.
 
 ### Routes
 

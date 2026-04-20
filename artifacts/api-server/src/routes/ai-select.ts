@@ -1,10 +1,19 @@
 import { Router } from "express";
-import { openai } from "@workspace/integrations-openai-ai-server";
 
 const router = Router();
 
+async function getOpenAI() {
+  if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || !process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+    throw new Error("OpenAI AI integration is not configured");
+  }
+
+  const { openai } = await import("@workspace/integrations-openai-ai-server");
+  return openai;
+}
+
 router.post("/ai/select-assist", async (req, res) => {
   try {
+    const openai = await getOpenAI();
     const { imageBase64, prompt, width, height } = req.body as {
       imageBase64: string;
       prompt: string;
@@ -84,12 +93,14 @@ RULES:
     });
   } catch (err) {
     console.error("AI select assist error:", err);
-    res.status(500).json({ error: "AI analysis failed. Please try again." });
+    const status = err instanceof Error && err.message.includes("not configured") ? 503 : 500;
+    res.status(status).json({ error: "AI analysis is currently unavailable. Please try again later." });
   }
 });
 
 router.post("/ai/command", async (req, res) => {
   try {
+    const openai = await getOpenAI();
     const { imageBase64, prompt, width, height } = req.body as {
       imageBase64: string;
       prompt: string;
@@ -251,7 +262,8 @@ plan should have 2–4 clear human-readable steps explaining exactly what will h
     });
   } catch (err) {
     console.error("AI command error:", err);
-    res.status(500).json({ error: "AI analysis failed. Please try again." });
+    const status = err instanceof Error && err.message.includes("not configured") ? 503 : 500;
+    res.status(status).json({ error: "AI analysis is currently unavailable. Please try again later." });
   }
 });
 
