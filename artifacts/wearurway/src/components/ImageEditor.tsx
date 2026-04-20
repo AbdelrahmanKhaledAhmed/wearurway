@@ -384,16 +384,38 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   },[restoreSnap]);
 
   // ── Global keyboard shortcuts ───────────────────────────────────────────────
-  // Ctrl+Z → undo, Ctrl+Y / Ctrl+Shift+Z → redo, Escape → clear selection
+  // Registered in CAPTURE phase ({capture:true}) so the handler fires before
+  // any focused element (slider, button, input) can swallow the event.
+  // e.key is normalised to lowercase for layout-independence.
 
   useEffect(()=>{
     const h=(e: KeyboardEvent)=>{
-      if ((e.ctrlKey||e.metaKey)&&e.key==="z") { e.preventDefault(); doUndo(); }
-      if ((e.ctrlKey||e.metaKey)&&(e.key==="y"||(e.shiftKey&&e.key==="Z"))) { e.preventDefault(); doRedo(); }
+      const key=e.key.toLowerCase();
+      // Ctrl+Z → undo
+      if ((e.ctrlKey||e.metaKey)&&!e.shiftKey&&key==="z") {
+        e.preventDefault();
+        e.stopPropagation();
+        doUndo();
+        return;
+      }
+      // Ctrl+Y → redo
+      if ((e.ctrlKey||e.metaKey)&&!e.shiftKey&&key==="y") {
+        e.preventDefault();
+        e.stopPropagation();
+        doRedo();
+        return;
+      }
+      // Ctrl+Shift+Z → redo (alternate)
+      if ((e.ctrlKey||e.metaKey)&&e.shiftKey&&key==="z") {
+        e.preventDefault();
+        e.stopPropagation();
+        doRedo();
+        return;
+      }
       if (e.key==="Escape") setSelectionMask(null);
     };
-    window.addEventListener("keydown",h);
-    return ()=>window.removeEventListener("keydown",h);
+    window.addEventListener("keydown",h,{capture:true});
+    return ()=>window.removeEventListener("keydown",h,{capture:true});
   },[doUndo,doRedo]);
 
   // ── Zoom ────────────────────────────────────────────────────────────────────
