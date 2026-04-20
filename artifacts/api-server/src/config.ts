@@ -12,7 +12,7 @@ const config = {
   },
 
   admin: {
-    password: "admin123",
+    password: "Boody@943",
   },
 };
 
