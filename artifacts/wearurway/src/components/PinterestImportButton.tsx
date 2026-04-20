@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Props {
@@ -53,13 +53,12 @@ function triggerDownload(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
-export default function PinterestImportButton({ onImageReady, disabled }: Props) {
+export default function PinterestImportButton({ disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("intro");
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState("");
   const [loadingMsg, setLoadingMsg] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
     setStep("intro");
@@ -100,7 +99,7 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
 
       if (!res.ok) {
         setStep("import");
-        setUrlError("Couldn't grab that image — try pasting the link again or upload the image directly.");
+        setUrlError("Couldn't grab that image — try pasting the link again.");
         return;
       }
 
@@ -115,14 +114,6 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
       setUrlError("Something went wrong. Please try again.");
     }
   };
-
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) { setUrlError("Please upload a valid image file."); return; }
-    handleClose();
-    setTimeout(() => onImageReady(file), 150);
-  }, [onImageReady]);
 
   const handleUrlKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleUrlSubmit();
@@ -249,26 +240,6 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
                       {urlError && <p className="text-[11px] text-red-400 mt-2">{urlError}</p>}
                     </div>
 
-                    {/* Divider */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-px bg-white/10" />
-                      <span className="text-[10px] text-white/30 uppercase tracking-widest">or</span>
-                      <div className="flex-1 h-px bg-white/10" />
-                    </div>
-
-                    {/* Upload */}
-                    <div>
-                      <p className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-2">Upload from your device</p>
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full flex items-center justify-center gap-2 border border-dashed border-white/20 py-4 text-xs text-white/50 hover:border-white/40 hover:text-white/80 transition-colors"
-                      >
-                        <span className="text-base leading-none">⬆</span>
-                        <span className="font-bold uppercase tracking-widest">Upload image</span>
-                      </button>
-                      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
-                    </div>
-
                     <button onClick={() => setStep("intro")} className="text-[10px] text-white/30 hover:text-white/60 transition-colors uppercase tracking-widest">
                       ← Back
                     </button>
@@ -293,7 +264,7 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
                     </div>
                     <div>
                       <p className="text-sm font-black uppercase tracking-widest text-white mb-1">Downloaded!</p>
-                      <p className="text-[11px] text-white/50 leading-relaxed">Your image was saved as a PNG.<br />You can now upload it here using the editor.</p>
+                      <p className="text-[11px] text-white/50 leading-relaxed">Your image was saved as a PNG.<br />You can now add it in the editor.</p>
                     </div>
                     <button
                       onClick={handleClose}
