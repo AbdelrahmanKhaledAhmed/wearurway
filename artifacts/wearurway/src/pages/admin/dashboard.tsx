@@ -957,41 +957,95 @@ function BoundingBoxEditor({
   );
 }
 
-function MockupFilenameInput({ label, value, generatedFilename }: {
-  label: string; value: string; generatedFilename: string;
+function MockupUploader({ label, generatedFilename, value, onChange }: {
+  label: string; generatedFilename: string; value: string; onChange: (url: string) => void;
 }) {
-  const PREFIX = "/api/uploads/mockups/";
-  const expectedUrl = generatedFilename ? `${PREFIX}${generatedFilename}` : "";
-  const currentFilename = value.startsWith(PREFIX) ? value.slice(PREFIX.length) : value;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleFile = async (file: File) => {
+    if (!generatedFilename) return;
+    setUploading(true);
+    setError("");
+    try {
+      const nameWithoutExt = generatedFilename.replace(/\.png$/, "");
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("name", nameWithoutExt);
+      const token = localStorage.getItem("wearurway_admin_token");
+      const res = await fetch("/api/uploads", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json() as { url: string };
+      onChange(data.url);
+    } catch {
+      setError("Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    if (value) {
+      const token = localStorage.getItem("wearurway_admin_token");
+      const match = value.match(/\/([^/]+)$/);
+      if (match) {
+        await fetch(`/api/uploads/mockups/${match[1]}`, {
+          method: "DELETE",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }).catch(() => {});
+      }
+    }
+    onChange("");
+  };
 
   return (
     <div className="space-y-3">
       <Label className="uppercase tracking-widest text-xs">{label}</Label>
-      <div className="border border-border bg-muted/10 p-4 space-y-2">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">Required file name</p>
-        <p className="text-sm font-mono break-all text-foreground">{generatedFilename || "Select product, fit, and color first"}</p>
-        {expectedUrl && (
-          <p className="text-[10px] text-muted-foreground leading-relaxed">
-            Put the PNG file in this folder and rename it exactly to the required file name:
-            <span className="block font-mono break-all mt-1 text-foreground">artifacts/uploads/mockups/</span>
-            The app will display it using this URL:
-            <span className="block font-mono break-all mt-1">{expectedUrl}</span>
-          </p>
-        )}
+      <div className="border border-border bg-muted/10 p-3 space-y-1">
+        <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Saved as</p>
+        <p className="text-xs font-mono break-all text-foreground">
+          {generatedFilename || "Select product, fit, and color first"}
+        </p>
       </div>
-      {value && (
-        <div className="flex items-start gap-3">
-          <div className="w-16 h-16 border border-border overflow-hidden bg-muted/10 shrink-0">
-            <img src={value} alt="preview" className="w-full h-full object-contain" />
+      {value ? (
+        <div className="relative w-fit">
+          <div className="w-40 h-40 border border-border overflow-hidden bg-muted/10">
+            <img src={value} alt="mockup preview" className="w-full h-full object-contain" />
           </div>
-          <div className="space-y-1 min-w-0">
-            <p className="text-[10px] text-muted-foreground font-mono break-all leading-relaxed">{value}</p>
-            {currentFilename && generatedFilename && currentFilename !== generatedFilename && (
-              <p className="text-[10px] text-amber-500 leading-relaxed">
-                This saved path is using an older filename. Saving now will update it to the generated filename.
-              </p>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={handleRemove}
+            className="absolute top-1 right-1 bg-background border border-border p-1 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!generatedFilename || uploading}
+            onClick={() => inputRef.current?.click()}
+            className="rounded-none text-xs uppercase tracking-widest gap-2"
+          >
+            <Upload className="w-3 h-3" />
+            {uploading ? "Uploading..." : "Upload Image"}
+          </Button>
+          {error && <p className="text-[10px] text-destructive">{error}</p>}
         </div>
       )}
     </div>
@@ -1195,15 +1249,16 @@ function MockupsManager() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Left: mockup image */}
             <div className="space-y-4">
-              <MockupFilenameInput
+              <MockupUploader
                 label={`${activeSide === "front" ? "Front" : "Back"} Mockup Image`}
-                value={currentImage}
                 generatedFilename={activeGeneratedFilename}
+                value={currentImage}
+                onChange={activeSide === "front" ? setFrontImage : setBackImage}
               />
               {!currentImage && (
                 <div className="border border-dashed border-border aspect-[3/4] flex flex-col items-center justify-center text-muted-foreground gap-3">
-                  <span className="text-xs uppercase tracking-widest">Select a full combination first</span>
-                  <span className="text-xs text-muted-foreground/60">Then upload the image using the generated filename</span>
+                  <span className="text-xs uppercase tracking-widest">No mockup uploaded yet</span>
+                  <span className="text-xs text-muted-foreground/60">Select a combination then click Upload Image</span>
                 </div>
               )}
             </div>
