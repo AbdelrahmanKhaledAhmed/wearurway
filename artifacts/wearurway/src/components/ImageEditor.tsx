@@ -219,6 +219,12 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const borderPixelsRef  = useRef<{idx:number;x:number;y:number}[]>([]);
   const animFrameRef     = useRef<number|null>(null);
 
+  // ── Sensitivity / last click (for live re-selection on slider drag) ─────────
+  // Stores the last image-pixel coordinate the user clicked for fuzzy select,
+  // so we can re-run the selection whenever the sensitivity slider changes.
+  const lastSelectPointRef  = useRef<{px:number;py:number}|null>(null);
+  const selectDebounceRef   = useRef<ReturnType<typeof setTimeout>|null>(null);
+
   // ── React state ─────────────────────────────────────────────────────────────
   const [bgPreview,     setBgPreview]     = useState<BgPreview>("checker");
   const [processing,    setProcessing]    = useState(false);
@@ -231,6 +237,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const [toolMode,      setToolMode]      = useState<ToolMode>(null);
   const [selectionMask, setSelectionMask] = useState<Uint8Array|null>(null);
   const [availArea,     setAvailArea]     = useState<{w:number;h:number}|null>(null);
+  // sensitivity: 1 (very precise) → 100 (very wide). Default ≈ 40 matches old hardcoded values.
+  const [sensitivity,   setSensitivity]   = useState(40);
   void histSig;
 
   useEffect(()=>{ panRef.current=pan; },[pan]);
@@ -424,21 +432,52 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     };
   },[nativeSize]);
 
+  // ── Sensitivity → tolerance mapping ────────────────────────────────────────
+  // sensitivity 1  → colorTol≈6,  edgeTol≈17  (very tight)
+  // sensitivity 40 → colorTol≈55, edgeTol≈77  (matches old hardcoded values)
+  // sensitivity 100→ colorTol≈130, edgeTol≈170 (very wide)
+  const tolerancesFromSensitivity = useCallback((s: number)=>{
+    const t=s/100;
+    return {colorTol:Math.round(5+t*125), edgeTol:Math.round(15+t*155)};
+  },[]);
+
   // ── Fuzzy select ─────────────────────────────────────────────────────────────
 
-  const handleFuzzySelect = useCallback((imgX: number, imgY: number)=>{
+  const runFuzzySelect = useCallback((px: number, py: number, sens: number)=>{
     const c=canvasRef.current; if (!c) return;
     const ctx=c.getContext("2d"); if (!ctx) return;
     setProcessing(true);
     setTimeout(()=>{
       const id=ctx.getImageData(0,0,c.width,c.height);
-      const px=Math.floor(Math.max(0,Math.min(c.width-1,imgX)));
-      const py=Math.floor(Math.max(0,Math.min(c.height-1,imgY)));
-      const maskResult=fuzzySelectRegion(id,px,py,55,70);
+      const {colorTol,edgeTol}=tolerancesFromSensitivity(sens);
+      const maskResult=fuzzySelectRegion(id,px,py,colorTol,edgeTol);
       setSelectionMask(maskResult);
       setProcessing(false);
     },0);
-  },[]);
+  },[tolerancesFromSensitivity]);
+
+  const handleFuzzySelect = useCallback((imgX: number, imgY: number)=>{
+    const c=canvasRef.current; if (!c) return;
+    const px=Math.floor(Math.max(0,Math.min(c.width-1,imgX)));
+    const py=Math.floor(Math.max(0,Math.min(c.height-1,imgY)));
+    lastSelectPointRef.current={px,py};
+    runFuzzySelect(px,py,sensitivity);
+  },[sensitivity,runFuzzySelect]);
+
+  // Re-run selection live whenever sensitivity changes, as long as the user
+  // has already clicked (i.e. there is a stored last-click point).
+  useEffect(()=>{
+    const pt=lastSelectPointRef.current;
+    if (!pt) return;
+    // Debounce so rapid slider drags don't flood the pixel loop
+    if (selectDebounceRef.current) clearTimeout(selectDebounceRef.current);
+    selectDebounceRef.current=setTimeout(()=>{
+      selectDebounceRef.current=null;
+      runFuzzySelect(pt.px,pt.py,sensitivity);
+    },60);
+    return ()=>{ if (selectDebounceRef.current) clearTimeout(selectDebounceRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[sensitivity]);
 
   // ── Selection actions ────────────────────────────────────────────────────────
 
@@ -474,7 +513,10 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     },0);
   },[selectionMask,saveUndo,updateDisplay]);
 
-  const handleClearSelection = useCallback(()=>setSelectionMask(null),[]);
+  const handleClearSelection = useCallback(()=>{
+    setSelectionMask(null);
+    lastSelectPointRef.current=null;
+  },[]);
 
   // ── Mouse events ────────────────────────────────────────────────────────────
 
@@ -529,9 +571,13 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
 
   const handleSetToolMode = useCallback((mode: ToolMode)=>{
     setToolMode(prev=>{
-      if (prev===mode) { setSelectionMask(null); return null; }
-      if (mode==="select") setSelectionMask(null);
-      if (mode===null) setSelectionMask(null);
+      if (prev===mode) {
+        setSelectionMask(null);
+        lastSelectPointRef.current=null;
+        return null;
+      }
+      if (mode==="select") { setSelectionMask(null); lastSelectPointRef.current=null; }
+      if (mode===null) { setSelectionMask(null); lastSelectPointRef.current=null; }
       return mode;
     });
   },[]);
@@ -677,6 +723,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             onDelete={handleDelete}
             onChangeColor={handleChangeColor}
             onClearSelection={handleClearSelection}
+            sensitivity={sensitivity}
+            onSensitivity={setSensitivity}
           />
         </div>
       </div>

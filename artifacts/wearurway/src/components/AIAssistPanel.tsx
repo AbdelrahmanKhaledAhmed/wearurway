@@ -9,6 +9,8 @@ interface Props {
   onDelete: () => void;
   onChangeColor: (color: string) => void;
   onClearSelection: () => void;
+  sensitivity: number;
+  onSensitivity: (v: number) => void;
 }
 
 const WandIcon = () => (
@@ -22,6 +24,7 @@ const WandIcon = () => (
 export default function FuzzySelectPanel({
   toolMode, hasSelection,
   onSetToolMode, onDelete, onChangeColor, onClearSelection,
+  sensitivity, onSensitivity,
 }: Props) {
   const [pickedColor, setPickedColor] = useState("#ff0000");
   const [showPicker,  setShowPicker]  = useState(false);
@@ -83,6 +86,40 @@ export default function FuzzySelectPanel({
               style={{ left: selectActive ? "calc(100% - 1.125rem)" : "0.125rem" }} />
           </div>
         </button>
+        {/* Sensitivity slider — shown whenever Magic Select is active */}
+        {selectActive && (
+          <div className="px-3 py-3 rounded-xl"
+            style={{ backgroundColor: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.18)" }}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(196,140,255,0.8)" }}>
+                Sensitivity
+              </p>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px]" style={{ color: "rgba(196,140,255,0.45)" }}>
+                  {sensitivity <= 25 ? "Precise" : sensitivity <= 60 ? "Balanced" : "Wide"}
+                </span>
+                <span className="text-[10px] font-mono font-bold" style={{ color: "rgba(196,140,255,0.65)" }}>
+                  {sensitivity}
+                </span>
+              </div>
+            </div>
+            <input
+              type="range" min={1} max={100} value={sensitivity}
+              onChange={e => onSensitivity(Number(e.target.value))}
+              className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+              style={{ accentColor: "#a855f7" }}
+            />
+            <div className="flex justify-between mt-1.5">
+              <span className="text-[8px]" style={{ color: "rgba(255,255,255,0.2)" }}>Narrow</span>
+              <span className="text-[8px]" style={{ color: "rgba(255,255,255,0.2)" }}>Wide</span>
+            </div>
+            {hasSelection && (
+              <p className="text-[9px] mt-2 text-center" style={{ color: "rgba(196,140,255,0.45)" }}>
+                Drag to refine selection live
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Waiting state ── */}
