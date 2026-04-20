@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGetMockup, useSaveMockup, getGetMockupQueryKey } from "@workspace/api-client-react";
@@ -137,20 +137,6 @@ export default function Design() {
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [newUploadLayerId, setNewUploadLayerId] = useState<string | null>(null);
   const [showTextModal, setShowTextModal] = useState(false);
-
-  // ── Drawing tool state ─────────────────────────────────────────────────────
-  const [drawingMode, setDrawingMode] = useState(false);
-  const [brushColor, setBrushColor] = useState("#ffffff");
-  const [brushSize, setBrushSize] = useState(6);
-  const drawingCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const drawingActiveRef = useRef(false);
-  const lastDrawPosRef = useRef<{ x: number; y: number } | null>(null);
-  const strokePointsRef = useRef<{ x: number; y: number }[]>([]);
-  const drawingCssSizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
-  const brushColorRef = useRef(brushColor);
-  const brushSizeRef = useRef(brushSize);
-  brushColorRef.current = brushColor;
-  brushSizeRef.current = brushSize;
 
   const [showExportButton, setShowExportButton] = useState(() => localStorage.getItem("wearurway_show_export_button") !== "false");
 
@@ -354,115 +340,6 @@ export default function Design() {
       startLayerY: layer.y,
     };
   };
-
-  // ── Drawing handlers ────────────────────────────────────────────────────────
-
-  useLayoutEffect(() => {
-    if (!drawingMode) return;
-    const canvas = drawingCanvasRef.current;
-    const clip = clipAreaRef.current;
-    if (!canvas || !clip) return;
-    const dpr = window.devicePixelRatio || 1;
-    const cssW = clip.clientWidth;
-    const cssH = clip.clientHeight;
-    canvas.width = Math.round(cssW * dpr);
-    canvas.height = Math.round(cssH * dpr);
-    drawingCssSizeRef.current = { w: cssW, h: cssH };
-    const ctx = canvas.getContext("2d");
-    if (ctx) ctx.scale(dpr, dpr);
-  }, [drawingMode]);
-
-  const getDrawPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  };
-
-  const handleDrawDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    drawingActiveRef.current = true;
-    const pos = getDrawPos(e);
-    strokePointsRef.current = [pos];
-    lastDrawPosRef.current = pos;
-    const ctx = e.currentTarget.getContext("2d");
-    if (!ctx) return;
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, brushSizeRef.current / 2, 0, Math.PI * 2);
-    ctx.fillStyle = brushColorRef.current;
-    ctx.fill();
-  };
-
-  const handleDrawMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drawingActiveRef.current) return;
-    e.preventDefault();
-    const pos = getDrawPos(e);
-    const pts = strokePointsRef.current;
-    pts.push(pos);
-    const ctx = e.currentTarget.getContext("2d");
-    if (!ctx || pts.length < 2) return;
-    ctx.beginPath();
-    ctx.strokeStyle = brushColorRef.current;
-    ctx.lineWidth = brushSizeRef.current;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    const i = pts.length - 1;
-    if (pts.length === 2) {
-      ctx.moveTo(pts[0].x, pts[0].y);
-      ctx.lineTo(pts[1].x, pts[1].y);
-    } else {
-      const mid1x = (pts[i - 2].x + pts[i - 1].x) / 2;
-      const mid1y = (pts[i - 2].y + pts[i - 1].y) / 2;
-      const mid2x = (pts[i - 1].x + pts[i].x) / 2;
-      const mid2y = (pts[i - 1].y + pts[i].y) / 2;
-      ctx.moveTo(mid1x, mid1y);
-      ctx.quadraticCurveTo(pts[i - 1].x, pts[i - 1].y, mid2x, mid2y);
-    }
-    ctx.stroke();
-    lastDrawPosRef.current = pos;
-  };
-
-  const handleDrawUp = () => {
-    drawingActiveRef.current = false;
-    lastDrawPosRef.current = null;
-    strokePointsRef.current = [];
-  };
-
-  const clearDrawingCanvas = () => {
-    const canvas = drawingCanvasRef.current;
-    if (!canvas) return;
-    const { w, h } = drawingCssSizeRef.current;
-    const ctx = canvas.getContext("2d");
-    ctx?.clearRect(0, 0, w || canvas.width, h || canvas.height);
-  };
-
-  const commitDrawing = useCallback(() => {
-    const canvas = drawingCanvasRef.current;
-    if (!canvas) { setDrawingMode(false); return; }
-    canvas.toBlob(blob => {
-      if (!blob) { setDrawingMode(false); return; }
-      const blobUrl = URL.createObjectURL(blob);
-      const { w, h } = drawingCssSizeRef.current;
-      const cssW = w || canvas.width;
-      const cssH = h || canvas.height;
-      setLayers(prev => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          name: "Drawing",
-          imageUrl: blobUrl,
-          x: 0,
-          y: 0,
-          width: cssW,
-          height: cssH,
-          rotation: 0,
-          visible: true,
-          naturalWidth: canvas.width,
-          naturalHeight: canvas.height,
-        },
-      ]);
-      setDrawingMode(false);
-    }, "image/png");
-  }, [setLayers]);
 
   const getLayerAspectRatio = (layer: DesignLayer) => {
     const naturalRatio =
@@ -1379,76 +1256,8 @@ export default function Design() {
                   );
                 })() : null
               )}
-              {/* ── Drawing canvas overlay ── */}
-              {drawingMode && (
-                <canvas
-                  ref={drawingCanvasRef}
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    zIndex: 20,
-                    cursor: "crosshair",
-                    touchAction: "none",
-                  }}
-                  onPointerDown={handleDrawDown}
-                  onPointerMove={handleDrawMove}
-                  onPointerUp={handleDrawUp}
-                  onPointerLeave={handleDrawUp}
-                />
-              )}
             </div>
           </div>
-
-          {/* ── Drawing toolbar ── */}
-          {drawingMode && (
-            <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-[#0d0d0d]/95 border border-white/20 px-4 py-3 shadow-xl backdrop-blur-sm">
-              <label className="flex items-center gap-1.5 cursor-pointer" title="Brush color">
-                <span className="text-[10px] uppercase tracking-widest text-white/40">Color</span>
-                <div className="relative w-7 h-7 border border-white/30 overflow-hidden cursor-pointer">
-                  <div className="absolute inset-0" style={{ backgroundColor: brushColor }} />
-                  <input
-                    type="color"
-                    value={brushColor}
-                    onChange={e => setBrushColor(e.target.value)}
-                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                  />
-                </div>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer" title="Brush size">
-                <span className="text-[10px] uppercase tracking-widest text-white/40">Size</span>
-                <input
-                  type="range"
-                  min={2}
-                  max={40}
-                  value={brushSize}
-                  onChange={e => setBrushSize(Number(e.target.value))}
-                  className="w-20 accent-white"
-                />
-                <span className="text-[10px] text-white/50 w-6 text-right">{brushSize}</span>
-              </label>
-              <div className="w-px h-5 bg-white/15" />
-              <button
-                onClick={clearDrawingCanvas}
-                className="text-[10px] uppercase tracking-widest text-white/50 hover:text-white border border-white/20 hover:border-white/50 px-2.5 py-1.5 transition-colors"
-              >
-                Clear
-              </button>
-              <button
-                onClick={commitDrawing}
-                className="text-[10px] uppercase tracking-widest font-black bg-white text-black px-4 py-1.5 hover:bg-white/90 transition-opacity"
-              >
-                Add to Design
-              </button>
-              <button
-                onClick={() => { handleDrawUp(); setDrawingMode(false); }}
-                className="text-[10px] uppercase tracking-widest text-white/30 hover:text-white/70 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
 
           </div>{/* close absolute inset-0 wrapper */}
         </div>{/* close chess area */}
@@ -1579,22 +1388,6 @@ export default function Design() {
               <span className="text-lg leading-none">T</span>
               <div className="text-left">
                 <p className="text-xs font-bold uppercase tracking-widest">Add Text</p>
-              </div>
-            </button>
-
-            {/* Drawing */}
-            <button
-              onClick={() => { setSelectedLayerId(null); setDrawingMode(v => !v); }}
-              className={`w-full flex items-center gap-3 border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors ${drawingMode ? "border-foreground bg-muted/10" : "border-border"}`}
-            >
-              <span className="text-lg leading-none">✏</span>
-              <div className="text-left">
-                <p className="text-xs font-bold uppercase tracking-widest">
-                  {drawingMode ? "Drawing…" : "Drawing"}
-                </p>
-                {drawingMode && (
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Draw on canvas below</p>
-                )}
               </div>
             </button>
 
