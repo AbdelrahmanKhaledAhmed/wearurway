@@ -214,7 +214,15 @@ export default function Design() {
   );
 
   const currentSide = side === "front" ? mockup?.front : mockup?.back;
-  const showSaveDesignButton = mockup?.showSaveDesignButton !== false;
+  const [showSaveDesignButton, setShowSaveDesignButton] = useState(() => localStorage.getItem("wearurway_show_save_design_button") !== "false");
+
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === "wearurway_show_save_design_button") setShowSaveDesignButton(e.newValue !== "false");
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
   const realWidth = selectedSize?.realWidth ?? 0;
   const realHeight = selectedSize?.realHeight ?? 0;
 

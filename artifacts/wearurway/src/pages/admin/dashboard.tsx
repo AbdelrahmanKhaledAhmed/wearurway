@@ -1007,6 +1007,7 @@ function MockupsManager() {
   const [selectedColorId, setSelectedColorId] = useState<string>("");
   const [activeSide, setActiveSide] = useState<"front" | "back">("front");
   const [showExportButton, setShowExportButton] = useState(() => localStorage.getItem("wearurway_show_export_button") !== "false");
+  const [showSaveDesignButtonGlobal, setShowSaveDesignButtonGlobal] = useState(() => localStorage.getItem("wearurway_show_save_design_button") !== "false");
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -1074,13 +1075,11 @@ function MockupsManager() {
   const [frontBbox, setFrontBbox] = useState<BBox | null>(null);
   const [backImage, setBackImage] = useState("");
   const [backBbox, setBackBbox] = useState<BBox | null>(null);
-  const [showSaveDesignButton, setShowSaveDesignButton] = useState(true);
 
   // Sync bboxes from fetched mockup when selection changes (images come from generated filenames)
   useEffect(() => {
     setFrontBbox(mockup?.front?.boundingBox ?? null);
     setBackBbox(mockup?.back?.boundingBox ?? null);
-    setShowSaveDesignButton(mockup?.showSaveDesignButton !== false);
   }, [mockup]);
 
   const productName = products?.find(p => p.id === selectedProductId)?.name ?? "";
@@ -1111,7 +1110,6 @@ function MockupsManager() {
           image: backGeneratedImage || backImage || undefined,
           boundingBox: backBbox ?? undefined,
         },
-        showSaveDesignButton,
       }
     }, {
       onSuccess: () => {
@@ -1226,7 +1224,10 @@ function MockupsManager() {
               </div>
 
               <div className="border border-border p-4 space-y-3">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground">Designer Display</p>
+                <div>
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground">Designer Display</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">Applies globally to all products, fits, and colors</p>
+                </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="toggle-export-button" className="text-xs uppercase tracking-widest cursor-pointer">Show Export Image Button</Label>
                   <Switch
@@ -1242,8 +1243,11 @@ function MockupsManager() {
                   <Label htmlFor="toggle-save-design-button" className="text-xs uppercase tracking-widest cursor-pointer">Show Save Design Button</Label>
                   <Switch
                     id="toggle-save-design-button"
-                    checked={showSaveDesignButton}
-                    onCheckedChange={setShowSaveDesignButton}
+                    checked={showSaveDesignButtonGlobal}
+                    onCheckedChange={v => {
+                      setShowSaveDesignButtonGlobal(v);
+                      localStorage.setItem("wearurway_show_save_design_button", v ? "true" : "false");
+                    }}
                   />
                 </div>
               </div>
