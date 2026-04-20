@@ -135,12 +135,13 @@ export async function checkStorageHealth(): Promise<{
   bucket: string;
   error?: string;
 }> {
+  let bucketName = "(not configured)";
   try {
-    const { bucketName } = getR2Config();
+    const config = getR2Config();
+    bucketName = config.bucketName;
     await objectExists("__health_check__");
     return { ok: true, provider: "Cloudflare R2", bucket: bucketName };
   } catch (err) {
-    const { bucketName } = getR2Config();
     return {
       ok: false,
       provider: "Cloudflare R2",
