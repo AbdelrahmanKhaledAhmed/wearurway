@@ -6,18 +6,51 @@ interface Props {
   disabled?: boolean;
 }
 
-type Step = "intro" | "import" | "loading";
+type Step = "intro" | "import" | "loading" | "done";
 
 const PINTEREST_URL = "https://www.pinterest.com/WEARURWAY/t-shirt-designs/";
 
 function isImageUrl(url: string): boolean {
   try {
     const u = new URL(url);
-    if (!["http:", "https:"].includes(u.protocol)) return false;
-    return true;
+    return ["http:", "https:"].includes(u.protocol);
   } catch {
     return false;
   }
+}
+
+async function convertToPng(blob: Blob): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { URL.revokeObjectURL(objectUrl); reject(new Error("Canvas unavailable")); return; }
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(objectUrl);
+      canvas.toBlob(png => {
+        if (png) resolve(png);
+        else reject(new Error("PNG conversion failed"));
+      }, "image/png");
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Image load failed")); };
+    img.crossOrigin = "anonymous";
+    img.src = objectUrl;
+  });
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
 export default function PinterestImportButton({ onImageReady, disabled }: Props) {
@@ -35,37 +68,19 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
     setLoadingMsg("");
   };
 
-  const handleOpen = () => {
-    reset();
-    setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-    setTimeout(reset, 300);
-  };
+  const handleOpen = () => { reset(); setOpen(true); };
+  const handleClose = () => { setOpen(false); setTimeout(reset, 300); };
 
   const handleOpenPinterest = () => {
     window.open(PINTEREST_URL, "_blank", "noopener,noreferrer");
     setStep("import");
   };
 
-  const processFile = useCallback((file: File) => {
-    handleClose();
-    setTimeout(() => onImageReady(file), 150);
-  }, [onImageReady]);
-
   const handleUrlSubmit = async () => {
     setUrlError("");
     const trimmed = urlInput.trim();
-    if (!trimmed) {
-      setUrlError("Please paste an image URL.");
-      return;
-    }
-    if (!isImageUrl(trimmed)) {
-      setUrlError("Please enter a valid http/https URL.");
-      return;
-    }
+    if (!trimmed) { setUrlError("Please paste an image URL."); return; }
+    if (!isImageUrl(trimmed)) { setUrlError("Please enter a valid http/https URL."); return; }
 
     setStep("loading");
     setLoadingMsg("Fetching image…");
@@ -79,34 +94,30 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
 
       if (!res.ok) {
         let msg = "Failed to fetch image.";
-        try {
-          const json = await res.json() as { error?: string };
-          if (json.error) msg = json.error;
-        } catch {}
+        try { const json = await res.json() as { error?: string }; if (json.error) msg = json.error; } catch {}
         setStep("import");
         setUrlError(msg);
         return;
       }
 
       const blob = await res.blob();
-      const ext = blob.type.includes("png") ? "png" : blob.type.includes("webp") ? "webp" : "jpg";
-      const file = new File([blob], `pinterest-image.${ext}`, { type: blob.type });
-      processFile(file);
+      setLoadingMsg("Converting to PNG…");
+      const png = await convertToPng(blob);
+      triggerDownload(png, "pinterest-design.png");
+      setStep("done");
     } catch {
       setStep("import");
       setUrlError("Network error. Please try again.");
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setUrlError("Please upload a valid image file.");
-      return;
-    }
-    processFile(file);
-  };
+    if (!file.type.startsWith("image/")) { setUrlError("Please upload a valid image file."); return; }
+    handleClose();
+    setTimeout(() => onImageReady(file), 150);
+  }, [onImageReady]);
 
   const handleUrlKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleUrlSubmit();
@@ -114,29 +125,30 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
 
   return (
     <>
-      {/* Floating trigger button */}
+      {/* Trigger button */}
       <motion.button
         onClick={handleOpen}
         disabled={disabled}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className="fixed bottom-6 left-6 z-40 flex items-center gap-2.5 px-4 py-3 rounded-full shadow-2xl disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.97 }}
+        className="fixed bottom-6 left-6 z-40 flex items-start gap-3 px-4 py-3 rounded-2xl shadow-2xl disabled:opacity-40 disabled:cursor-not-allowed transition-opacity max-w-[220px] text-left"
         style={{ backgroundColor: "#E60023", color: "#fff" }}
-        title="Import design from Pinterest"
+        title="I'll help you find or pick the perfect design"
       >
-        <PinterestIcon className="w-5 h-5 flex-shrink-0" />
-        <span className="text-xs font-black uppercase tracking-widest hidden sm:block">Pinterest</span>
+        <PinterestIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
+        <span className="text-[11px] font-semibold leading-snug">
+          Not sure which design fits your idea?{" "}
+          <span className="underline underline-offset-2 font-black">I'll help you pick the perfect one.</span>
+        </span>
       </motion.button>
 
-      {/* Modal overlay + panel */}
+      {/* Modal */}
       <AnimatePresence>
         {open && (
           <>
             <motion.div
               key="overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm"
               onClick={handleClose}
@@ -157,32 +169,26 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
                   <div className="flex items-center gap-3">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: "#E60023" }}
-                    >
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E60023" }}>
                       <PinterestIcon className="w-4 h-4 text-white" />
                     </div>
                     <div>
                       <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase">Design Inspiration</p>
-                      <h2 className="text-sm font-black uppercase tracking-widest">Import from Pinterest</h2>
+                      <h2 className="text-sm font-black uppercase tracking-widest">Find Your Design</h2>
                     </div>
                   </div>
-                  <button
-                    onClick={handleClose}
-                    className="text-white/30 hover:text-white transition-colors text-xl leading-none font-light ml-4"
-                  >
-                    ×
-                  </button>
+                  <button onClick={handleClose} className="text-white/30 hover:text-white transition-colors text-xl leading-none font-light ml-4">×</button>
                 </div>
 
                 {/* Intro step */}
                 {step === "intro" && (
                   <div className="px-6 py-6">
                     <p className="text-sm text-white/70 leading-relaxed mb-6">
-                      I'll help you find a t-shirt design from Pinterest. Open the link, pick a design you like, then come back and paste the image link or upload the image.
+                      Not sure how to choose a good image or design that fits your idea?{" "}
+                      <span className="text-white font-semibold">I'll help you find or pick the perfect design.</span>
+                      <br /><br />
+                      Open our curated Pinterest board, pick a design you love, then come back and paste the link — it'll download instantly as a PNG ready to use.
                     </p>
-
                     <div className="flex flex-col gap-3">
                       <motion.button
                         whileTap={{ scale: 0.97 }}
@@ -191,13 +197,15 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
                         style={{ backgroundColor: "#E60023", color: "#fff" }}
                       >
                         <PinterestIcon className="w-4 h-4" />
-                        Open Pinterest
+                        Browse Pinterest Designs
                       </motion.button>
-
                       <button
-                        onClick={handleClose}
+                        onClick={() => setStep("import")}
                         className="w-full py-3.5 border border-white/15 font-bold uppercase text-xs tracking-[0.2em] text-white/50 hover:text-white hover:border-white/30 transition-colors"
                       >
+                        I already have a link
+                      </button>
+                      <button onClick={handleClose} className="w-full py-2 text-[10px] text-white/25 hover:text-white/50 transition-colors uppercase tracking-widest">
                         Cancel
                       </button>
                     </div>
@@ -208,19 +216,19 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
                 {step === "import" && (
                   <div className="px-6 py-6 space-y-5">
                     <p className="text-[11px] text-white/50 leading-relaxed">
-                      Found a design you like? Paste the direct image URL below, or upload the image from your device.
+                      Paste a Pinterest pin or direct image URL below. The image will be automatically converted to PNG and downloaded to your device.
                     </p>
 
-                    {/* Option A — URL */}
+                    {/* URL input */}
                     <div>
-                      <p className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-2">Option A — Paste Pinterest pin or image URL</p>
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-2">Paste Pinterest pin or image URL</p>
                       <div className="flex gap-2">
                         <input
                           type="url"
                           value={urlInput}
                           onChange={e => { setUrlInput(e.target.value); setUrlError(""); }}
                           onKeyDown={handleUrlKeyDown}
-                          placeholder="https://www.pinterest.com/pin/… or direct image URL"
+                          placeholder="https://www.pinterest.com/pin/…"
                           className="flex-1 bg-white/5 border border-white/15 px-3 py-2.5 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-white/40 transition-colors"
                           autoFocus
                         />
@@ -230,12 +238,10 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
                           className="px-4 py-2.5 font-black uppercase text-xs tracking-widest transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed"
                           style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
                         >
-                          Use
+                          Download
                         </button>
                       </div>
-                      {urlError && (
-                        <p className="text-[11px] text-red-400 mt-2">{urlError}</p>
-                      )}
+                      {urlError && <p className="text-[11px] text-red-400 mt-2">{urlError}</p>}
                     </div>
 
                     {/* Divider */}
@@ -245,29 +251,20 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
                       <div className="flex-1 h-px bg-white/10" />
                     </div>
 
-                    {/* Option B — Upload */}
+                    {/* Upload */}
                     <div>
-                      <p className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-2">Option B — Upload from device</p>
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-2">Upload from your device</p>
                       <button
                         onClick={() => fileInputRef.current?.click()}
                         className="w-full flex items-center justify-center gap-2 border border-dashed border-white/20 py-4 text-xs text-white/50 hover:border-white/40 hover:text-white/80 transition-colors"
                       >
                         <span className="text-base leading-none">⬆</span>
-                        <span className="font-bold uppercase tracking-widest">Upload image from your device</span>
+                        <span className="font-bold uppercase tracking-widest">Upload image</span>
                       </button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleFileUpload}
-                      />
+                      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
                     </div>
 
-                    <button
-                      onClick={() => setStep("intro")}
-                      className="text-[10px] text-white/30 hover:text-white/60 transition-colors uppercase tracking-widest"
-                    >
+                    <button onClick={() => setStep("intro")} className="text-[10px] text-white/30 hover:text-white/60 transition-colors uppercase tracking-widest">
                       ← Back
                     </button>
                   </div>
@@ -278,6 +275,28 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
                   <div className="px-6 py-10 flex flex-col items-center gap-4">
                     <div className="w-8 h-8 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
                     <p className="text-xs text-white/50 uppercase tracking-widest">{loadingMsg || "Processing…"}</p>
+                  </div>
+                )}
+
+                {/* Done step */}
+                {step === "done" && (
+                  <div className="px-6 py-10 flex flex-col items-center gap-5 text-center">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E60023" }}>
+                      <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-black uppercase tracking-widest text-white mb-1">Downloaded!</p>
+                      <p className="text-[11px] text-white/50 leading-relaxed">Your image was saved as a PNG.<br />You can now upload it here using the editor.</p>
+                    </div>
+                    <button
+                      onClick={handleClose}
+                      className="mt-2 px-6 py-2.5 font-black uppercase text-xs tracking-widest transition-opacity hover:opacity-80"
+                      style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
+                    >
+                      Done
+                    </button>
                   </div>
                 )}
               </div>
