@@ -120,6 +120,8 @@ export default function Design() {
   const sideRef = useRef(side);
   sideRef.current = side;
   const layers = side === "front" ? frontLayers : backLayers;
+  const layersRef = useRef<DesignLayer[]>(layers);
+  layersRef.current = layers;
   const setLayers = useCallback((updater: React.SetStateAction<DesignLayer[]>) => {
     if (sideRef.current === "front") setFrontLayers(updater);
     else setBackLayers(updater);
@@ -286,20 +288,21 @@ export default function Design() {
     const dx = e.clientX - drag.startMouseX;
     const dy = e.clientY - drag.startMouseY;
     const canvasCenterX = mockupSizeRef.current / 2;
-    let didSnap = false;
+    const rawX = drag.startLayerX + dx;
+    const rawY = drag.startLayerY + dy;
+
+    // Compute snap outside the state updater so it's always reliable
+    const layer = layersRef.current.find(l => l.id === drag.layerId);
+    const layerW = layer ? Math.max(MIN_LAYER_SIZE, layer.width) : 0;
+    const snapping = layerW > 0 && Math.abs((rawX + layerW / 2) - canvasCenterX) < SNAP_THRESHOLD;
+    const finalX = snapping ? canvasCenterX - layerW / 2 : rawX;
+
     setLayers(prev =>
-      prev.map(l => {
-        if (l.id !== drag.layerId) return l;
-        const rawX = drag.startLayerX + dx;
-        const rawY = drag.startLayerY + dy;
-        const layerW = Math.max(MIN_LAYER_SIZE, l.width);
-        const layerCenterX = rawX + layerW / 2;
-        const snapping = Math.abs(layerCenterX - canvasCenterX) < SNAP_THRESHOLD;
-        didSnap = snapping;
-        return { ...l, x: snapping ? canvasCenterX - layerW / 2 : rawX, y: rawY };
-      })
+      prev.map(l =>
+        l.id === drag.layerId ? { ...l, x: finalX, y: rawY } : l
+      )
     );
-    setSnapActive(didSnap);
+    setSnapActive(snapping);
   }, []);
 
   const onMouseUp = useCallback(() => {
