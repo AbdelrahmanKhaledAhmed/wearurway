@@ -127,7 +127,7 @@ export default function PinterestImportButton({ disabled }: Props) {
         disabled={disabled}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.97 }}
-        className="fixed bottom-6 left-6 z-40 flex items-start gap-3 px-4 py-4 rounded-2xl shadow-2xl disabled:opacity-40 disabled:cursor-not-allowed transition-opacity max-w-[190px] text-left"
+        className="fixed bottom-6 left-2 z-40 flex items-start gap-3 px-4 py-4 rounded-2xl shadow-2xl disabled:opacity-40 disabled:cursor-not-allowed transition-opacity max-w-[190px] text-left"
         style={{ backgroundColor: "#E60023", color: "#fff" }}
         title="I'll help you find or pick the perfect design"
       >
