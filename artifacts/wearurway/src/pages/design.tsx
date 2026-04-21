@@ -1334,10 +1334,6 @@ export default function Design() {
                   <span className="font-bold uppercase">{selectedColor.name}</span>
                 </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground uppercase tracking-widest">Size</span>
-                <span className="font-bold uppercase">{selectedSize?.name ?? '—'}</span>
-              </div>
             </div>
           </div>
 
