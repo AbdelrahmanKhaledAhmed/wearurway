@@ -164,7 +164,7 @@ function sharpenImageData(id: ImageData) {
 }
 
 function enhanceCanvas(src: HTMLCanvasElement, qualityScale=1) {
-  const maxSide=8192, scale=Math.min(Math.max(qualityScale,1),maxSide/src.width,maxSide/src.height);
+  const maxSide=16384, scale=Math.min(Math.max(qualityScale,1),maxSide/src.width,maxSide/src.height);
   const out=document.createElement("canvas");
   out.width=Math.max(1,Math.round(src.width*scale)); out.height=Math.max(1,Math.round(src.height*scale));
   const ctx=out.getContext("2d"); if (!ctx) return src;
