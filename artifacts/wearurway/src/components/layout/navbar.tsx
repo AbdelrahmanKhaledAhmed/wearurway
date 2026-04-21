@@ -39,14 +39,6 @@ export function Navbar() {
           </>
         )}
         
-        {(selectedColor || location === '/sizes') && (
-          <>
-            <ChevronRight className="w-3 h-3" />
-            <span className={`${location === '/sizes' ? 'text-foreground font-bold' : ''}`}>
-              Sizes
-            </span>
-          </>
-        )}
       </div>
     </nav>
   );
