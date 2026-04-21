@@ -93,19 +93,88 @@ function extractPinImgUrls(html: string): string[] {
 // WITHOUT percent-encoding the slashes — wsrv.nl requires raw forward slashes.
 
 async function fetchViaWsrv(imageUrl: string): Promise<Buffer> {
-  // Strip protocol so wsrv.nl gets bare "i.pinimg.com/originals/..."
   const bare = imageUrl.replace(/^https?:\/\//, "");
-  const wsrvUrl = `https://wsrv.nl/?url=${bare}&output=jpg&q=95`;
-  const { buffer } = await fetchBuffer(wsrvUrl, {
+
+  // Try wsrv.nl first — public proxy that bypasses Pinterest's IP blocks
+  try {
+    const wsrvUrl = `https://wsrv.nl/?url=${bare}&output=png&n=-1`;
+    const { buffer } = await fetchBuffer(wsrvUrl, {
+      "User-Agent": BROWSER_UA,
+      Accept: "image/*,*/*;q=0.8",
+    }, 30000);
+    return buffer;
+  } catch { /* fall through to alternatives */ }
+
+  // Fallback: try 736x size if originals failed (smaller but widely available)
+  const fallbackUrl = imageUrl.replace(/\/originals\//, "/736x/");
+  if (fallbackUrl !== imageUrl) {
+    try {
+      const bareFallback = fallbackUrl.replace(/^https?:\/\//, "");
+      const wsrvFallback = `https://wsrv.nl/?url=${bareFallback}&output=png&n=-1`;
+      const { buffer } = await fetchBuffer(wsrvFallback, {
+        "User-Agent": BROWSER_UA,
+        Accept: "image/*,*/*;q=0.8",
+      }, 25000);
+      return buffer;
+    } catch { /* fall through */ }
+  }
+
+  // Last resort: direct fetch (works for some pinimg.com images)
+  const { buffer } = await fetchBuffer(imageUrl, {
     "User-Agent": BROWSER_UA,
     Accept: "image/*,*/*;q=0.8",
-  }, 30000);
+    Referer: "https://www.pinterest.com/",
+    "sec-fetch-dest": "image",
+    "sec-fetch-mode": "no-cors",
+    "sec-fetch-site": "cross-site",
+  }, 25000);
   return buffer;
+}
+
+// ── Pinterest oEmbed API ──────────────────────────────────────────────────────
+// Most reliable: Pinterest exposes a public oEmbed endpoint that returns
+// structured JSON including a thumbnail_url pointing to i.pinimg.com.
+
+async function fetchViaOEmbed(pinUrl: string): Promise<string | null> {
+  try {
+    const endpoint = `https://www.pinterest.com/oembed.json?url=${encodeURIComponent(pinUrl)}`;
+    const { buffer } = await fetchBuffer(endpoint, {
+      "User-Agent": BROWSER_UA,
+      Accept: "application/json",
+      "Accept-Language": "en-US,en;q=0.9",
+    }, 12000);
+    const json = JSON.parse(buffer.toString("utf-8")) as Record<string, unknown>;
+    const thumb = typeof json.thumbnail_url === "string" ? json.thumbnail_url : null;
+    if (thumb && thumb.includes("pinimg.com")) return upgradeToOriginals(thumb);
+  } catch { /* fall through */ }
+  return null;
 }
 
 // ── Pinterest pin page scrape ─────────────────────────────────────────────────
 
 async function scrapePinPage(pinUrl: string): Promise<string | null> {
+  // Strategy 1: oEmbed API — most reliable, works even when HTML is JS-rendered
+  const oembed = await fetchViaOEmbed(pinUrl);
+  if (oembed) return oembed;
+
+  // Strategy 2: AMP page — much simpler HTML, more likely to contain image data
+  try {
+    const ampUrl = pinUrl.replace(/\/?$/, "?amp=1");
+    const { buffer: ampBuf } = await fetchBuffer(ampUrl, {
+      "User-Agent": BROWSER_UA,
+      Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+    }, 12000);
+    const ampHtml = ampBuf.toString("utf-8");
+    const ampUrls = extractPinImgUrls(ampHtml);
+    if (ampUrls.length > 0) return ampUrls[0];
+    const ogAmp =
+      ampHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1] ??
+      ampHtml.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)?.[1];
+    if (ogAmp) return upgradeToOriginals(ogAmp);
+  } catch { /* fall through */ }
+
+  // Strategy 3: Full HTML scrape fallback
   try {
     const { buffer } = await fetchBuffer(pinUrl, {
       "User-Agent": BROWSER_UA,
@@ -114,17 +183,14 @@ async function scrapePinPage(pinUrl: string): Promise<string | null> {
       "Cache-Control": "no-cache",
     }, 18000);
     const html = buffer.toString("utf-8");
-
-    // Priority 1: find i.pinimg.com image URLs inside the Redux state JSON
     const urls = extractPinImgUrls(html);
     if (urls.length > 0) return urls[0];
-
-    // Priority 2: og:image meta tag
     const og =
       html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1] ??
       html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)?.[1];
     if (og) return upgradeToOriginals(og);
   } catch { /* fall through */ }
+
   return null;
 }
 
