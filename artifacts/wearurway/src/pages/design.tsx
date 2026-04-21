@@ -41,6 +41,7 @@ const ZOOM_STEP_BUTTON = 0.01;
 const MIN_LAYER_SIZE = 10;
 const MAX_LAYER_SCALE = 200;
 const ROTATE_STEP = 1;
+const SNAP_THRESHOLD = 8;
 
 const SAVE_KEY = (productId: string, fitId: string, colorId: string) =>
   `ww_design_${productId}_${fitId}_${colorId}`;
@@ -144,6 +145,9 @@ export default function Design() {
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const pinchRef = useRef<{ dist: number } | null>(null);
+  const mockupSizeRef = useRef(mockupSize);
+  useEffect(() => { mockupSizeRef.current = mockupSize; }, [mockupSize]);
+  const [snapActive, setSnapActive] = useState(false);
   const holdActionRef = useRef<(() => void) | null>(null);
   const holdTimerRef = useRef<{ timeout: ReturnType<typeof setTimeout> | null; interval: ReturnType<typeof setInterval> | null }>({ timeout: null, interval: null });
 
@@ -281,17 +285,26 @@ export default function Design() {
     if (!drag) return;
     const dx = e.clientX - drag.startMouseX;
     const dy = e.clientY - drag.startMouseY;
+    const canvasCenterX = mockupSizeRef.current / 2;
+    let didSnap = false;
     setLayers(prev =>
-      prev.map(l =>
-        l.id === drag.layerId
-          ? { ...l, x: drag.startLayerX + dx, y: drag.startLayerY + dy }
-          : l
-      )
+      prev.map(l => {
+        if (l.id !== drag.layerId) return l;
+        const rawX = drag.startLayerX + dx;
+        const rawY = drag.startLayerY + dy;
+        const layerW = Math.max(MIN_LAYER_SIZE, l.width);
+        const layerCenterX = rawX + layerW / 2;
+        const snapping = Math.abs(layerCenterX - canvasCenterX) < SNAP_THRESHOLD;
+        didSnap = snapping;
+        return { ...l, x: snapping ? canvasCenterX - layerW / 2 : rawX, y: rawY };
+      })
     );
+    setSnapActive(didSnap);
   }, []);
 
   const onMouseUp = useCallback(() => {
     dragRef.current = null;
+    setSnapActive(false);
   }, []);
 
   useEffect(() => {
@@ -1188,6 +1201,24 @@ export default function Design() {
                 )}
               </motion.div>
             </AnimatePresence>
+
+            {/* ── Center snap guide line ── */}
+            {snapActive && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: "1px",
+                  backgroundColor: "#3b82f6",
+                  zIndex: 20,
+                  pointerEvents: "none",
+                  opacity: 0.75,
+                }}
+              />
+            )}
 
             {/* ── Design clip area ── */}
             {/* z-index 5 places designs above the shirt (z-index 1). */}
