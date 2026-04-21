@@ -127,12 +127,12 @@ export default function PinterestImportButton({ disabled }: Props) {
         disabled={disabled}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.97 }}
-        className="fixed bottom-6 left-6 z-40 flex items-start gap-3 px-4 py-3 rounded-2xl shadow-2xl disabled:opacity-40 disabled:cursor-not-allowed transition-opacity max-w-[220px] text-left"
+        className="fixed bottom-6 left-6 z-40 w-56 h-56 flex flex-col items-center justify-center gap-3 shadow-2xl disabled:opacity-40 disabled:cursor-not-allowed transition-opacity text-center"
         style={{ backgroundColor: "#E60023", color: "#fff" }}
         title="I'll help you find or pick the perfect design"
       >
-        <PinterestIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
-        <span className="text-[11px] font-semibold leading-snug">
+        <PinterestIcon className="w-8 h-8 flex-shrink-0" />
+        <span className="text-[11px] font-semibold leading-snug px-4">
           Not sure which design fits your idea?{" "}
           <span className="font-black">I'll help you pick the perfect one.</span>
         </span>
