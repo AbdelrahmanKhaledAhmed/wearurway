@@ -1212,7 +1212,7 @@ export default function Design() {
                   left: "50%",
                   transform: "translateX(-50%)",
                   width: "1px",
-                  backgroundColor: "#3b82f6",
+                  backgroundColor: "#f5c842",
                   zIndex: 20,
                   pointerEvents: "none",
                   opacity: 0.75,
