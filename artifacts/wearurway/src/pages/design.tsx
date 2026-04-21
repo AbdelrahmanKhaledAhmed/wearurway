@@ -140,6 +140,11 @@ export default function Design() {
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [newUploadLayerId, setNewUploadLayerId] = useState<string | null>(null);
   const [showTextModal, setShowTextModal] = useState(false);
+  const [showDragHint, setShowDragHint] = useState(false);
+  const [dragOverSide, setDragOverSide] = useState<"front" | "back" | null>(null);
+  const dragOverSideRef = useRef<"front" | "back" | null>(null);
+  dragOverSideRef.current = dragOverSide;
+  const sideBtnsRef = useRef<HTMLDivElement>(null);
 
   const { data: orderSettings } = useGetOrderSettings();
   const showExportButton = orderSettings?.showExportButton === true;
@@ -303,11 +308,41 @@ export default function Design() {
       )
     );
     setSnapActive(snapping);
+
+    // Detect hover over Front/Back buttons for drag-to-transfer
+    const btnRect = sideBtnsRef.current?.getBoundingClientRect();
+    if (btnRect && e.clientX >= btnRect.left && e.clientX <= btnRect.right && e.clientY >= btnRect.top && e.clientY <= btnRect.bottom) {
+      const midX = (btnRect.left + btnRect.right) / 2;
+      setDragOverSide(e.clientX < midX ? "front" : "back");
+    } else {
+      setDragOverSide(null);
+    }
   }, []);
 
   const onMouseUp = useCallback(() => {
+    const drag = dragRef.current;
     dragRef.current = null;
     setSnapActive(false);
+
+    const overSide = dragOverSideRef.current;
+    setDragOverSide(null);
+
+    // Transfer layer to the other side if dropped on the opposite button
+    if (drag && overSide && overSide !== sideRef.current) {
+      const layerId = drag.layerId;
+      const layer = layersRef.current.find(l => l.id === layerId);
+      if (layer) {
+        if (sideRef.current === "front") {
+          setFrontLayers(prev => prev.filter(l => l.id !== layerId));
+          setBackLayers(prev => [...prev, layer]);
+        } else {
+          setBackLayers(prev => prev.filter(l => l.id !== layerId));
+          setFrontLayers(prev => [...prev, layer]);
+        }
+        setSide(overSide);
+        setSelectedLayerId(layerId);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -723,6 +758,12 @@ export default function Design() {
       };
       setLayers(prev => [...prev, newLayer]);
       setSelectedLayerId(newLayer.id);
+
+      // Show one-time hint after first image is added
+      if (!localStorage.getItem("ww_drag_hint_shown")) {
+        localStorage.setItem("ww_drag_hint_shown", "1");
+        setShowDragHint(true);
+      }
     } finally {
       setUploading(false);
     }
@@ -967,6 +1008,35 @@ export default function Design() {
 
   return (
     <>
+    {/* ── One-time drag-to-transfer hint popup ── */}
+    {showDragHint && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+        onClick={() => setShowDragHint(false)}
+      >
+        <div
+          className="bg-background border border-border p-8 max-w-sm mx-4 shadow-2xl"
+          onClick={e => e.stopPropagation()}
+        >
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3 font-bold">Tip</p>
+          <h2 className="text-base font-black uppercase tracking-widest mb-4 leading-snug">
+            Move your design to Front or Back
+          </h2>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+            While dragging an image layer, move it over the{" "}
+            <span className="text-foreground font-bold">Front</span> or{" "}
+            <span className="text-foreground font-bold">Back</span> buttons at the top of the
+            canvas — then release to transfer the layer to that side of the T-shirt.
+          </p>
+          <button
+            onClick={() => setShowDragHint(false)}
+            className="w-full py-2.5 text-xs uppercase tracking-widest font-bold bg-foreground text-background hover:opacity-90 transition-opacity"
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    )}
     {editorFile && (
       <ImageEditor
         file={editorFile}
@@ -1160,12 +1230,18 @@ export default function Design() {
         >
 
           {/* Front / Back toggle — pinned at top center */}
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex gap-0 border border-border/60">
+          <div ref={sideBtnsRef} className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex gap-0 border border-border/60">
             {(["front", "back"] as const).map(s => (
               <button
                 key={s}
                 onClick={() => { setSide(s); setSelectedLayerId(null); }}
-                className={`px-6 py-2 text-xs uppercase tracking-widest font-medium transition-colors ${side === s ? "bg-foreground text-background" : "bg-background/20 text-foreground hover:bg-muted/20"}`}
+                className={`px-6 py-2 text-xs uppercase tracking-widest font-medium transition-colors ${
+                  dragOverSide === s
+                    ? "bg-yellow-400 text-black"
+                    : side === s
+                    ? "bg-foreground text-background"
+                    : "bg-background/20 text-foreground hover:bg-muted/20"
+                }`}
               >
                 {s}
               </button>
