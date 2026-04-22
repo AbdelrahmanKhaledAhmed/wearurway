@@ -163,15 +163,57 @@ function sharpenImageData(id: ImageData) {
   return new ImageData(dst,w,h);
 }
 
+// Stepwise high-quality upscale: doubling each pass with bilinear smoothing
+// preserves edges far better than a single huge drawImage call.
+function upscaleStepwise(src: HTMLCanvasElement, targetW: number, targetH: number): HTMLCanvasElement {
+  let cur=src;
+  while (cur.width*2<=targetW && cur.height*2<=targetH) {
+    const next=document.createElement("canvas");
+    next.width=cur.width*2; next.height=cur.height*2;
+    const nctx=next.getContext("2d"); if (!nctx) return cur;
+    nctx.imageSmoothingEnabled=true; nctx.imageSmoothingQuality="high";
+    nctx.drawImage(cur,0,0,next.width,next.height);
+    cur=next;
+  }
+  if (cur.width!==targetW||cur.height!==targetH) {
+    const final=document.createElement("canvas");
+    final.width=targetW; final.height=targetH;
+    const fctx=final.getContext("2d"); if (!fctx) return cur;
+    fctx.imageSmoothingEnabled=true; fctx.imageSmoothingQuality="high";
+    fctx.drawImage(cur,0,0,targetW,targetH);
+    cur=final;
+  }
+  return cur;
+}
+
 function enhanceCanvas(src: HTMLCanvasElement, qualityScale=1) {
-  const maxSide=16384, scale=Math.min(Math.max(qualityScale,1),maxSide/src.width,maxSide/src.height);
+  // Auto-pick the most aggressive sensible scale.
+  // Targets ~4096px on the long side (print-grade); never downscales; capped to
+  // avoid runaway memory on already-large images.
+  const TARGET_LONG=4096, MAX_SIDE=8192, MAX_AUTO_SCALE=8;
+  const longSide=Math.max(src.width,src.height);
+  const autoScale=Math.min(MAX_AUTO_SCALE,Math.max(1,TARGET_LONG/longSide));
+  const scale=Math.min(
+    Math.max(qualityScale,autoScale),
+    MAX_SIDE/src.width,
+    MAX_SIDE/src.height
+  );
+  const targetW=Math.max(1,Math.round(src.width*scale));
+  const targetH=Math.max(1,Math.round(src.height*scale));
+
+  const upscaled=scale>1?upscaleStepwise(src,targetW,targetH):src;
+
   const out=document.createElement("canvas");
-  out.width=Math.max(1,Math.round(src.width*scale)); out.height=Math.max(1,Math.round(src.height*scale));
-  const ctx=out.getContext("2d"); if (!ctx) return src;
+  out.width=upscaled.width; out.height=upscaled.height;
+  const ctx=out.getContext("2d"); if (!ctx) return upscaled;
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
-  ctx.drawImage(src,0,0,out.width,out.height);
-  const id=ctx.getImageData(0,0,out.width,out.height);
-  ctx.putImageData(sharpenImageData(id),0,0);
+  ctx.drawImage(upscaled,0,0);
+
+  // Two sharpen passes for crisper edges after the upscale.
+  let id=ctx.getImageData(0,0,out.width,out.height);
+  id=sharpenImageData(id);
+  id=sharpenImageData(id);
+  ctx.putImageData(id,0,0);
   return out;
 }
 
@@ -578,9 +620,17 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     trimRef.current=bounds
       ?{originalWidth:c.width,originalHeight:c.height,x:bounds.x,y:bounds.y,width:bounds.width,height:bounds.height}
       :{originalWidth:c.width,originalHeight:c.height,x:0,y:0,width:c.width,height:c.height};
-    const trimmed=trimTransparency(c).canvas;
-    const enhanced=enhanceCanvas(trimmed,qualityScale);
-    enhanced.toBlob(b=>{ if (b) onConfirm(b,trimRef.current!); },"image/png");
+    setProcessing(true);
+    // Yield to the browser so the "Applying…" overlay paints before the
+    // CPU-heavy upscale + sharpen passes lock the main thread.
+    setTimeout(()=>{
+      const trimmed=trimTransparency(c).canvas;
+      const enhanced=enhanceCanvas(trimmed,qualityScale);
+      enhanced.toBlob(b=>{
+        setProcessing(false);
+        if (b) onConfirm(b,trimRef.current!);
+      },"image/png");
+    },30);
   },[qualityScale,onConfirm]);
 
   // ── Derived display values ───────────────────────────────────────────────────
