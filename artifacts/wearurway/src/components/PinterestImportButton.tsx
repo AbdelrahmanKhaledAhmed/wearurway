@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Props {
@@ -60,9 +60,7 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
   const [urlError, setUrlError] = useState("");
   const [loadingMsg, setLoadingMsg] = useState("");
   const [downloadedFile, setDownloadedFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const reset = () => {
     setStep("intro");
@@ -70,7 +68,6 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
     setUrlError("");
     setLoadingMsg("");
     setDownloadedFile(null);
-    setIsDragging(false);
     setUploadError("");
   };
 
@@ -291,61 +288,16 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
                       </div>
                     </div>
 
-                    {/* Drop zone */}
-                    <div
-                      onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
-                      onDragLeave={() => setIsDragging(false)}
-                      onDrop={e => {
-                        e.preventDefault();
-                        setIsDragging(false);
-                        const file = e.dataTransfer.files?.[0];
-                        if (file) acceptFile(file);
-                      }}
-                      onClick={() => fileInputRef.current?.click()}
-                      className={`flex flex-col items-center justify-center gap-3 px-6 py-10 border-2 border-dashed cursor-pointer transition-colors ${
-                        isDragging ? "border-white/60 bg-white/5" : "border-white/20 hover:border-white/40"
-                      }`}
-                    >
-                      <svg className="w-8 h-8 text-white/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="17 8 12 3 7 8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
-                      </svg>
-                      <p className="text-[11px] text-white/60 text-center leading-relaxed">
-                        <span className="font-semibold text-white">Drag &amp; drop</span> your image here<br />
-                        <span className="text-white/30">or click to browse</span>
-                      </p>
-                    </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={e => {
-                        const file = e.target.files?.[0];
-                        if (file) acceptFile(file);
-                        e.target.value = "";
-                      }}
-                    />
-
-                    <div className="flex flex-col gap-2">
+                    {downloadedFile && (
                       <motion.button
                         whileTap={{ scale: 0.97 }}
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={() => acceptFile(downloadedFile)}
                         className="w-full py-3.5 font-black uppercase text-xs tracking-[0.2em] transition-opacity hover:opacity-80"
                         style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
                       >
-                        Browse Files
+                        Start Design
                       </motion.button>
-                      {downloadedFile && (
-                        <button
-                          onClick={() => acceptFile(downloadedFile)}
-                          className="w-full py-2.5 border border-white/15 font-bold uppercase text-[10px] tracking-[0.2em] text-white/60 hover:text-white hover:border-white/30 transition-colors"
-                        >
-                          Use just-downloaded image
-                        </button>
-                      )}
-                    </div>
+                    )}
 
                     {uploadError && <p className="text-[11px] text-red-400">{uploadError}</p>}
                   </div>
