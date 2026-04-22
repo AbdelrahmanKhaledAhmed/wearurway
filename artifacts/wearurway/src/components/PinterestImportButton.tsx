@@ -264,7 +264,10 @@ export default function PinterestImportButton({ disabled }: Props) {
                     </div>
                     <div>
                       <p className="text-sm font-black uppercase tracking-widest text-white mb-1">Downloaded!</p>
-                      <p className="text-[11px] text-white/50 leading-relaxed">Your image was saved as a PNG.<br />You can now add it in the editor.</p>
+                      <p className="text-[11px] text-white/50 leading-relaxed">
+                        Your image was saved as a PNG.<br />
+                        You can now upload it using <span className="text-white font-semibold">Browse</span> or <span className="text-white font-semibold">Drag &amp; Drop</span>.
+                      </p>
                     </div>
                     <button
                       onClick={handleClose}
