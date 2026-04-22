@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { isAdminAuthenticated } from "./admin.js";
 import { checkDatabaseHealth } from "../services/databaseService.js";
 import { checkStorageHealth } from "../services/storageService.js";
+import { getStore } from "../data/store.js";
 import config from "../config.js";
 
 const router: IRouter = Router();
@@ -52,10 +53,17 @@ router.get("/admin/system/config", (req, res) => {
         ? `${config.r2.accountId.slice(0, 6)}...`
         : "(not set)",
     },
-    telegram: {
-      configured: false,
-      note: "Bot token and chat ID are configurable via the Settings tab in Admin Panel",
-    },
+    telegram: (() => {
+      const s = getStore().orderSettings;
+      const hasToken = !!s.telegramBotToken?.trim();
+      const hasChat = !!s.telegramChatId?.trim();
+      return {
+        configured: hasToken && hasChat,
+        botToken: hasToken ? "set" : "(not set)",
+        chatId: hasChat ? "set" : "(not set)",
+        note: "Bot token and chat ID are configurable via the Settings tab in Admin Panel",
+      };
+    })(),
     environment: process.env.NODE_ENV ?? "development",
   });
 });
