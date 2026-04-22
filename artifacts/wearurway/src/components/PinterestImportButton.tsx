@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Props {
@@ -6,7 +6,7 @@ interface Props {
   disabled?: boolean;
 }
 
-type Step = "intro" | "import" | "loading" | "done";
+type Step = "intro" | "import" | "loading" | "upload";
 
 const PINTEREST_URL = "https://www.pinterest.com/WEARURWAY/t-shirt-designs/";
 
@@ -53,18 +53,36 @@ function triggerDownload(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
-export default function PinterestImportButton({ disabled }: Props) {
+export default function PinterestImportButton({ onImageReady, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("intro");
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState("");
   const [loadingMsg, setLoadingMsg] = useState("");
+  const [downloadedFile, setDownloadedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const reset = () => {
     setStep("intro");
     setUrlInput("");
     setUrlError("");
     setLoadingMsg("");
+    setDownloadedFile(null);
+    setIsDragging(false);
+    setUploadError("");
+  };
+
+  const acceptFile = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Please choose an image file.");
+      return;
+    }
+    setUploadError("");
+    onImageReady(file);
+    setOpen(false);
+    setTimeout(reset, 300);
   };
 
   const handleOpen = () => { reset(); setOpen(true); };
@@ -107,7 +125,9 @@ export default function PinterestImportButton({ disabled }: Props) {
       setLoadingMsg("Converting to PNG…");
       const png = await convertToPng(blob);
       triggerDownload(png, "pinterest-design.png");
-      setStep("done");
+      const file = new File([png], "pinterest-design.png", { type: "image/png" });
+      setDownloadedFile(file);
+      setStep("upload");
     } catch {
       clearInterval(ticker);
       setStep("import");
@@ -254,28 +274,80 @@ export default function PinterestImportButton({ disabled }: Props) {
                   </div>
                 )}
 
-                {/* Done step */}
-                {step === "done" && (
-                  <div className="px-6 py-10 flex flex-col items-center gap-5 text-center">
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E60023" }}>
-                      <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 6 9 17l-5-5" />
-                      </svg>
+                {/* Upload step */}
+                {step === "upload" && (
+                  <div className="px-6 py-6 space-y-5">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E60023" }}>
+                        <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-black uppercase tracking-widest text-white mb-1">Downloaded!</p>
+                        <p className="text-[11px] text-white/50 leading-relaxed">
+                          Your image was saved as a PNG. Now upload it to your design below.
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-black uppercase tracking-widest text-white mb-1">Downloaded!</p>
-                      <p className="text-[11px] text-white/50 leading-relaxed">
-                        Your image was saved as a PNG.<br />
-                        You can now upload it using <span className="text-white font-semibold">Browse</span> or <span className="text-white font-semibold">Drag &amp; Drop</span>.
+
+                    {/* Drop zone */}
+                    <div
+                      onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={e => {
+                        e.preventDefault();
+                        setIsDragging(false);
+                        const file = e.dataTransfer.files?.[0];
+                        if (file) acceptFile(file);
+                      }}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`flex flex-col items-center justify-center gap-3 px-6 py-10 border-2 border-dashed cursor-pointer transition-colors ${
+                        isDragging ? "border-white/60 bg-white/5" : "border-white/20 hover:border-white/40"
+                      }`}
+                    >
+                      <svg className="w-8 h-8 text-white/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                      <p className="text-[11px] text-white/60 text-center leading-relaxed">
+                        <span className="font-semibold text-white">Drag &amp; drop</span> your image here<br />
+                        <span className="text-white/30">or click to browse</span>
                       </p>
                     </div>
-                    <button
-                      onClick={handleClose}
-                      className="mt-2 px-6 py-2.5 font-black uppercase text-xs tracking-widest transition-opacity hover:opacity-80"
-                      style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
-                    >
-                      Done
-                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) acceptFile(file);
+                        e.target.value = "";
+                      }}
+                    />
+
+                    <div className="flex flex-col gap-2">
+                      <motion.button
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full py-3.5 font-black uppercase text-xs tracking-[0.2em] transition-opacity hover:opacity-80"
+                        style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
+                      >
+                        Browse Files
+                      </motion.button>
+                      {downloadedFile && (
+                        <button
+                          onClick={() => acceptFile(downloadedFile)}
+                          className="w-full py-2.5 border border-white/15 font-bold uppercase text-[10px] tracking-[0.2em] text-white/60 hover:text-white hover:border-white/30 transition-colors"
+                        >
+                          Use just-downloaded image
+                        </button>
+                      )}
+                    </div>
+
+                    {uploadError && <p className="text-[11px] text-red-400">{uploadError}</p>}
                   </div>
                 )}
               </div>
