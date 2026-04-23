@@ -202,6 +202,8 @@ function CanvaInstructions({ onUnderstand }: { onUnderstand: () => void }) {
 
 function UploadFinal({ onFile }: { onFile: (file: File) => void }) {
   const [isDragging, setIsDragging] = useState(false);
+  const [pasting, setPasting] = useState(false);
+  const [pasteError, setPasteError] = useState<string | null>(null);
   const dragDepthRef = useRef(0);
 
   const browse = useCallback(() => {
@@ -213,6 +215,36 @@ function UploadFinal({ onFile }: { onFile: (file: File) => void }) {
       const file = input.files?.[0];
       if (file) onFile(file);
     };
+  }, [onFile]);
+
+  const pasteFromClipboard = useCallback(async () => {
+    setPasteError(null);
+    setPasting(true);
+    try {
+      const anyNav = navigator as unknown as {
+        clipboard?: { read?: () => Promise<Array<{ types: string[]; getType: (t: string) => Promise<Blob> }>> };
+      };
+      if (!anyNav.clipboard?.read) {
+        throw new Error("Your browser doesn't support reading from the clipboard.");
+      }
+      const items = await anyNav.clipboard.read();
+      for (const item of items) {
+        const imageType = item.types.find((t) => t.startsWith("image/"));
+        if (imageType) {
+          const blob = await item.getType(imageType);
+          const ext = imageType.split("/")[1] || "png";
+          const file = new File([blob], `pasted-design.${ext}`, { type: imageType });
+          onFile(file);
+          return;
+        }
+      }
+      throw new Error("No image found on your clipboard. Copy your downloaded image first, then try again.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Couldn't read your clipboard.";
+      setPasteError(msg);
+    } finally {
+      setPasting(false);
+    }
   }, [onFile]);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -262,6 +294,45 @@ function UploadFinal({ onFile }: { onFile: (file: File) => void }) {
         Once your design is ready in Canva, download it and upload it here so
         you can keep editing in our image editor.
       </p>
+
+      <button
+        onClick={pasteFromClipboard}
+        disabled={pasting}
+        className="group w-full flex items-center gap-4 px-5 py-4 mb-3 rounded-xl transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
+        style={{
+          background: "linear-gradient(135deg,#a855f7,#7c3aed)",
+          color: "#fff",
+          boxShadow: "0 8px 24px rgba(124,58,237,0.35)",
+        }}
+      >
+        <span className="w-10 h-10 flex items-center justify-center rounded-lg bg-white/15 text-base">
+          📋
+        </span>
+        <div className="text-left flex-1">
+          <p className="text-xs font-bold uppercase tracking-widest">
+            {pasting ? "Reading Clipboard…" : "Use Last Downloaded"}
+          </p>
+          <p className="text-[10px] uppercase tracking-widest text-white/80 mt-0.5">
+            Paste the image you just downloaded
+          </p>
+        </div>
+        <span className="text-lg leading-none opacity-80 group-hover:translate-x-0.5 transition-all">
+          →
+        </span>
+      </button>
+
+      {pasteError && (
+        <p
+          className="text-[11px] mb-3 px-3 py-2 rounded"
+          style={{
+            background: "rgba(245,200,66,0.1)",
+            color: "#f5c842",
+            border: "1px solid rgba(245,200,66,0.35)",
+          }}
+        >
+          {pasteError}
+        </p>
+      )}
 
       <button
         onClick={browse}

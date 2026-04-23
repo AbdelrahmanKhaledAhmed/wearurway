@@ -781,20 +781,20 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
           {loaded && !processing && (
             <button
               onClick={()=>setShowHelpWizard(true)}
-              className="absolute bottom-5 left-5 max-w-[260px] text-left px-4 py-3 rounded-lg transition-all hover:scale-[1.02] active:scale-[0.99]"
+              className="absolute bottom-5 left-5 max-w-[260px] text-left px-4 py-3 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.99]"
               style={{
-                background:"rgba(0,0,0,0.7)",
-                border:"1px solid rgba(168,85,247,0.4)",
+                background:"linear-gradient(135deg,rgba(168,85,247,0.85),rgba(124,58,237,0.85))",
+                border:"1px solid rgba(196,140,255,0.6)",
                 backdropFilter:"blur(8px)",
-                color:"rgba(255,255,255,0.9)"
+                color:"#fff",
+                boxShadow:"0 8px 24px rgba(124,58,237,0.35)"
               }}
             >
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-1" style={{color:"rgba(196,140,255,0.95)"}}>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-1" style={{color:"#fff"}}>
                 Need Help?
               </p>
-              <p className="text-[11px] leading-snug">
-                Can't achieve what you have in mind using these tools?{" "}
-                <span className="underline" style={{color:"#f5c842"}}>Click here.</span>
+              <p className="text-[11px] leading-snug" style={{color:"rgba(255,255,255,0.95)"}}>
+                Can't achieve what you have in mind using these tools?
               </p>
             </button>
           )}
