@@ -201,21 +201,8 @@ function CanvaInstructions({ onUnderstand }: { onUnderstand: () => void }) {
 }
 
 function UploadFinal({ onFile }: { onFile: (file: File) => void }) {
-  const [isDragging, setIsDragging] = useState(false);
   const [pasting, setPasting] = useState(false);
   const [pasteError, setPasteError] = useState<string | null>(null);
-  const dragDepthRef = useRef(0);
-
-  const browse = useCallback(() => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.click();
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (file) onFile(file);
-    };
-  }, [onFile]);
 
   const pasteFromClipboard = useCallback(async () => {
     setPasteError(null);
@@ -247,48 +234,8 @@ function UploadFinal({ onFile }: { onFile: (file: File) => void }) {
     }
   }, [onFile]);
 
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragDepthRef.current += 1;
-    if (e.dataTransfer.types.includes("Files")) setIsDragging(true);
-  }, []);
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = "copy";
-  }, []);
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragDepthRef.current -= 1;
-    if (dragDepthRef.current <= 0) {
-      dragDepthRef.current = 0;
-      setIsDragging(false);
-    }
-  }, []);
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dragDepthRef.current = 0;
-      setIsDragging(false);
-      const file = Array.from(e.dataTransfer.files).find((f) =>
-        f.type.startsWith("image/"),
-      );
-      if (file) onFile(file);
-    },
-    [onFile],
-  );
-
   return (
-    <div
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className="relative"
-    >
+    <div className="relative">
       <Header kicker="Almost Done" title="Upload Your Final Design" />
       <p className="text-sm text-white/70 mb-6 leading-relaxed">
         Once your design is ready in Canva, download it and upload it here so
@@ -334,53 +281,6 @@ function UploadFinal({ onFile }: { onFile: (file: File) => void }) {
         </p>
       )}
 
-      <button
-        onClick={browse}
-        className="group w-full flex items-center gap-4 border px-5 py-4 hover:bg-white/5 transition-all mb-3"
-        style={{ borderColor: "rgba(255,255,255,0.15)" }}
-      >
-        <span className="w-10 h-10 flex items-center justify-center border border-white/15 text-base">
-          📁
-        </span>
-        <div className="text-left flex-1">
-          <p className="text-xs font-bold uppercase tracking-widest">
-            Browse File
-          </p>
-          <p className="text-[10px] uppercase tracking-widest text-white/50 mt-0.5">
-            Select your final design
-          </p>
-        </div>
-        <span className="text-lg leading-none text-white/40 group-hover:translate-x-0.5 transition-all">
-          →
-        </span>
-      </button>
-
-      <div className="flex items-center gap-3 my-5">
-        <div className="flex-1 h-px bg-white/10" />
-        <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/40">
-          Or
-        </span>
-        <div className="flex-1 h-px bg-white/10" />
-      </div>
-
-      <div
-        className={`w-full border-2 border-dashed px-4 py-10 text-center transition-colors ${
-          isDragging ? "bg-white/5" : ""
-        }`}
-        style={{
-          borderColor: isDragging
-            ? "rgba(168,85,247,0.7)"
-            : "rgba(255,255,255,0.18)",
-        }}
-      >
-        <p className="text-3xl mb-3 leading-none">⬆</p>
-        <p className="text-xs font-bold uppercase tracking-widest mb-1">
-          {isDragging ? "Drop To Upload" : "Drag & Drop"}
-        </p>
-        <p className="text-[10px] uppercase tracking-widest text-white/50">
-          Drop an image anywhere on this window
-        </p>
-      </div>
     </div>
   );
 }
