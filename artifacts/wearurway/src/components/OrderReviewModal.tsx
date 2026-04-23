@@ -16,6 +16,20 @@ interface DesignLayer {
   height: number;
   rotation: number;
   visible: boolean;
+  naturalWidth?: number;
+  naturalHeight?: number;
+}
+
+function getLayerDisplaySize(layer: DesignLayer): { width: number; height: number } {
+  const naturalRatio =
+    (layer.naturalWidth ?? 0) > 0 && (layer.naturalHeight ?? 0) > 0
+      ? (layer.naturalWidth ?? 0) / (layer.naturalHeight ?? 1)
+      : 0;
+  const fallbackRatio =
+    layer.width > 0 && layer.height > 0 ? layer.width / layer.height : 1;
+  const ratio = Number.isFinite(naturalRatio) && naturalRatio > 0 ? naturalRatio : fallbackRatio;
+  const w = Math.max(10, layer.width);
+  return { width: w, height: Math.max(10, w / ratio) };
 }
 
 interface Mockup {
@@ -93,17 +107,18 @@ async function generatePreview(
   for (const layer of sideLayers.filter(l => l.visible)) {
     const img = await loadCanvasImage(layer.imageUrl);
     if (!img) continue;
-    const cx    = (layer.x + layer.width  / 2) * scaleX;
-    const cy    = (layer.y + layer.height / 2) * scaleY;
+    const { width: dispW, height: dispH } = getLayerDisplaySize(layer);
+    const cx    = (layer.x + dispW / 2) * scaleX;
+    const cy    = (layer.y + dispH / 2) * scaleY;
     const angle = (layer.rotation * Math.PI) / 180;
     dctx.save();
     dctx.translate(cx, cy);
     dctx.rotate(angle);
     dctx.drawImage(img,
-      -layer.width  * scaleX / 2,
-      -layer.height * scaleY / 2,
-       layer.width  * scaleX,
-       layer.height * scaleY,
+      -dispW * scaleX / 2,
+      -dispH * scaleY / 2,
+       dispW * scaleX,
+       dispH * scaleY,
     );
     dctx.restore();
   }
