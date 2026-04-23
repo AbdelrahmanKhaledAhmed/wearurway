@@ -45,6 +45,25 @@ function Router() {
   );
 }
 
+function MobileBlocker() {
+  return (
+    <div className="md:hidden fixed inset-0 z-[9999] flex items-center justify-center bg-background p-6 text-center">
+      <div className="max-w-md space-y-4">
+        <h1 className="text-2xl font-bold">Desktop Only</h1>
+        <p className="text-base text-muted-foreground">
+          This website is designed for desktop and laptop use only.
+        </p>
+        <p className="text-base text-muted-foreground">
+          To create your T-shirt design with full precision and a professional experience, please open it on a computer.
+        </p>
+        <p className="text-base text-muted-foreground">
+          Mobile access is not supported to ensure the best quality and usability of the design tools.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -54,6 +73,7 @@ function App() {
             <Router />
           </WouterRouter>
           <Toaster />
+          <MobileBlocker />
         </TooltipProvider>
       </CustomizerProvider>
     </QueryClientProvider>
