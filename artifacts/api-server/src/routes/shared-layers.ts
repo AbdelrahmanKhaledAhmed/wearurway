@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import multer from "multer";
 import path from "path";
 import sharp from "sharp";
-import { uploadBuffer, streamObject } from "../lib/objectStorage.js";
+import { uploadBuffer, streamObject } from "../services/storageService.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),

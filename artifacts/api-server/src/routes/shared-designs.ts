@@ -1,11 +1,11 @@
 import { Router, type IRouter } from "express";
 import { getStore, updateStore, generateId, type SharedDesign } from "../data/store.js";
-import { deleteObject } from "../lib/objectStorage.js";
+import { deleteObject } from "../services/storageService.js";
 import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 
-const SHARE_TTL_MS = 24 * 60 * 60 * 1000;
+const SHARE_TTL_MS = 12 * 60 * 60 * 1000;
 
 router.post("/shared-designs", (req, res) => {
   const { product, fit, color, size, frontLayers, backLayers, layerFilenames } = req.body as Partial<SharedDesign> & { layerFilenames?: string[] };
