@@ -142,6 +142,16 @@ export default function Design() {
   const [newUploadLayerId, setNewUploadLayerId] = useState<string | null>(null);
   const [showTextModal, setShowTextModal] = useState(false);
   const [showAddImageModal, setShowAddImageModal] = useState(false);
+  const [showQualityNotice, setShowQualityNotice] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return sessionStorage.getItem("designQualityNoticeSeen") !== "1";
+  });
+  const dismissQualityNotice = useCallback(() => {
+    setShowQualityNotice(false);
+    try {
+      sessionStorage.setItem("designQualityNoticeSeen", "1");
+    } catch {}
+  }, []);
   const [showDragHint, setShowDragHint] = useState(false);
   const [dragOverSide, setDragOverSide] = useState<"front" | "back" | null>(null);
   const dragOverSideRef = useRef<"front" | "back" | null>(null);
@@ -1069,6 +1079,38 @@ export default function Design() {
         onConfirm={handleAddTextBlob}
         onCancel={() => setShowTextModal(false)}
       />
+    )}
+    {showQualityNotice && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"
+        onClick={dismissQualityNotice}
+      >
+        <div
+          className="w-full max-w-md bg-background border border-border p-8 relative shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mb-6">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground mb-2">
+              Heads Up
+            </p>
+            <h2 className="text-xl font-black uppercase tracking-wide leading-tight">
+              About Image Quality
+            </h2>
+          </div>
+          <p className="text-sm leading-relaxed text-foreground/90 mb-6">
+            Don't worry about quality at all — even if your image looks low
+            quality or pixelated, we can still turn it into a high-resolution
+            print. The preview on screen is not the final print result.
+          </p>
+          <button
+            onClick={dismissQualityNotice}
+            className="w-full py-4 font-black uppercase text-sm tracking-[0.2em] transition-all active:scale-[0.98] hover:opacity-90"
+            style={{ backgroundColor: "#f5c842", color: "#0d0d0d", letterSpacing: "0.25em" }}
+          >
+            Got It
+          </button>
+        </div>
+      </div>
     )}
     {showAddImageModal && (
       <AddImageModal
