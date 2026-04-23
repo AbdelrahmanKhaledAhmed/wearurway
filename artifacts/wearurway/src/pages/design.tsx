@@ -47,8 +47,6 @@ const SNAP_THRESHOLD = 8;
 const SAVE_KEY = (productId: string, fitId: string, colorId: string) =>
   `ww_design_${productId}_${fitId}_${colorId}`;
 
-const COMPRESS_MAX_DIM = 1500;
-
 async function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -58,47 +56,6 @@ async function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
   });
 }
 
-async function compressImageToBlob(url: string, maxDim = COMPRESS_MAX_DIM): Promise<Blob> {
-  let blobObjectUrl: string | null = null;
-  try {
-    let src = url;
-    if (url.startsWith("blob:") || url.startsWith("/") || url.startsWith("http")) {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      blobObjectUrl = URL.createObjectURL(blob);
-      src = blobObjectUrl;
-    }
-    const img = await loadImageFromUrl(src);
-    const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight, 1));
-    const w = Math.max(1, Math.round(img.naturalWidth * scale));
-    const h = Math.max(1, Math.round(img.naturalHeight * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(img, 0, 0, w, h);
-    return await new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob(b => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png")
-    );
-  } finally {
-    if (blobObjectUrl) URL.revokeObjectURL(blobObjectUrl);
-  }
-}
-
-async function blobUrlToDataUrl(url: string): Promise<string> {
-  if (!url.startsWith("blob:")) return url;
-  try {
-    const blob = await compressImageToBlob(url);
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return url;
-  }
-}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -106,7 +63,6 @@ export default function Design() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const isAdminPreview = new URLSearchParams(search).get("admin") === "1";
-  const shareId = new URLSearchParams(search).get("share");
   const { selectedProduct, selectedFit, selectedColor, selectedSize, setProduct, setFit, setColor, setSize, reset } = useCustomizer();
   const { toast } = useToast();
   const saveMockup = useSaveMockup();
@@ -130,12 +86,6 @@ export default function Design() {
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [sharing, setSharing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<Date | null>(null);
-  const [shareLoading, setShareLoading] = useState(() => !!shareId);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [editorFile, setEditorFile] = useState<File | null>(null);
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
@@ -187,45 +137,12 @@ export default function Design() {
   const holdTimerRef = useRef<{ timeout: ReturnType<typeof setTimeout> | null; interval: ReturnType<typeof setInterval> | null }>({ timeout: null, interval: null });
 
   useEffect(() => {
-    if (shareLoading) return;
     if (!selectedProduct || !selectedFit || !selectedColor) {
       setLocation("/products");
     }
-  }, [shareLoading, selectedProduct, selectedFit, selectedColor, setLocation]);
+  }, [selectedProduct, selectedFit, selectedColor, setLocation]);
 
   const savedDesignLoaded = useRef(false);
-  const shareLoadedRef = useRef(false);
-  useEffect(() => {
-    if (!shareId || shareLoadedRef.current) return;
-    shareLoadedRef.current = true;
-    fetch(`/api/shared-designs/${shareId}`)
-      .then(async r => {
-        if (r.status === 410) throw Object.assign(new Error("expired"), { expired: true });
-        if (!r.ok) throw new Error("not found");
-        return r.json();
-      })
-      .then((design: { product: Parameters<typeof setProduct>[0]; fit: Parameters<typeof setFit>[0]; color: Parameters<typeof setColor>[0]; size: Parameters<typeof setSize>[0]; frontLayers: DesignLayer[]; backLayers: DesignLayer[] }) => {
-        setProduct(design.product);
-        setFit(design.fit);
-        setColor(design.color);
-        setSize(design.size);
-        if (design.frontLayers?.length) setFrontLayers(design.frontLayers);
-        if (design.backLayers?.length) setBackLayers(design.backLayers);
-        savedDesignLoaded.current = true;
-      })
-      .catch((err: unknown) => {
-        const expired = (err instanceof Error) && (err as Error & { expired?: boolean }).expired;
-        toast({
-          title: expired ? "Design link expired" : "Share link not found",
-          description: expired
-            ? "This design link has expired. Please ask for a new one."
-            : "This design link could not be found.",
-        });
-        setLocation("/products");
-      })
-      .finally(() => setShareLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shareId]);
 
   const { data: mockup } = useGetMockup(
     {
@@ -246,15 +163,6 @@ export default function Design() {
   );
 
   const currentSide = side === "front" ? mockup?.front : mockup?.back;
-  const [showSaveDesignButton, setShowSaveDesignButton] = useState(() => localStorage.getItem("wearurway_show_save_design_button") !== "false");
-
-  useEffect(() => {
-    const handler = (e: StorageEvent) => {
-      if (e.key === "wearurway_show_save_design_button") setShowSaveDesignButton(e.newValue !== "false");
-    };
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
-  }, []);
   const realWidth = selectedSize?.realWidth ?? 0;
   const realHeight = selectedSize?.realHeight ?? 0;
 
@@ -929,91 +837,6 @@ export default function Design() {
     ctx.drawImage(img, x + (w - drawW) / 2, y + (h - drawH) / 2, drawW, drawH);
   };
 
-  const uploadBlobUrl = useCallback(async (url: string): Promise<{ url: string; filename: string | null }> => {
-    if (!url.startsWith("blob:")) return { url, filename: null };
-    const compressed = await compressImageToBlob(url);
-    const form = new FormData();
-    form.append("file", compressed, "layer.png");
-    const uploadRes = await fetch("/api/shared-layers", { method: "POST", body: form });
-    if (!uploadRes.ok) throw new Error("Upload failed");
-    const { url: serverUrl, filename } = await uploadRes.json() as { url: string; filename: string };
-    return { url: serverUrl, filename };
-  }, []);
-
-  const handleShareDesign = useCallback(async () => {
-    if (!selectedProduct || !selectedFit || !selectedColor) return;
-    setSharing(true);
-    try {
-      const layerFilenames: string[] = [];
-      const serializeLayers = async (ls: DesignLayer[]) =>
-        Promise.all(ls.map(async l => {
-          const { url, filename } = await uploadBlobUrl(l.imageUrl);
-          if (filename) layerFilenames.push(filename);
-          return { ...l, imageUrl: url };
-        }));
-      const [serializedFront, serializedBack] = await Promise.all([
-        serializeLayers(frontLayers),
-        serializeLayers(backLayers),
-      ]);
-      const res = await fetch("/api/shared-designs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          product: selectedProduct,
-          fit: selectedFit,
-          color: selectedColor,
-          size: selectedSize,
-          frontLayers: serializedFront,
-          backLayers: serializedBack,
-          layerFilenames,
-        }),
-      });
-      if (!res.ok) throw new Error("Server error");
-      const { id } = await res.json() as { id: string };
-      const url = `${window.location.origin}/design?share=${id}`;
-      setShareUrl(url);
-      setLinkCopied(false);
-    } catch {
-      toast({ title: "Share failed", description: "Could not generate a share link." });
-    } finally {
-      setSharing(false);
-    }
-  }, [selectedProduct, selectedFit, selectedColor, selectedSize, frontLayers, backLayers, uploadBlobUrl, toast]);
-
-  const handleCopyShareLink = useCallback(async () => {
-    if (!shareUrl) return;
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2500);
-    } catch {
-      /* clipboard blocked — user can manually select */
-    }
-  }, [shareUrl]);
-
-  // ── Save Design ─────────────────────────────────────────────────────────────
-
-  const handleSaveDesign = useCallback(async () => {
-    if (!selectedProduct || !selectedFit || !selectedColor) return;
-    setSaving(true);
-    try {
-      const serializeLayers = async (ls: DesignLayer[]) =>
-        Promise.all(ls.map(async l => ({ ...l, imageUrl: await blobUrlToDataUrl(l.imageUrl) })));
-      const [savedFront, savedBack] = await Promise.all([
-        serializeLayers(frontLayers),
-        serializeLayers(backLayers),
-      ]);
-      const key = SAVE_KEY(selectedProduct.id, selectedFit.id, selectedColor.id);
-      localStorage.setItem(key, JSON.stringify({ frontLayers: savedFront, backLayers: savedBack }));
-      setSavedAt(new Date());
-      toast({ title: "Design saved", description: "Your design will be restored on refresh." });
-    } catch {
-      toast({ title: "Save failed", description: "Could not save your design." });
-    } finally {
-      setSaving(false);
-    }
-  }, [selectedProduct, selectedFit, selectedColor, frontLayers, backLayers, toast]);
-
   // ── Export ─────────────────────────────────────────────────────────────────
 
   const handleExport = useCallback(async () => {
@@ -1607,36 +1430,6 @@ export default function Design() {
               </div>
             </button>
 
-            <button
-              onClick={handleShareDesign}
-              disabled={sharing || uploading || (!mockup?.front?.image && !mockup?.back?.image)}
-              className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <span className="text-lg leading-none">↗</span>
-              <p className="text-xs font-bold uppercase tracking-widest">
-                {sharing ? "Preparing…" : "Share Design"}
-              </p>
-            </button>
-
-            {showSaveDesignButton && (
-              <button
-                onClick={handleSaveDesign}
-                disabled={saving || (!frontLayers.length && !backLayers.length)}
-                className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <span className="text-lg leading-none">↓</span>
-                <div className="text-left">
-                  <p className="text-xs font-bold uppercase tracking-widest">
-                    {saving ? "Saving…" : "Save Design"}
-                  </p>
-                  {savedAt && !saving && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Saved {savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  )}
-                </div>
-              </button>
-            )}
           </div>
 
           {/* ── Export ── */}
@@ -1673,57 +1466,6 @@ export default function Design() {
       selectedColor={selectedColor}
     />
 
-    <AnimatePresence>
-      {shareUrl && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
-          onClick={() => setShareUrl(null)}
-        >
-          <motion.div
-            initial={{ scale: 0.92, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.92, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 320, damping: 28 }}
-            className="bg-background border border-border w-full max-w-md p-6 flex flex-col gap-5"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase tracking-widest">Share Your Design</h2>
-              <button
-                onClick={() => setShareUrl(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Anyone with this link can open your design and edit it — same mockup, same layers, everything.
-            </p>
-            <p className="text-xs text-amber-500/80 font-medium uppercase tracking-widest">
-              This link is available for 24 hours only
-            </p>
-            <div className="flex gap-2">
-              <input
-                readOnly
-                value={shareUrl}
-                onFocus={e => e.currentTarget.select()}
-                className="flex-1 bg-muted/20 border border-border px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:border-foreground transition-colors min-w-0"
-              />
-              <button
-                onClick={handleCopyShareLink}
-                className="shrink-0 text-xs font-bold uppercase tracking-widest px-4 py-2 bg-foreground text-background hover:opacity-80 transition-opacity"
-              >
-                {linkCopied ? "Copied!" : "Copy"}
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
     </>
   );
 }
