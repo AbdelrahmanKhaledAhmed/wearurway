@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import FuzzySelectPanel from "./AIAssistPanel";
+import EditorHelpWizard from "./EditorHelpWizard";
 
 type BgPreview = "checker" | "white" | "black";
 type ToolMode  = "select" | null;
@@ -236,6 +237,9 @@ const RedoIcon = () => (
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 }: Props) {
+  const [currentFile, setCurrentFile] = useState<File>(file);
+  useEffect(()=>{ setCurrentFile(file); },[file]);
+  const [showHelpWizard, setShowHelpWizard] = useState(false);
   const canvasRef        = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef           = useRef<HTMLImageElement>(null);
@@ -371,7 +375,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   // ── Load ────────────────────────────────────────────────────────────────────
 
   useEffect(()=>{
-    const url=URL.createObjectURL(file);
+    const url=URL.createObjectURL(currentFile);
     const img=new Image();
     img.onload=()=>{
       const c=canvasRef.current; if (!c) return;
@@ -385,7 +389,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     };
     img.src=url;
     return ()=>URL.revokeObjectURL(url);
-  },[file,updateDisplay]);
+  },[currentFile,updateDisplay]);
 
   // ── Undo / Redo ─────────────────────────────────────────────────────────────
 
@@ -774,6 +778,27 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             </div>
           )}
 
+          {loaded && !processing && (
+            <button
+              onClick={()=>setShowHelpWizard(true)}
+              className="absolute bottom-5 left-5 max-w-[260px] text-left px-4 py-3 rounded-lg transition-all hover:scale-[1.02] active:scale-[0.99]"
+              style={{
+                background:"rgba(0,0,0,0.7)",
+                border:"1px solid rgba(168,85,247,0.4)",
+                backdropFilter:"blur(8px)",
+                color:"rgba(255,255,255,0.9)"
+              }}
+            >
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-1" style={{color:"rgba(196,140,255,0.95)"}}>
+                Need Help?
+              </p>
+              <p className="text-[11px] leading-snug">
+                Can't achieve what you have in mind using these tools?{" "}
+                <span className="underline" style={{color:"#f5c842"}}>Click here.</span>
+              </p>
+            </button>
+          )}
+
           {toolMode==="select" && !selectionMask && loaded && !processing && (
             <div className="absolute bottom-5 left-1/2 -translate-x-1/2 pointer-events-none">
               <div className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-bold"
@@ -788,6 +813,12 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
 
         {/* ── Tool panel ── */}
         <div className="w-80 border-l flex flex-col shrink-0" style={{borderColor:"rgba(168,85,247,0.2)"}}>
+          {showHelpWizard && (
+            <EditorHelpWizard
+              onClose={()=>setShowHelpWizard(false)}
+              onUploadFile={(f)=>setCurrentFile(f)}
+            />
+          )}
           <FuzzySelectPanel
             toolMode={toolMode}
             hasSelection={!!selectionMask}

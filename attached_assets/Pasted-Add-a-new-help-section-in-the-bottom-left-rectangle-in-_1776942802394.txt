@@ -1,0 +1,82 @@
+Add a new help section in the bottom-left rectangle in the Image Editor interface that says:
+
+**"Can’t achieve what you have in mind using these tools? Click here."**
+
+When the user clicks on it, open a popup with a 2**-step wizard flow**, each step separated with a **Next button**.
+
+---
+
+## Step 1 (First screen)
+
+No stress at all, just upload your image and we’ll handle everything. Once you place your order, we’ll contact you immediately to confirm all the details. We’ll first listen to everything you want to change, then professionally edit the design in Photoshop with you until it’s exactly the way you imagine it.
+
+Button: **Next**
+
+---
+
+## Step 3 (Final screen)
+
+If you’d like to try creating your design yourself in a more professional, easy, and simple way, you can go to Canva. Once you click the Canva button, you’ll find a simple guide that walks you through everything step by step so your design comes out exactly the way you imagine.
+
+Button: **Canva** (primary action button)
+
+---
+
+## On Canva Button Click:
+
+1. Show a second popup containing **step-by-step instructions:**
+
+After clicking the link, follow these exact steps:
+
+1. Click on **"Try Magic Layers"**
+2. Log in using your email
+3. Click **"Select Media"**
+4. Upload your design
+5. The editor will open, where you can edit everything
+6. You will see all layers separated
+7. Select any layer you want to edit or remove (text, background, etc.)
+
+⚠️ **Important Note:**
+
+When removing the background, it does NOT become transparent.
+
+It becomes a solid color.
+
+So:
+
+- If your design (text or character) is white
+- Make the background a different color (e.g. black)
+
+Then you can remove the background later using the **Magic Tool** inside my website.
+
+---
+
+Under the instructions, show a button:
+
+**"I Understand"**
+
+---
+
+## After clicking "I Understand":
+
+- Redirect the user to: https://www.canva.com/magic-layers/
+- Open in a new tab
+
+---
+
+## After returning from Canva:
+
+Show another popup asking the user to upload their design:
+
+- Title: **"Upload your final design"**
+- Options:
+    - Browse file
+    - Drag & drop upload area
+
+---
+
+## Final Step:
+
+After the user uploads the new design:
+
+- Send the image directly to the Image Editor interface for editing and processing.
