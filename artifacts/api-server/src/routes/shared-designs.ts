@@ -10,8 +10,8 @@ const SHARE_TTL_MS = 12 * 60 * 60 * 1000;
 router.post("/shared-designs", (req, res) => {
   const { product, fit, color, size, frontLayers, backLayers, layerFilenames } = req.body as Partial<SharedDesign> & { layerFilenames?: string[] };
 
-  if (!product || !fit || !color || !size) {
-    res.status(400).json({ error: "product, fit, color, size are required" });
+  if (!product || !fit || !color) {
+    res.status(400).json({ error: "product, fit, and color are required" });
     return;
   }
 
@@ -24,7 +24,7 @@ router.post("/shared-designs", (req, res) => {
     product,
     fit,
     color,
-    size,
+    size: size ?? null,
     frontLayers: frontLayers ?? [],
     backLayers: backLayers ?? [],
     createdAt: now.toISOString(),

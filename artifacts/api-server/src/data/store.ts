@@ -85,7 +85,7 @@ export interface SharedDesign {
   product: Product;
   fit: Fit;
   color: Color;
-  size: Size;
+  size?: Size | null;
   frontLayers: DesignLayer[];
   backLayers: DesignLayer[];
   createdAt: string;
