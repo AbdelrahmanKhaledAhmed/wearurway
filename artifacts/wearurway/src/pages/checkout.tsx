@@ -422,10 +422,9 @@ export default function Checkout() {
                       className="aspect-[3/4] border border-white/8 overflow-hidden flex items-center justify-center"
                       style={{ backgroundColor: "#111" }}
                     >
-                      {src
-                        ? <img src={src} alt={label} className="w-full h-full object-cover" />
-                        : <p className="text-[10px] text-white/20 uppercase tracking-widest">No design</p>
-                      }
+                      {src && (
+                        <img src={src} alt={label} className="w-full h-full object-cover" />
+                      )}
                     </div>
                     <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] text-center mt-1.5 font-bold">{label}</p>
                   </div>

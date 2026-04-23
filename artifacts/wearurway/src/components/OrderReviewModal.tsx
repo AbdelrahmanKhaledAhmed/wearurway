@@ -90,11 +90,7 @@ async function generatePreview(
   dctx.imageSmoothingEnabled = true;
   dctx.imageSmoothingQuality = "high";
 
-  for (const layer of sideLayers.filter(l => {
-    if (!l.visible) return false;
-    const normalized = (l.name ?? "").replace(/\s+/g, "-").toLowerCase();
-    return !/^layer-/.test(normalized);
-  })) {
+  for (const layer of sideLayers.filter(l => l.visible)) {
     const img = await loadCanvasImage(layer.imageUrl);
     if (!img) continue;
     const cx    = (layer.x + layer.width  / 2) * scaleX;
