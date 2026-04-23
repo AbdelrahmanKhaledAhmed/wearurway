@@ -150,12 +150,17 @@ export async function generateDesignExportFiles({
     designFileName: string,
     mockupFileName: string,
   ) => {
-    if (visibleLayers.length === 0) return;
     const shirtImg = shirtUrl ? await loadImg(shirtUrl) : null;
+    if (visibleLayers.length === 0 && !shirtImg) return;
     const loaded = (
       await Promise.all(visibleLayers.map(async l => ({ l, img: await loadImg(l.imageUrl) })))
     ).filter((x): x is { l: DesignLayerForExport; img: HTMLImageElement } => x.img !== null);
-    if (loaded.length === 0) return;
+    if (visibleLayers.length > 0 && loaded.length < visibleLayers.length) {
+      console.warn(
+        `[design-export] ${visibleLayers.length - loaded.length} of ${visibleLayers.length} ` +
+          `layers failed to load for ${designFileName}`,
+      );
+    }
 
     const MAX_CANVAS_PX = 16384;
     const scaleForMinimum = 4000 / mockupSize;
@@ -206,8 +211,10 @@ export async function generateDesignExportFiles({
       layerCtx.globalCompositeOperation = "source-over";
     }
 
-    const designDataUrl = await canvasToDataUrl(trimCanvas(layerCanvas));
-    if (designDataUrl) files.push({ fileName: designFileName, dataUrl: designDataUrl });
+    if (loaded.length > 0) {
+      const designDataUrl = await canvasToDataUrl(trimCanvas(layerCanvas));
+      if (designDataUrl) files.push({ fileName: designFileName, dataUrl: designDataUrl });
+    }
 
     if (shirtImg) {
       const finalCanvas = makeCanvas();
