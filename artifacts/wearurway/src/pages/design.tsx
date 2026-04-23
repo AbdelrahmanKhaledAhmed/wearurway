@@ -152,6 +152,22 @@ export default function Design() {
       sessionStorage.setItem("designQualityNoticeSeen", "1");
     } catch {}
   }, []);
+  const [showSideHintNotice, setShowSideHintNotice] = useState(false);
+  const dismissSideHintNotice = useCallback(() => {
+    setShowSideHintNotice(false);
+    try {
+      localStorage.setItem("designSideHintSeen", "1");
+    } catch {}
+  }, []);
+  useEffect(() => {
+    if (frontLayers.length + backLayers.length === 0) return;
+    try {
+      if (localStorage.getItem("designSideHintSeen") === "1") return;
+    } catch {
+      return;
+    }
+    setShowSideHintNotice(true);
+  }, [frontLayers.length, backLayers.length]);
   const [showDragHint, setShowDragHint] = useState(false);
   const [dragOverSide, setDragOverSide] = useState<"front" | "back" | null>(null);
   const dragOverSideRef = useRef<"front" | "back" | null>(null);
@@ -1104,6 +1120,50 @@ export default function Design() {
           </p>
           <button
             onClick={dismissQualityNotice}
+            className="w-full py-4 font-black uppercase text-sm tracking-[0.2em] transition-all active:scale-[0.98] hover:opacity-90"
+            style={{ backgroundColor: "#f5c842", color: "#0d0d0d", letterSpacing: "0.25em" }}
+          >
+            Got It
+          </button>
+        </div>
+      </div>
+    )}
+    {showSideHintNotice && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"
+        onClick={dismissSideHintNotice}
+      >
+        <div
+          className="w-full max-w-md bg-background border border-border p-8 relative shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mb-6">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground mb-2">
+              Pro Tip
+            </p>
+            <h2 className="text-xl font-black uppercase tracking-wide leading-tight">
+              Move Designs Between Sides
+            </h2>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 mb-5">
+            <div className="px-4 py-2 border border-border text-[10px] font-bold uppercase tracking-widest">
+              Front
+            </div>
+            <div className="px-4 py-2 border border-border text-[10px] font-bold uppercase tracking-widest">
+              Back
+            </div>
+          </div>
+
+          <p className="text-sm leading-relaxed text-foreground/90 mb-6">
+            You can hold and drag any image onto the{" "}
+            <span className="font-bold uppercase">Front</span> or{" "}
+            <span className="font-bold uppercase">Back</span> buttons at the top
+            of the t-shirt to instantly move it to the other side.
+          </p>
+
+          <button
+            onClick={dismissSideHintNotice}
             className="w-full py-4 font-black uppercase text-sm tracking-[0.2em] transition-all active:scale-[0.98] hover:opacity-90"
             style={{ backgroundColor: "#f5c842", color: "#0d0d0d", letterSpacing: "0.25em" }}
           >
