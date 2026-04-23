@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { motion } from "framer-motion";
+import { FaInstagram, FaTiktok } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 
 export default function Landing() {
@@ -26,6 +27,29 @@ export default function Landing() {
               Start Customize
             </Button>
           </Link>
+        </div>
+
+        <div className="flex items-center gap-6 pt-4">
+          <a
+            href="https://www.instagram.com/wearurway.store/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Instagram"
+            className="text-muted-foreground hover:text-foreground transition-colors duration-300"
+            data-testid="link-instagram"
+          >
+            <FaInstagram className="w-7 h-7" />
+          </a>
+          <a
+            href="https://www.tiktok.com/@wearurway"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="TikTok"
+            className="text-muted-foreground hover:text-foreground transition-colors duration-300"
+            data-testid="link-tiktok"
+          >
+            <FaTiktok className="w-7 h-7" />
+          </a>
         </div>
       </motion.div>
     </div>
