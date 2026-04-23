@@ -6,6 +6,7 @@ import { useCustomizer } from "@/hooks/use-customizer";
 import { useToast } from "@/hooks/use-toast";
 import ImageEditor, { type ImageEditResult } from "@/components/ImageEditor";
 import TextLayerModal from "@/components/TextLayerModal";
+import AddImageModal from "@/components/AddImageModal";
 import OrderReviewModal from "@/components/OrderReviewModal";
 import PinterestImportButton from "@/components/PinterestImportButton";
 import { generateDesignExportFiles } from "@/lib/design-export";
@@ -140,6 +141,7 @@ export default function Design() {
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [newUploadLayerId, setNewUploadLayerId] = useState<string | null>(null);
   const [showTextModal, setShowTextModal] = useState(false);
+  const [showAddImageModal, setShowAddImageModal] = useState(false);
   const [showDragHint, setShowDragHint] = useState(false);
   const [dragOverSide, setDragOverSide] = useState<"front" | "back" | null>(null);
   const dragOverSideRef = useRef<"front" | "back" | null>(null);
@@ -566,6 +568,10 @@ export default function Design() {
   // ── Add Image — use a local object URL (never touches the server) ──────────
 
   const handleAddImage = useCallback(() => {
+    setShowAddImageModal(true);
+  }, []);
+
+  const handleAddImageBrowse = useCallback(() => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
@@ -573,6 +579,7 @@ export default function Design() {
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
+      setShowAddImageModal(false);
       setUploading(true);
       try {
         const objectUrl = URL.createObjectURL(file);
@@ -1061,6 +1068,16 @@ export default function Design() {
       <TextLayerModal
         onConfirm={handleAddTextBlob}
         onCancel={() => setShowTextModal(false)}
+      />
+    )}
+    {showAddImageModal && (
+      <AddImageModal
+        onBrowse={handleAddImageBrowse}
+        onFile={(file) => {
+          setShowAddImageModal(false);
+          handleImportFile(file);
+        }}
+        onCancel={() => setShowAddImageModal(false)}
       />
     )}
     <div className="h-screen overflow-hidden pt-20 flex flex-col bg-background">
