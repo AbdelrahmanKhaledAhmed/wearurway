@@ -98,7 +98,7 @@ function registerOrderFolder(orderId: string, details: { customerName?: string; 
     const nextFiles = Array.from(new Set([...existingFiles, ...(details.files ?? [])]));
     store.orderFiles[orderId] = {
       orderId,
-      folderPath: `Object Storage: orders/${orderId}/`,
+      folderPath: `Cloudflare R2: orders/${orderId}/`,
       files: nextFiles,
       customerName: details.customerName ?? existing?.customerName,
       phone: details.phone ?? existing?.phone,
@@ -164,7 +164,8 @@ async function sendOrderMessage(orderId: string, body: CreateOrderBody) {
     `💳  Payment:  ${paymentMethod}`,
     "",
     "📁  DOCUMENTS",
-    `   Object Storage: orders/${orderId}/`,
+    "   Stored on Cloudflare R2 ☁️",
+    `   Folder: orders/${orderId}/`,
     "   Admin Panel → Order Files",
     "",
     line,
