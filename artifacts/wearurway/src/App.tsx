@@ -18,10 +18,11 @@ import Checkout from "@/pages/checkout";
 
 import { Navbar } from "@/components/layout/navbar";
 import { CustomizerProvider } from "@/hooks/use-customizer";
+import { getAdminToken } from "@/lib/admin-token";
 
 const queryClient = new QueryClient();
 
-setAuthTokenGetter(() => localStorage.getItem("wearurway_admin_token"));
+setAuthTokenGetter(() => getAdminToken());
 
 function Router() {
   return (

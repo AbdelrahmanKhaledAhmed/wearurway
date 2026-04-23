@@ -18,7 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, Edit, LogOut, Upload, X, FolderOpen, Copy } from "lucide-react";
+import { Trash2, Plus, Edit, LogOut, Upload, X, FolderOpen, Copy, ExternalLink } from "lucide-react";
+import { getAdminToken, clearAdminToken } from "@/lib/admin-token";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +34,7 @@ export default function AdminDashboard() {
   const queryClient = useQueryClient();
 
   // Immediately block if no token is stored — no API call needed
-  const [hasToken] = useState(() => !!localStorage.getItem("wearurway_admin_token"));
+  const [hasToken] = useState(() => !!getAdminToken());
 
   // Force a fresh auth check every time this page is visited (ignore cache)
   useEffect(() => {
@@ -60,7 +61,7 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     logoutMutation.mutate({}, {
       onSuccess: () => {
-        localStorage.removeItem("wearurway_admin_token");
+        clearAdminToken();
         queryClient.clear();
         setLocation("/admin");
       }
@@ -158,7 +159,7 @@ function ImageUploader({ value, onChange, label = "Image", uploadPath = "/api/up
       const fd = new FormData();
       fd.append("file", file);
       fd.append("name", safeName);
-      const token = localStorage.getItem("wearurway_admin_token");
+      const token = getAdminToken();
       const res = await fetch(uploadPath, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -174,7 +175,7 @@ function ImageUploader({ value, onChange, label = "Image", uploadPath = "/api/up
 
   const handleRemove = async () => {
     if (value) {
-      const token = localStorage.getItem("wearurway_admin_token");
+      const token = getAdminToken();
       const match = value.match(/^(\/api(?:\/[^/]+)+)\/([^/]+)$/);
       if (match) {
         await fetch(`${match[1]}/${match[2]}`, {
@@ -263,7 +264,7 @@ function OrderFilesManager() {
   const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("wearurway_admin_token");
+      const token = getAdminToken();
       const res = await fetch("/api/admin/order-files", {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -289,7 +290,7 @@ function OrderFilesManager() {
     if (!window.confirm(`Delete saved files for ${orderId}? Only do this after you copy the documents.`)) return;
     setDeletingId(orderId);
     try {
-      const token = localStorage.getItem("wearurway_admin_token");
+      const token = getAdminToken();
       const res = await fetch(`/api/admin/order-files/${orderId}`, {
         method: "DELETE",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -311,6 +312,16 @@ function OrderFilesManager() {
         <p className="text-sm text-muted-foreground">
           Print files and InstaPay screenshots are saved in server folders by Order ID. Copy the files from the folder, then delete them here to free storage.
         </p>
+        <a
+          href="https://dash.cloudflare.com/f622b5c9fad461401da4da3bf5954846/r2/default/buckets/images-of-orders"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 mt-3 text-xs uppercase tracking-widest border border-border px-3 py-2 hover:bg-muted/30 transition-colors"
+          data-testid="link-cloudflare-r2"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          Open Cloudflare R2 Bucket
+        </a>
       </div>
 
       {loading ? (
@@ -973,7 +984,7 @@ function MockupUploader({ label, generatedFilename, value, onChange }: {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("name", nameWithoutExt);
-      const token = localStorage.getItem("wearurway_admin_token");
+      const token = getAdminToken();
       const res = await fetch("/api/uploads", {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -991,7 +1002,7 @@ function MockupUploader({ label, generatedFilename, value, onChange }: {
 
   const handleRemove = async () => {
     if (value) {
-      const token = localStorage.getItem("wearurway_admin_token");
+      const token = getAdminToken();
       const match = value.match(/\/([^/]+)$/);
       if (match) {
         await fetch(`/api/uploads/mockups/${match[1]}`, {
@@ -1733,7 +1744,7 @@ function SystemManager() {
     setLoading(true);
     setError("");
     try {
-      const token = localStorage.getItem("wearurway_admin_token");
+      const token = getAdminToken();
       const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
       const [healthRes, configRes] = await Promise.all([
         fetch("/api/admin/system/health", { headers }),

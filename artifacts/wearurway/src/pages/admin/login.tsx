@@ -8,9 +8,11 @@ import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetAdminMeQueryKey } from "@workspace/api-client-react";
+import { setAdminToken } from "@/lib/admin-token";
 
 export default function AdminLogin() {
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -19,7 +21,7 @@ export default function AdminLogin() {
     mutation: {
       onSuccess: (data) => {
         if (data.success && data.token) {
-          localStorage.setItem("wearurway_admin_token", data.token);
+          setAdminToken(data.token, remember);
           queryClient.invalidateQueries({ queryKey: getGetAdminMeQueryKey() });
           setLocation("/admin/dashboard");
         } else {
@@ -71,6 +73,16 @@ export default function AdminLogin() {
               data-testid="input-password"
             />
           </div>
+          <label className="flex items-center gap-2 text-xs uppercase tracking-widest cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="h-4 w-4 rounded-none border border-foreground/30 accent-foreground cursor-pointer"
+              data-testid="checkbox-remember-me"
+            />
+            Remember me
+          </label>
           <Button
             type="submit"
             className="w-full rounded-none uppercase tracking-widest h-12 font-bold"
