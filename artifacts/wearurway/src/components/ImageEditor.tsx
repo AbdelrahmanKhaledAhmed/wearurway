@@ -523,12 +523,16 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const runFuzzySelect = useCallback((px: number, py: number, sens: number)=>{
     const c=canvasRef.current; if (!c) return;
     const ctx=c.getContext("2d"); if (!ctx) return;
-    // Cancel any in-progress recolor preview before re-selecting; otherwise
-    // the new mask would be computed from previewed (not committed) pixels.
+    // If there is a pending recolor preview, COMMIT it before making a new
+    // selection so the user doesn't lose their work by clicking the canvas.
+    // The previewed pixels stay applied and a single undo entry is saved.
     if (recolorBaseRef.current) {
-      ctx.putImageData(recolorBaseRef.current,0,0);
+      undoRef.current=[...undoRef.current.slice(-19),{
+        width:c.width,height:c.height,data:recolorBaseRef.current,trim:trimRef.current,
+      }];
+      redoRef.current=[];
+      setHistSig(h=>h+1);
       recolorBaseRef.current=null;
-      updateDisplay();
     }
     setProcessing(true);
     setTimeout(()=>{
@@ -538,7 +542,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       setSelectionMask(maskResult);
       setProcessing(false);
     },0);
-  },[tolerancesFromSensitivity,updateDisplay]);
+  },[tolerancesFromSensitivity]);
 
   const handleFuzzySelect = useCallback((imgX: number, imgY: number)=>{
     const c=canvasRef.current; if (!c) return;

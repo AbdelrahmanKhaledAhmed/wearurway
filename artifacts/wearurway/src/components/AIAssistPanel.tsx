@@ -269,13 +269,23 @@ export default function FuzzySelectPanel({
                   </div>
                 </div>
 
-                {/* Apply Color — sits right under the picker so it's easy to confirm */}
-                <button onClick={handleApplyColor}
-                  className="w-full py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 mb-3"
-                  style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff" }}
-                  data-testid="button-apply-color">
-                  Apply Color
-                </button>
+                {/* Apply Color — large, prominent, with helper text so users
+                    know they have to confirm to keep the picked color. */}
+                <div className="rounded-xl p-2.5 mb-3"
+                  style={{ background: "linear-gradient(135deg,rgba(168,85,247,0.15),rgba(124,58,237,0.10))", border: "1px solid rgba(168,85,247,0.35)" }}>
+                  <p className="text-[9px] text-center uppercase tracking-[0.18em] mb-2" style={{ color: "rgba(196,140,255,0.85)" }}>
+                    ✦ Click Apply to keep this color
+                  </p>
+                  <button onClick={handleApplyColor}
+                    className="w-full py-3.5 rounded-lg text-[13px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
+                    style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff", boxShadow: "0 4px 18px rgba(168,85,247,0.35)" }}
+                    data-testid="button-apply-color">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    Apply Color
+                  </button>
+                </div>
 
                 {/* Optional quick presets */}
                 <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: "rgba(255,255,255,0.3)" }}>
