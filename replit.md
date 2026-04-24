@@ -88,9 +88,11 @@ A premium streetwear customization website with a multi-step product configurato
 - `POST /api/admin/login` — admin login (returns Bearer token)
 - `POST /api/admin/logout` — admin logout
 - `GET /api/admin/me` — check admin session
-- `POST /api/create-order` — create order, save docs to Object Storage, send Telegram notification
-- `POST /api/orders/:orderId/documents` — upload additional export files to Object Storage
-- `POST /api/orders/:orderId/complete` — trigger Telegram order summary message
+- `POST /api/create-order` — create order; uploads (payment proof, export files) and the Telegram notification are pushed onto a persistent retry outbox so they never silently fail
+- `POST /api/orders/:orderId/documents` — queue additional export files for upload via the outbox
+- `POST /api/orders/:orderId/documents/upload` — queue a single raw upload via the outbox
+- `POST /api/orders/:orderId/complete` — queue the Telegram order summary; outbox waits for all pending uploads to succeed before sending
+- Order outbox: `services/orderOutbox.ts` retries every pending upload and notification with exponential backoff (cap 60s) forever, persists state in the `store_data` JSONB row, and resumes on server restart.
 - `GET /api/admin/order-files` — list all orders with their stored file metadata (admin)
 - `DELETE /api/admin/order-files/:orderId` — delete order files from Object Storage + remove record (admin)
 

@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { initStore } from "./data/store.js";
 import { cleanupExpiredDesigns } from "./routes/shared-designs.js";
+import { startOrderOutbox } from "./services/orderOutbox.js";
 import http from "node:http";
 
 const rawPort = process.env["PORT"];
@@ -36,6 +37,8 @@ async function main() {
 
     cleanupExpiredDesigns();
     setInterval(cleanupExpiredDesigns, 60 * 60 * 1000);
+
+    startOrderOutbox();
   });
 
   process.on("SIGTERM", () => {

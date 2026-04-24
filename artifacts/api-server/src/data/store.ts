@@ -106,6 +106,36 @@ export interface OrderSettings {
   showExportButton?: boolean;
 }
 
+export interface PendingUploadEntry {
+  id: string;
+  fileName: string;
+  contentType: string;
+  dataBase64: string;
+  attempts: number;
+  lastError?: string;
+  nextAttemptAt: number;
+}
+
+export interface PendingNotificationEntry {
+  payload: {
+    name?: string;
+    phone?: string;
+    address?: string;
+    product?: string;
+    fit?: string;
+    color?: string;
+    size?: { name?: string; realWidth?: number; realHeight?: number };
+    paymentMethod?: "cod" | "instapay";
+    productPrice?: number;
+    shippingPrice?: number;
+    total?: number;
+    feedback?: string;
+  };
+  attempts: number;
+  lastError?: string;
+  nextAttemptAt: number;
+}
+
 export interface OrderFileRecord {
   orderId: string;
   folderPath: string;
@@ -114,6 +144,9 @@ export interface OrderFileRecord {
   phone?: string;
   createdAt: string;
   updatedAt: string;
+  pendingUploads?: PendingUploadEntry[];
+  pendingNotification?: PendingNotificationEntry;
+  notificationSentAt?: string;
 }
 
 export interface OrderRecord {
