@@ -8,6 +8,8 @@ interface Props {
   onSetToolMode: (mode: ToolMode) => void;
   onDelete: () => void;
   onChangeColor: (color: string) => void;
+  onPreviewColor: (color: string) => void;
+  onCancelColorPreview: () => void;
   onClearSelection: () => void;
   sensitivity: number;
   onSensitivity: (v: number) => void;
@@ -23,7 +25,7 @@ const WandIcon = () => (
 
 export default function FuzzySelectPanel({
   toolMode, hasSelection,
-  onSetToolMode, onDelete, onChangeColor, onClearSelection,
+  onSetToolMode, onDelete, onChangeColor, onPreviewColor, onCancelColorPreview, onClearSelection,
   sensitivity, onSensitivity,
 }: Props) {
   const [pickedColor, setPickedColor] = useState("#ff0000");
@@ -34,19 +36,31 @@ export default function FuzzySelectPanel({
   const updateColor = (color: string) => {
     setPickedColor(color);
     setHexInput(color.toUpperCase());
+    onPreviewColor(color);
   };
 
   const handleHexChange = (raw: string) => {
     const v = raw.startsWith("#") ? raw : `#${raw}`;
     setHexInput(v.toUpperCase());
     if (/^#([0-9a-fA-F]{6})$/.test(v)) {
-      setPickedColor(v.toLowerCase());
+      const lower = v.toLowerCase();
+      setPickedColor(lower);
+      onPreviewColor(lower);
     }
   };
 
   const handleApplyColor = () => {
     onChangeColor(pickedColor);
     setShowPicker(false);
+  };
+
+  const handleTogglePicker = () => {
+    setShowPicker(v => {
+      const next = !v;
+      // Closing the picker without applying — revert any live preview.
+      if (!next) onCancelColorPreview();
+      return next;
+    });
   };
 
   const selectActive = toolMode === "select";
@@ -194,7 +208,7 @@ export default function FuzzySelectPanel({
           {/* Change Color */}
           <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
             <button
-              onClick={() => setShowPicker(v => !v)}
+              onClick={handleTogglePicker}
               className="w-full flex items-center gap-3 px-4 py-3.5 transition-all"
               style={{ backgroundColor: showPicker ? "rgba(168,85,247,0.12)" : "rgba(255,255,255,0.04)" }}
             >

@@ -254,6 +254,11 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const redoRef          = useRef<CanvasSnapshot[]>([]);
   const trimRef          = useRef<ImageEditResult|null>(null);
 
+  // ── Live recolor preview state ──────────────────────────────────────────────
+  // Snapshot of the canvas pixels taken on the first preview, so each color
+  // tweak can restore-then-recolor without stacking edits or undo entries.
+  const recolorBaseRef   = useRef<ImageData|null>(null);
+
   // ── Refs for stale-closure-safe reads ───────────────────────────────────────
   const panRef           = useRef({x:0,y:0});
   const zoomRef          = useRef(1);
@@ -416,6 +421,9 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const doUndo = useCallback(()=>{
     const snap=undoRef.current.pop(); if (!snap) return;
     const c=canvasRef.current; if (!c) return;
+    // Discard any pending recolor preview without restoring (the snap will
+    // overwrite the canvas anyway).
+    recolorBaseRef.current=null;
     redoRef.current=[...redoRef.current,{width:c.width,height:c.height,data:c.getContext("2d")!.getImageData(0,0,c.width,c.height),trim:trimRef.current}];
     restoreSnap(snap); setHistSig(h=>h+1);
     setSelectionMask(null);
@@ -424,6 +432,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const doRedo = useCallback(()=>{
     const snap=redoRef.current.pop(); if (!snap) return;
     const c=canvasRef.current; if (!c) return;
+    recolorBaseRef.current=null;
     undoRef.current=[...undoRef.current,{width:c.width,height:c.height,data:c.getContext("2d")!.getImageData(0,0,c.width,c.height),trim:trimRef.current}];
     restoreSnap(snap); setHistSig(h=>h+1);
     setSelectionMask(null);
@@ -514,6 +523,13 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const runFuzzySelect = useCallback((px: number, py: number, sens: number)=>{
     const c=canvasRef.current; if (!c) return;
     const ctx=c.getContext("2d"); if (!ctx) return;
+    // Cancel any in-progress recolor preview before re-selecting; otherwise
+    // the new mask would be computed from previewed (not committed) pixels.
+    if (recolorBaseRef.current) {
+      ctx.putImageData(recolorBaseRef.current,0,0);
+      recolorBaseRef.current=null;
+      updateDisplay();
+    }
     setProcessing(true);
     setTimeout(()=>{
       const id=ctx.getImageData(0,0,c.width,c.height);
@@ -522,7 +538,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       setSelectionMask(maskResult);
       setProcessing(false);
     },0);
-  },[tolerancesFromSensitivity]);
+  },[tolerancesFromSensitivity,updateDisplay]);
 
   const handleFuzzySelect = useCallback((imgX: number, imgY: number)=>{
     const c=canvasRef.current; if (!c) return;
@@ -553,6 +569,11 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     if (!selectionMask) return;
     const c=canvasRef.current; if (!c) return;
     const ctx=c.getContext("2d"); if (!ctx) return;
+    // Drop any in-progress recolor preview before deleting pixels.
+    if (recolorBaseRef.current) {
+      ctx.putImageData(recolorBaseRef.current,0,0);
+      recolorBaseRef.current=null;
+    }
     setProcessing(true);
     saveUndo();
     setTimeout(()=>{
@@ -565,26 +586,59 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     },0);
   },[selectionMask,saveUndo,updateDisplay]);
 
+  // Live recolor preview — restores from the original snapshot and re-applies
+  // the recolor with each new color, so dragging the picker updates the canvas
+  // in real time without piling on undo entries.
+  const handlePreviewColor = useCallback((color: string)=>{
+    if (!selectionMask) return;
+    const c=canvasRef.current; if (!c) return;
+    const ctx=c.getContext("2d"); if (!ctx) return;
+    if (!recolorBaseRef.current) {
+      recolorBaseRef.current=ctx.getImageData(0,0,c.width,c.height);
+    }
+    const base=recolorBaseRef.current;
+    const result=applyMaskRecolor(base,selectionMask,color);
+    ctx.putImageData(result,0,0);
+    updateDisplay();
+  },[selectionMask,updateDisplay]);
+
+  // Cancel any pending preview by restoring the snapshot taken before the
+  // first preview color was applied.
+  const cancelColorPreview = useCallback(()=>{
+    if (!recolorBaseRef.current) return;
+    const c=canvasRef.current; if (!c) return;
+    const ctx=c.getContext("2d"); if (!ctx) return;
+    ctx.putImageData(recolorBaseRef.current,0,0);
+    recolorBaseRef.current=null;
+    updateDisplay();
+  },[updateDisplay]);
+
   const handleChangeColor = useCallback((color: string)=>{
     if (!selectionMask) return;
     const c=canvasRef.current; if (!c) return;
     const ctx=c.getContext("2d"); if (!ctx) return;
-    setProcessing(true);
-    saveUndo();
-    setTimeout(()=>{
-      const id=ctx.getImageData(0,0,c.width,c.height);
-      const result=applyMaskRecolor(id,selectionMask,color);
-      ctx.putImageData(result,0,0);
-      updateDisplay();
-      setSelectionMask(null);
-      setProcessing(false);
-    },0);
-  },[selectionMask,saveUndo,updateDisplay]);
+    // Snapshot the pre-preview pixels so undo can restore the original.
+    const baseSnapshot=recolorBaseRef.current
+      ?? ctx.getImageData(0,0,c.width,c.height);
+    // Push the original to the undo stack (so Ctrl+Z reverts the recolor).
+    undoRef.current=[...undoRef.current.slice(-19),{
+      width:c.width,height:c.height,data:baseSnapshot,trim:trimRef.current,
+    }];
+    redoRef.current=[];
+    setHistSig(h=>h+1);
+    // Apply the final color from the original baseline.
+    const result=applyMaskRecolor(baseSnapshot,selectionMask,color);
+    ctx.putImageData(result,0,0);
+    recolorBaseRef.current=null;
+    updateDisplay();
+    setSelectionMask(null);
+  },[selectionMask,updateDisplay]);
 
   const handleClearSelection = useCallback(()=>{
+    cancelColorPreview();
     setSelectionMask(null);
     lastSelectPointRef.current=null;
-  },[]);
+  },[cancelColorPreview]);
 
   // ── Mouse events ────────────────────────────────────────────────────────────
 
@@ -825,6 +879,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             onSetToolMode={handleSetToolMode}
             onDelete={handleDelete}
             onChangeColor={handleChangeColor}
+            onPreviewColor={handlePreviewColor}
+            onCancelColorPreview={cancelColorPreview}
             onClearSelection={handleClearSelection}
             sensitivity={sensitivity}
             onSensitivity={setSensitivity}
