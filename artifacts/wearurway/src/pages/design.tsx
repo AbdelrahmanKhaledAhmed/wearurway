@@ -5,7 +5,7 @@ import { useGetMockup, useSaveMockup, getGetMockupQueryKey, useGetOrderSettings 
 import { useCustomizer } from "@/hooks/use-customizer";
 import { useToast } from "@/hooks/use-toast";
 import ImageEditor, { type ImageEditResult } from "@/components/ImageEditor";
-import TextLayerModal from "@/components/TextLayerModal";
+import TextLayerModal, { type TextLayerOptions } from "@/components/TextLayerModal";
 import AddImageModal from "@/components/AddImageModal";
 import OrderReviewModal from "@/components/OrderReviewModal";
 import PinterestImportButton from "@/components/PinterestImportButton";
@@ -27,6 +27,11 @@ interface DesignLayer {
   visible: boolean;
   naturalWidth: number;
   naturalHeight: number;
+  // Text-layer specific. When `kind === "text"`, the layer was produced by the
+  // TextLayerModal and should be edited as text (re-opening the same modal),
+  // not as a raster image. `textOptions` lets us re-seed the modal state.
+  kind?: "image" | "text";
+  textOptions?: TextLayerOptions;
 }
 
 interface DragState {
@@ -710,8 +715,15 @@ export default function Design() {
     }
   }, [layers.length, editingLayerId]);
 
-  // Open editor for an existing layer
+  // Open editor for an existing layer.
+  // Text layers re-open the TextLayerModal (so they're edited as text), image
+  // layers continue to open the raster ImageEditor.
   const startEditLayer = useCallback(async (layer: DesignLayer) => {
+    if (layer.kind === "text" && layer.textOptions) {
+      setEditingLayerId(layer.id);
+      setShowTextModal(true);
+      return;
+    }
     try {
       const res = await fetch(layer.imageUrl);
       const blob = await res.blob();
@@ -723,8 +735,10 @@ export default function Design() {
     }
   }, []);
 
-  // Add text layer from TextLayerModal blob
-  const handleAddTextBlob = useCallback(async (blob: Blob) => {
+  // Add text layer from TextLayerModal blob.
+  // We persist the original `TextLayerOptions` on the layer so we can re-open
+  // the same modal later with all settings pre-filled.
+  const handleAddTextBlob = useCallback(async (blob: Blob, opts: TextLayerOptions) => {
     setShowTextModal(false);
     const objectUrl = URL.createObjectURL(blob);
     const clipEl = clipAreaRef.current;
@@ -761,10 +775,46 @@ export default function Design() {
       visible: true,
       naturalWidth: natural.w,
       naturalHeight: natural.h,
+      kind: "text",
+      textOptions: opts,
     };
     setLayers(prev => [...prev, newLayer]);
     setSelectedLayerId(newLayer.id);
   }, [layers.length]);
+
+  // Replace an existing text layer with a freshly rendered version.
+  // Keeps position/rotation; updates dimensions to keep the previous height,
+  // recomputing width from the new aspect ratio so the layer doesn't jump in size.
+  const handleEditTextBlob = useCallback(async (blob: Blob, opts: TextLayerOptions) => {
+    const targetId = editingLayerId;
+    setShowTextModal(false);
+    setEditingLayerId(null);
+    if (!targetId) return;
+    const objectUrl = URL.createObjectURL(blob);
+    const natural = await new Promise<{ w: number; h: number }>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+      img.onerror = () => resolve({ w: 1, h: 1 });
+      img.src = objectUrl;
+    });
+    setLayers(prev => prev.map(l => {
+      if (l.id !== targetId) return l;
+      if (l.imageUrl.startsWith("blob:")) URL.revokeObjectURL(l.imageUrl);
+      const aspect = natural.h > 0 ? natural.w / natural.h : (l.width / l.height);
+      const nextH = Math.max(MIN_LAYER_SIZE, l.height);
+      const nextW = Math.max(MIN_LAYER_SIZE, nextH * aspect);
+      return {
+        ...l,
+        imageUrl: objectUrl,
+        width: nextW,
+        height: nextH,
+        naturalWidth: natural.w,
+        naturalHeight: natural.h,
+        kind: "text",
+        textOptions: opts,
+      };
+    }));
+  }, [editingLayerId]);
 
   const removeLayer = (id: string) => {
     setLayers(prev => {
@@ -913,12 +963,26 @@ export default function Design() {
         }}
       />
     )}
-    {showTextModal && (
-      <TextLayerModal
-        onConfirm={handleAddTextBlob}
-        onCancel={() => setShowTextModal(false)}
-      />
-    )}
+    {showTextModal && (() => {
+      // If editingLayerId is set AND that layer is a text layer, this is an
+      // EDIT — pre-fill the modal with its saved options and route confirm
+      // through handleEditTextBlob (which replaces in place). Otherwise it's
+      // a brand new "Add Text" → handleAddTextBlob (appends a new layer).
+      const editing = editingLayerId
+        ? layers.find(l => l.id === editingLayerId)
+        : null;
+      const isEditingText = editing?.kind === "text" && !!editing.textOptions;
+      return (
+        <TextLayerModal
+          initial={isEditingText ? editing!.textOptions! : null}
+          onConfirm={isEditingText ? handleEditTextBlob : handleAddTextBlob}
+          onCancel={() => {
+            setShowTextModal(false);
+            setEditingLayerId(null);
+          }}
+        />
+      );
+    })()}
     {showQualityNotice && (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"

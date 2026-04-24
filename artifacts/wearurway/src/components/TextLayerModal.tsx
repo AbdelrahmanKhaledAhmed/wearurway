@@ -13,7 +13,10 @@ export interface TextLayerOptions {
 }
 
 interface Props {
-  onConfirm: (blob: Blob) => void;
+  // When supplied, the modal opens directly in the style editor with these
+  // values pre-loaded — used for re-editing an existing text layer.
+  initial?: TextLayerOptions | null;
+  onConfirm: (blob: Blob, opts: TextLayerOptions) => void;
   onCancel: () => void;
 }
 
@@ -317,14 +320,16 @@ function StyledPreview({ opts }: { opts: TextLayerOptions }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function TextLayerModal({ onConfirm, onCancel }: Props) {
-  const [phase, setPhase] = useState<"pick" | "style">("pick");
-  const [text, setText] = useState("");
-  const [selectedFont, setSelectedFont] = useState<FontConfig | null>(null);
-  const [color, setColor] = useState("#ffffff");
-  const [outlineColor, setOutlineColor] = useState("#000000");
-  const [outlineWidth, setOutlineWidth] = useState(0);
-  const [arcDeg, setArcDeg] = useState(0);
+export default function TextLayerModal({ initial, onConfirm, onCancel }: Props) {
+  // When `initial` is supplied we're EDITING an existing text layer — start
+  // straight in the style editor with all options pre-filled.
+  const [phase, setPhase] = useState<"pick" | "style">(initial ? "style" : "pick");
+  const [text, setText] = useState(initial?.text ?? "");
+  const [selectedFont, setSelectedFont] = useState<FontConfig | null>(initial?.font ?? null);
+  const [color, setColor] = useState(initial?.color ?? "#ffffff");
+  const [outlineColor, setOutlineColor] = useState(initial?.outlineColor ?? "#000000");
+  const [outlineWidth, setOutlineWidth] = useState(initial?.outlineWidth ?? 0);
+  const [arcDeg, setArcDeg] = useState(initial?.arcDeg ?? 0);
   const [rendering, setRendering] = useState(false);
   const [fontsReady, setFontsReady] = useState(false);
 
@@ -347,7 +352,7 @@ export default function TextLayerModal({ onConfirm, onCancel }: Props) {
     setRendering(true);
     try {
       const blob = await renderTextToBlob(styledOpts);
-      onConfirm(blob);
+      onConfirm(blob, styledOpts);
     } finally {
       setRendering(false);
     }
