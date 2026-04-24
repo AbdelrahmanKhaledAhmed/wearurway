@@ -15,15 +15,15 @@ const config = {
   },
 
   r2: {
-    accountId: readEnv("R2_ACCOUNT_ID"),
-    accessKeyId: readEnv("R2_ACCESS_KEY_ID"),
-    secretAccessKey: readEnv("R2_SECRET_ACCESS_KEY"),
-    bucketName: readEnv("R2_BUCKET_NAME"),
+    accountId: readEnv("R2_ACCOUNT_ID", { optional: true }),
+    accessKeyId: readEnv("R2_ACCESS_KEY_ID", { optional: true }),
+    secretAccessKey: readEnv("R2_SECRET_ACCESS_KEY", { optional: true }),
+    bucketName: readEnv("R2_BUCKET_NAME", { optional: true }),
     publicUrl: readEnv("R2_PUBLIC_URL", { optional: true }),
   },
 
   admin: {
-    password: readEnv("ADMIN_PASSWORD"),
+    password: readEnv("ADMIN_PASSWORD", { optional: true, default: "admin123" }),
   },
 };
 
