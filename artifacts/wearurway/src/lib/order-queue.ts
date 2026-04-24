@@ -388,6 +388,65 @@ async function processSubmitRecord(
 }
 
 /**
+ * Foreground submission: save the spec for durability, render the design
+ * exports, and POST to /api/create-order — all awaited. Resolves only after
+ * the server returns HTTP 200 with an orderId, so the caller can confidently
+ * show the success screen. On failure the spec record is left in IndexedDB
+ * so the background queue (and Service Worker Background Sync) can keep
+ * retrying without losing the order.
+ *
+ * The server-side outbox still handles file uploads to object storage and
+ * the Telegram notification asynchronously after responding, so the customer
+ * does not wait for those.
+ */
+export async function submitOrderAndWait(
+  args: SaveSpecArgs,
+): Promise<{ orderId: string }> {
+  const { orderId } = await saveSpecQueuedOrder(args);
+
+  const records = await loadQueuedOrders();
+  const record = records.find(
+    (r): r is QueuedOrderSpecRecord =>
+      r.kind === "spec" && r.orderId === orderId,
+  );
+  if (!record) {
+    throw new Error("Order was saved but could not be located for submission");
+  }
+
+  let submitRecord: QueuedOrderSubmitRecord;
+  try {
+    submitRecord = await upgradeSpecToSubmit(record);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await bumpAttempt(record.id, message).catch(() => {});
+    throw new Error(
+      "Could not prepare your design for submission. We've saved your order locally and will retry automatically — please try again.",
+    );
+  }
+
+  const result = await postOrder(submitRecord.payload);
+  if (result.ok) {
+    await removeQueuedOrder(submitRecord.id).catch(() => {});
+    return { orderId };
+  }
+
+  const message = result.error ?? "Unknown error";
+  await bumpAttempt(submitRecord.id, message).catch(() => {});
+
+  if (result.retriable) {
+    void registerBackgroundSync();
+    throw new Error(
+      "We couldn't reach the server. Your order is saved on this device and will be sent automatically as soon as you're online — or you can tap Complete Order again now.",
+    );
+  }
+
+  // Non-retriable (4xx). Drop the record so the background queue does not
+  // loop on a structurally bad payload.
+  await removeQueuedOrder(submitRecord.id).catch(() => {});
+  throw new Error(message);
+}
+
+/**
  * Drain the queue: process every pending record. For spec records we render
  * then submit; for submit records we post. Returns immediately — work
  * continues in the background. Safe to call multiple times concurrently.

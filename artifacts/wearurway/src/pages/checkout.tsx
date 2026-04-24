@@ -6,9 +6,7 @@ import { useGetOrderSettings } from "@workspace/api-client-react";
 import type { CreateOrderDesignJob } from "@workspace/api-client-react";
 import { trackEvent } from "@/lib/analytics";
 import {
-  saveSpecQueuedOrder,
-  flushQueuedOrders,
-  registerBackgroundSync,
+  submitOrderAndWait,
   type QueuedOrderCustomer,
 } from "@/lib/order-queue";
 
@@ -158,12 +156,14 @@ export default function Checkout() {
         backImage: backPreview || undefined,
       };
 
-      // 2. Save the spec to IndexedDB. Heavy work (rendering the design
-      //    export PNGs, uploading, notifying Telegram) is intentionally NOT
-      //    done here — it's deferred to the background queue worker. As soon
-      //    as this resolves the order is durable and the customer can be
-      //    shown the success screen, even if they disconnect immediately.
-      const { orderId: newOrderId } = await saveSpecQueuedOrder({
+      // 2. Save the spec to IndexedDB for durability, render the design
+      //    export PNGs, then POST to /api/create-order and AWAIT the
+      //    response. The "Placing Order…" loading state stays on screen for
+      //    the entire duration. Resolves only after the server returns
+      //    HTTP 200 with an orderId; on any failure the spec stays in the
+      //    queue so the background worker / Service Worker can retry, and
+      //    the error is surfaced to the customer.
+      const { orderId: newOrderId } = await submitOrderAndWait({
         customer,
         paymentProof,
         designJob,
@@ -171,26 +171,21 @@ export default function Checkout() {
       });
 
       // 3. Clear sessionStorage so a refresh doesn't re-prepare the same
-      //    design — the durable copy is already in IndexedDB.
+      //    design — the order is now safely on the server.
       sessionStorage.removeItem("ww_checkout_front");
       sessionStorage.removeItem("ww_checkout_back");
       sessionStorage.removeItem("ww_checkout_price");
       sessionStorage.removeItem("ww_checkout_design_job");
 
-      // 4. Show the success screen IMMEDIATELY with the order id we just
-      //    generated client-side. The server treats that id as an
-      //    idempotency key so retries from the queue can never duplicate.
+      // 4. The server has confirmed the order. Show the success screen with
+      //    the confirmed orderId. The server-side outbox continues to
+      //    upload files to object storage and send the Telegram
+      //    notification in the background after responding, so the
+      //    customer doesn't wait for those.
       setOrderId(newOrderId);
       setSubmitting(false);
       setSubmitted(true);
       trackEvent("complete_order");
-
-      // 5. Kick off background processing — render the design exports, POST
-      //    to /api/create-order, retry forever on failure. Don't await; this
-      //    runs while the customer enjoys the success screen, navigates
-      //    away, or even closes the tab (Service Worker takes over).
-      void flushQueuedOrders();
-      void registerBackgroundSync();
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Could not submit order. Please try again.",
