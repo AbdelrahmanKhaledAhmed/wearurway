@@ -1409,9 +1409,8 @@ export default function Design() {
             <button
               onClick={handleAddImage}
               disabled={uploading}
-              className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full flex items-center border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <span className="text-lg leading-none">🖼</span>
               <div className="text-left">
                 <p className="text-xs font-bold uppercase tracking-widest">
                   {uploading ? "Uploading…" : "Add Image"}
@@ -1422,9 +1421,8 @@ export default function Design() {
             {/* Add Text */}
             <button
               onClick={() => setShowTextModal(true)}
-              className="w-full flex items-center gap-3 border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full flex items-center border border-border px-4 py-3 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <span className="text-lg leading-none">T</span>
               <div className="text-left">
                 <p className="text-xs font-bold uppercase tracking-widest">Add Text</p>
               </div>
