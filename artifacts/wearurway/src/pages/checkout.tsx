@@ -412,7 +412,7 @@ export default function Checkout() {
             <div className="lg:hidden pt-6 mt-2 border-t border-white/10">
               <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleSubmit} />
               {submitError && <p className="text-xs text-red-400 mt-3">{submitError}</p>}
-              <div className="mt-3 text-center">
+              <div className="mt-3 flex items-center justify-center gap-4">
                 <button
                   type="button"
                   onClick={() => setShowRefundPolicy(true)}
@@ -420,6 +420,15 @@ export default function Checkout() {
                 >
                   Refund Policy
                 </button>
+                <span className="text-white/20">·</span>
+                <a
+                  href={`https://wa.me/2${(orderSettings?.instaPayPhone ?? "01069383482").replace(/^0/, "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
+                >
+                  Contact Us
+                </a>
               </div>
             </div>
 
@@ -500,7 +509,7 @@ export default function Checkout() {
             <div className="hidden lg:block pt-4 mt-2">
               <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleSubmit} />
               {submitError && <p className="text-xs text-red-400 mt-3">{submitError}</p>}
-              <div className="mt-3 text-center">
+              <div className="mt-3 flex items-center justify-center gap-4">
                 <button
                   type="button"
                   onClick={() => setShowRefundPolicy(true)}
@@ -508,6 +517,15 @@ export default function Checkout() {
                 >
                   Refund Policy
                 </button>
+                <span className="text-white/20">·</span>
+                <a
+                  href={`https://wa.me/2${(orderSettings?.instaPayPhone ?? "01069383482").replace(/^0/, "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
+                >
+                  Contact Us
+                </a>
               </div>
             </div>
 
