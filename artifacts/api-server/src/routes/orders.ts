@@ -123,7 +123,7 @@ function formatMoney(value: number | undefined): string {
   return `${Number(value ?? 0)} EGP`;
 }
 
-async function sendOrderMessage(orderId: string, body: CreateOrderBody) {
+async function sendOrderMessage(orderId: string, body: CreateOrderBody, feedback?: string) {
   const settings = getStore().orderSettings;
   const botToken = settings.telegramBotToken;
   const chatId = settings.telegramChatId;
@@ -138,6 +138,7 @@ async function sendOrderMessage(orderId: string, body: CreateOrderBody) {
   const shippingPrice = body.shippingPrice ?? Math.max(0, (body.total ?? 0) - productPrice);
   const sizeDetails = `${body.size?.name ?? "-"} (${body.size?.realWidth ?? "-"} × ${body.size?.realHeight ?? "-"} cm)`;
   const line = "━━━━━━━━━━━━━━━━━━━━";
+  const trimmedFeedback = feedback?.trim();
   const message = [
     line,
     "🛍  NEW ORDER",
@@ -168,6 +169,9 @@ async function sendOrderMessage(orderId: string, body: CreateOrderBody) {
     `   Folder: orders/${orderId}/`,
     "   Admin Panel → Order Files",
     "",
+    ...(trimmedFeedback
+      ? ["💬  CUSTOMER FEEDBACK", trimmedFeedback, ""]
+      : []),
     line,
   ].join("\n");
 
@@ -262,6 +266,9 @@ router.post("/orders/:orderId/complete", (req, res) => {
     return;
   }
 
+  const requestBody = (req.body ?? {}) as { feedback?: unknown };
+  const feedback = typeof requestBody.feedback === "string" ? requestBody.feedback : undefined;
+
   res.json({ success: true });
 
   const body: CreateOrderBody = order
@@ -279,7 +286,7 @@ router.post("/orders/:orderId/complete", (req, res) => {
         total: order.total,
       }
     : {};
-  void sendOrderMessage(orderId, body)
+  void sendOrderMessage(orderId, body, feedback)
     .catch((error) => logger.error({ err: error, orderId }, "Failed to send order Telegram message"));
 });
 

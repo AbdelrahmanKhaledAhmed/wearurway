@@ -62,10 +62,14 @@ async function uploadFilesWithRetry(orderId: string, files: DesignExportFile[], 
   }
 }
 
-async function notifyOrderCompleteWithRetry(orderId: string, maxAttempts = 30) {
+async function notifyOrderCompleteWithRetry(orderId: string, feedback: string, maxAttempts = 30) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const res = await fetch(`/api/orders/${orderId}/complete`, { method: "POST" });
+      const res = await fetch(`/api/orders/${orderId}/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedback: feedback.trim() || undefined }),
+      });
       if (!res.ok) throw new Error("Notify failed");
       return;
     } catch {
@@ -97,6 +101,8 @@ export default function Checkout() {
   const [orderId, setOrderId] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [showRefundPolicy, setShowRefundPolicy] = useState(false);
+  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const shippingCost = shipping === "free" ? 0 : (orderSettings?.shippingPrice ?? 85);
@@ -130,8 +136,15 @@ export default function Checkout() {
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = async () => {
+  const handleCompleteOrderClick = () => {
     if (!validate()) return;
+    setSubmitError("");
+    setFeedbackText("");
+    setShowFeedbackPrompt(true);
+  };
+
+  const submitOrder = async (feedback: string) => {
+    setShowFeedbackPrompt(false);
     setSubmitError("");
     setSubmitting(true);
     try {
@@ -182,7 +195,7 @@ export default function Checkout() {
               await uploadFilesWithRetry(newOrderId, exportFiles);
             }
           }
-          await notifyOrderCompleteWithRetry(newOrderId);
+          await notifyOrderCompleteWithRetry(newOrderId, feedback);
         } finally {
           setUploadingFiles(false);
         }
@@ -410,7 +423,7 @@ export default function Checkout() {
 
             {/* Complete Order — mobile visible */}
             <div className="lg:hidden pt-6 mt-2 border-t border-white/10">
-              <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleSubmit} />
+              <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleCompleteOrderClick} />
               {submitError && <p className="text-xs text-red-400 mt-3">{submitError}</p>}
               <div className="mt-3 flex items-center justify-center gap-4">
                 <button
@@ -507,7 +520,7 @@ export default function Checkout() {
 
             {/* Complete Order — desktop */}
             <div className="hidden lg:block pt-4 mt-2">
-              <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleSubmit} />
+              <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleCompleteOrderClick} />
               {submitError && <p className="text-xs text-red-400 mt-3">{submitError}</p>}
               <div className="mt-3 flex items-center justify-center gap-4">
                 <button
@@ -534,6 +547,56 @@ export default function Checkout() {
       </div>
 
       <AnimatePresence>
+        {showFeedbackPrompt && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.18 }}
+              className="w-full max-w-md bg-[#141414] border border-white/10 p-6"
+            >
+              <p className="text-[10px] tracking-[0.3em] text-white/40 uppercase mb-2">Before You Go</p>
+              <h3 className="text-lg font-black uppercase tracking-[0.06em] mb-3" style={{ fontFamily: "monospace" }}>
+                Your Feedback
+              </h3>
+              <p className="text-sm text-white/70 leading-relaxed mb-4">
+                If you have any suggestions about the website or any difficulties you faced, or anything you would like to change.
+              </p>
+              <textarea
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                rows={5}
+                placeholder="Write your feedback here…"
+                className="w-full bg-transparent border px-4 py-3 text-sm text-white placeholder-white/20 outline-none transition-colors focus:border-white/40 resize-none"
+                style={{ borderColor: "rgba(255,255,255,0.12)" }}
+                autoFocus
+              />
+              <div className="grid grid-cols-2 gap-3 mt-5">
+                <button
+                  type="button"
+                  onClick={() => void submitOrder("")}
+                  className="py-3 font-black uppercase tracking-[0.2em] text-xs border border-white/15 text-white/70 hover:text-white hover:border-white/30 transition-colors active:scale-[0.98]"
+                >
+                  Skip
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void submitOrder(feedbackText)}
+                  className="py-3 font-black uppercase tracking-[0.2em] text-xs transition-all active:scale-[0.98]"
+                  style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
+                >
+                  Submit
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
         {showRefundPolicy && (
           <motion.div
             initial={{ opacity: 0 }}
