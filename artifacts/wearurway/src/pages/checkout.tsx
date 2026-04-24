@@ -231,31 +231,15 @@ export default function Checkout() {
             className="w-20 h-20 mx-auto mb-8 rounded-full flex items-center justify-center"
             style={{ backgroundColor: "#f5c842" }}
           >
-            {uploadingFiles ? (
-              <div className="w-8 h-8 border-4 border-black/30 border-t-black rounded-full animate-spin" />
-            ) : (
-              <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-                <path d="M8 18L15 25L28 11" stroke="#0d0d0d" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+              <path d="M8 18L15 25L28 11" stroke="#0d0d0d" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </motion.div>
           <p className="text-[10px] tracking-[0.3em] text-white/40 uppercase mb-3">Order Confirmed</p>
           <h1 className="text-4xl font-black uppercase mb-4" style={{ fontFamily: "monospace" }}>You're all set.</h1>
           <p className="text-sm text-white/50 leading-relaxed mb-4">
-            Your order has been received. Your Order ID is <span className="font-black text-white">{orderId}</span>. Our team will reach out to {form.phone} to confirm delivery details.
+            Your order has been received. Your Order ID is <span className="font-black text-white">{orderId}</span>. Our team will contact you shortly to confirm the delivery details.
           </p>
-          <AnimatePresence>
-            {uploadingFiles && (
-              <motion.p
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="text-[11px] text-white/30 uppercase tracking-widest mb-6"
-              >
-                Preparing your design files…
-              </motion.p>
-            )}
-          </AnimatePresence>
           <div className="mb-10" />
           <button
             onClick={() => { reset(); setLocation("/products"); }}
