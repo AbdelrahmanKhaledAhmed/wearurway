@@ -645,13 +645,22 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLElement>)=>{
     if (!loaded||!nativeSize) return;
 
+    // Right-click (button 2) always pans, regardless of the active tool — lets
+    // the user hold right-click to move while in Magic Select etc.
+    if (e.button===2) {
+      e.preventDefault();
+      isMoving.current=true;
+      moveStartRef.current={pointerX:e.clientX,pointerY:e.clientY,panX:panRef.current.x,panY:panRef.current.y};
+      return;
+    }
+
     if (toolMode==="select") {
       const pt=getImageCoords(e.clientX,e.clientY);
       if (pt) handleFuzzySelect(pt.imgX,pt.imgY);
       return;
     }
 
-    // Default: pan
+    // Default: left-click also pans
     isMoving.current=true;
     moveStartRef.current={pointerX:e.clientX,pointerY:e.clientY,panX:panRef.current.x,panY:panRef.current.y};
   },[loaded,nativeSize,toolMode,getImageCoords,handleFuzzySelect]);
@@ -669,6 +678,12 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   },[]);
 
   const onMouseLeave = useCallback(()=>{ onMouseUp(); },[onMouseUp]);
+
+  // Suppress the browser context menu on the canvas area so right-click is
+  // free to be used as a pan gesture.
+  const onContextMenu = useCallback((e: React.MouseEvent<HTMLElement>)=>{
+    e.preventDefault();
+  },[]);
 
   // ── Confirm ─────────────────────────────────────────────────────────────────
 
@@ -771,6 +786,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseLeave}
+          onContextMenu={onContextMenu}
           onWheel={onWheel}
         >
           {displaySrc && displayDims && (

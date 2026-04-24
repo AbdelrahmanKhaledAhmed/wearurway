@@ -269,11 +269,19 @@ export default function FuzzySelectPanel({
                   </div>
                 </div>
 
+                {/* Apply Color — sits right under the picker so it's easy to confirm */}
+                <button onClick={handleApplyColor}
+                  className="w-full py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 mb-3"
+                  style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff" }}
+                  data-testid="button-apply-color">
+                  Apply Color
+                </button>
+
                 {/* Optional quick presets */}
                 <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: "rgba(255,255,255,0.3)" }}>
                   Quick presets
                 </p>
-                <div className="grid grid-cols-8 gap-1.5 mb-3">
+                <div className="grid grid-cols-8 gap-1.5">
                   {["#ffffff","#000000","#ef4444","#f97316","#eab308","#22c55e","#3b82f6","#a855f7",
                     "#ec4899","#14b8a6","#8b5cf6","#f59e0b","#10b981","#6366f1","#64748b","#1e293b"].map(c => (
                     <button key={c} onClick={() => updateColor(c)}
@@ -281,12 +289,6 @@ export default function FuzzySelectPanel({
                       style={{ backgroundColor: c, borderColor: pickedColor.toLowerCase() === c ? "#fff" : "transparent" }} />
                   ))}
                 </div>
-                <button onClick={handleApplyColor}
-                  className="w-full py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95"
-                  style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff" }}
-                  data-testid="button-apply-color">
-                  Apply Color
-                </button>
               </div>
             )}
           </div>
@@ -300,11 +302,37 @@ export default function FuzzySelectPanel({
         </div>
       )}
 
-      {/* ── Footer ── */}
+      {/* ── Shortcuts box ── */}
       <div className="px-4 py-3 border-t shrink-0" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-        <p className="text-[9px] text-center tracking-wide" style={{ color: "rgba(255,255,255,0.15)" }}>
-          Ctrl+Z undo · Ctrl+Y redo · Esc deselect · Scroll zoom
-        </p>
+        <div className="rounded-xl p-3"
+          style={{ backgroundColor: "rgba(168,85,247,0.06)", border: "1px solid rgba(168,85,247,0.18)" }}>
+          <div className="flex items-center gap-1.5 mb-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(196,140,255,0.85)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 11, height: 11 }}>
+              <rect x="2" y="6" width="20" height="12" rx="2"/>
+              <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>
+            </svg>
+            <p className="text-[9px] font-black uppercase tracking-[0.2em]" style={{ color: "rgba(196,140,255,0.85)" }}>
+              Shortcuts
+            </p>
+          </div>
+          <ul className="space-y-1.5">
+            {[
+              { keys: "Hold right-click", label: "Move / Pan" },
+              { keys: "Scroll", label: "Zoom" },
+              { keys: "Ctrl + Z", label: "Undo" },
+              { keys: "Ctrl + Y", label: "Redo" },
+              { keys: "Esc", label: "Deselect" },
+            ].map(s => (
+              <li key={s.keys} className="flex items-center justify-between gap-2">
+                <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.55)" }}>{s.label}</span>
+                <kbd className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded"
+                  style={{ backgroundColor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.85)" }}>
+                  {s.keys}
+                </kbd>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );
