@@ -19,11 +19,14 @@ interface FormState {
   area: string;
   street: string;
   building: string;
+  floor: string;
+  apartment: string;
 }
 
 const EMPTY_FORM: FormState = {
   firstName: "", lastName: "", phone: "",
   city: "", area: "", street: "", building: "",
+  floor: "", apartment: "",
 };
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -119,6 +122,8 @@ export default function Checkout() {
     if (!form.area.trim())      errs.area      = "Required";
     if (!form.street.trim())    errs.street    = "Required";
     if (!form.building.trim())  errs.building  = "Required";
+    if (!form.floor.trim())     errs.floor     = "Required";
+    if (!form.apartment.trim()) errs.apartment = "Required";
     if (payment === "instapay" && !proofFile) errs.proof = "Please upload payment proof";
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -138,7 +143,7 @@ export default function Checkout() {
         data: {
           name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
           phone: form.phone.trim(),
-          address: `${form.building.trim()}, ${form.street.trim()}, ${form.area.trim()}, ${form.city.trim()}`,
+          address: `Building ${form.building.trim()}, Floor ${form.floor.trim()}, Apt ${form.apartment.trim()}, ${form.street.trim()}, ${form.area.trim()}, ${form.city.trim()}`,
           product: selectedProduct?.name ?? undefined,
           fit: selectedFit?.name ?? undefined,
           size: {
@@ -280,6 +285,10 @@ export default function Checkout() {
                 <Field label="Street Address"  value={form.street}   onChange={setField("street")}   error={errors.street} />
                 <Field label="Building Number" value={form.building} onChange={setField("building")} error={errors.building} />
               </div>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <Field label="Floor"           value={form.floor}     onChange={setField("floor")}     error={errors.floor} />
+                <Field label="Apartment Number" value={form.apartment} onChange={setField("apartment")} error={errors.apartment} />
+              </div>
             </section>
 
             {/* Shipping */}
@@ -399,7 +408,7 @@ export default function Checkout() {
             </section>
 
             {/* Complete Order — mobile visible */}
-            <div className="lg:hidden">
+            <div className="lg:hidden pt-6 mt-2 border-t border-white/10">
               <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleSubmit} />
               {submitError && <p className="text-xs text-red-400 mt-3">{submitError}</p>}
             </div>
@@ -478,7 +487,7 @@ export default function Checkout() {
             </section>
 
             {/* Complete Order — desktop */}
-            <div className="hidden lg:block">
+            <div className="hidden lg:block pt-4 mt-2">
               <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleSubmit} />
               {submitError && <p className="text-xs text-red-400 mt-3">{submitError}</p>}
             </div>
