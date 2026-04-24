@@ -422,7 +422,7 @@ export default function Checkout() {
                 </button>
                 <span className="text-white/20">·</span>
                 <a
-                  href={`https://wa.me/2${(orderSettings?.instaPayPhone ?? "01069383482").replace(/^0/, "")}`}
+                  href={`https://wa.me/20${(orderSettings?.instaPayPhone ?? "01069383482").replace(/^0/, "")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
@@ -519,7 +519,7 @@ export default function Checkout() {
                 </button>
                 <span className="text-white/20">·</span>
                 <a
-                  href={`https://wa.me/2${(orderSettings?.instaPayPhone ?? "01069383482").replace(/^0/, "")}`}
+                  href={`https://wa.me/20${(orderSettings?.instaPayPhone ?? "01069383482").replace(/^0/, "")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
