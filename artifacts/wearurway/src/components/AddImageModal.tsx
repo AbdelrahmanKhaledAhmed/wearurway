@@ -109,9 +109,6 @@ export default function AddImageModal({ onBrowse, onFile, onCancel }: Props) {
           onClick={onBrowse}
           className="group w-full flex items-center gap-4 border border-border px-5 py-4 hover:border-foreground hover:bg-foreground hover:text-background transition-all mb-3"
         >
-          <span className="w-10 h-10 flex items-center justify-center border border-border group-hover:border-background text-base">
-            📁
-          </span>
           <div className="text-left flex-1">
             <p className="text-xs font-bold uppercase tracking-widest">
               Browse Photo
