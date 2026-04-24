@@ -27,8 +27,22 @@ export default function FuzzySelectPanel({
   sensitivity, onSensitivity,
 }: Props) {
   const [pickedColor, setPickedColor] = useState("#ff0000");
+  const [hexInput, setHexInput]       = useState("#ff0000");
   const [showPicker,  setShowPicker]  = useState(false);
   const colorInputRef = useRef<HTMLInputElement>(null);
+
+  const updateColor = (color: string) => {
+    setPickedColor(color);
+    setHexInput(color.toUpperCase());
+  };
+
+  const handleHexChange = (raw: string) => {
+    const v = raw.startsWith("#") ? raw : `#${raw}`;
+    setHexInput(v.toUpperCase());
+    if (/^#([0-9a-fA-F]{6})$/.test(v)) {
+      setPickedColor(v.toLowerCase());
+    }
+  };
 
   const handleApplyColor = () => {
     onChangeColor(pickedColor);
@@ -200,31 +214,63 @@ export default function FuzzySelectPanel({
 
             {showPicker && (
               <div className="px-4 pb-4 pt-2" style={{ backgroundColor: "rgba(255,255,255,0.02)" }}>
-                <div className="flex items-center gap-3 mb-3">
+                {/* Big color picker — click anywhere to open native picker for any shade */}
+                <button
+                  type="button"
+                  onClick={() => colorInputRef.current?.click()}
+                  className="relative w-full h-24 rounded-xl mb-3 overflow-hidden cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
+                  style={{ backgroundColor: pickedColor, border: "1px solid rgba(255,255,255,0.18)", boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.25)" }}
+                  data-testid="button-open-color-picker"
+                  aria-label="Open color picker"
+                >
                   <input
                     ref={colorInputRef}
                     type="color"
                     value={pickedColor}
-                    onChange={e => setPickedColor(e.target.value)}
-                    className="w-10 h-10 rounded-lg cursor-pointer border-0 p-0"
-                    style={{ backgroundColor: "transparent" }}
+                    onChange={e => updateColor(e.target.value)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    data-testid="input-color-picker"
                   />
-                  <div className="flex-1">
-                    <p className="text-[10px] font-mono font-bold text-white/70">{pickedColor.toUpperCase()}</p>
-                    <p className="text-[9px]" style={{ color: "rgba(255,255,255,0.3)" }}>Selected color</p>
+                  <div className="absolute bottom-1.5 right-2 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                    style={{ backgroundColor: "rgba(0,0,0,0.55)", color: "rgba(255,255,255,0.85)" }}>
+                    Tap to pick any shade
+                  </div>
+                </button>
+
+                {/* Hex input — type any color */}
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-9 h-9 rounded-lg shrink-0" style={{ backgroundColor: pickedColor, border: "1px solid rgba(255,255,255,0.15)" }} />
+                  <div className="flex-1 flex items-center rounded-lg overflow-hidden"
+                    style={{ backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                    <span className="pl-2.5 text-[11px] font-mono font-bold" style={{ color: "rgba(255,255,255,0.35)" }}>#</span>
+                    <input
+                      type="text"
+                      value={hexInput.replace(/^#/, "")}
+                      onChange={e => handleHexChange(e.target.value)}
+                      maxLength={6}
+                      placeholder="RRGGBB"
+                      className="flex-1 bg-transparent px-1.5 py-2 text-[11px] font-mono font-bold text-white outline-none uppercase tracking-wider"
+                      data-testid="input-hex-color"
+                    />
                   </div>
                 </div>
+
+                {/* Optional quick presets */}
+                <p className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: "rgba(255,255,255,0.3)" }}>
+                  Quick presets
+                </p>
                 <div className="grid grid-cols-8 gap-1.5 mb-3">
                   {["#ffffff","#000000","#ef4444","#f97316","#eab308","#22c55e","#3b82f6","#a855f7",
                     "#ec4899","#14b8a6","#8b5cf6","#f59e0b","#10b981","#6366f1","#64748b","#1e293b"].map(c => (
-                    <button key={c} onClick={() => setPickedColor(c)}
+                    <button key={c} onClick={() => updateColor(c)}
                       className="w-full aspect-square rounded-md border-2 transition-all hover:scale-110"
-                      style={{ backgroundColor: c, borderColor: pickedColor === c ? "#fff" : "transparent" }} />
+                      style={{ backgroundColor: c, borderColor: pickedColor.toLowerCase() === c ? "#fff" : "transparent" }} />
                   ))}
                 </div>
                 <button onClick={handleApplyColor}
                   className="w-full py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95"
-                  style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff" }}>
+                  style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff" }}
+                  data-testid="button-apply-color">
                   Apply Color
                 </button>
               </div>
