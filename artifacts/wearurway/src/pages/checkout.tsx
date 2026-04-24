@@ -519,6 +519,42 @@ export default function Checkout() {
       </div>
 
       <AnimatePresence>
+        {submitting && (
+          <motion.div
+            key="placing-order-popup"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.18 }}
+              className="w-full max-w-sm bg-[#141414] border border-white/10 p-6 text-center"
+            >
+              <div className="flex justify-center mb-5">
+                <span
+                  className="w-10 h-10 border-2 rounded-full animate-spin"
+                  style={{ borderColor: "rgba(245,200,66,0.25)", borderTopColor: "#f5c842" }}
+                />
+              </div>
+              <p className="text-[10px] tracking-[0.3em] text-white/40 uppercase mb-2">Just a moment</p>
+              <h3
+                className="text-lg font-black uppercase tracking-[0.06em] mb-3"
+                style={{ fontFamily: "monospace" }}
+              >
+                Preparing Your Order
+              </h3>
+              <p className="text-sm text-white/70 leading-relaxed">
+                Please wait a moment while we prepare your order. This will only take a few seconds — please keep this page open until it's done.
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
         {showFeedbackPrompt && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -708,14 +744,7 @@ function CompleteOrderButton({ total, submitting, onSubmit }: { total: number; s
       className="w-full py-4 font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-[0.98] disabled:opacity-60"
       style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
     >
-      {submitting ? (
-        <span className="flex items-center justify-center gap-2">
-          <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-          Placing Order…
-        </span>
-      ) : (
-        `Complete Order — ${total} EGP`
-      )}
+      {`Complete Order — ${total} EGP`}
     </button>
   );
 }
