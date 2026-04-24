@@ -40,6 +40,7 @@ interface CreateOrderBody {
   backImage?: string;
   paymentProof?: CreateOrderFile;
   exportFiles?: CreateOrderFile[];
+  feedback?: string;
 }
 
 interface UploadOrderDocumentsBody {
@@ -166,6 +167,27 @@ router.post("/create-order", (req, res) => {
   registerOrderFolder(orderId, { customerName: body.name, phone: body.phone });
 
   enqueueUploads(orderId, prepared);
+
+  // Queue the Telegram notification atomically with the uploads. The outbox
+  // will only send it once every pending upload for this order has succeeded.
+  const feedback =
+    typeof body.feedback === "string" && body.feedback.trim()
+      ? body.feedback.trim()
+      : undefined;
+  enqueueNotification(orderId, {
+    name: body.name,
+    phone: body.phone,
+    address: body.address,
+    product: body.product,
+    fit: body.fit,
+    color: body.color,
+    size: body.size,
+    paymentMethod: body.paymentMethod,
+    productPrice: body.productPrice,
+    shippingPrice: body.shippingPrice,
+    total: body.total,
+    feedback,
+  });
 
   res.json({ orderId });
 });

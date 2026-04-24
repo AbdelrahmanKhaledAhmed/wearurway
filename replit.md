@@ -88,11 +88,20 @@ A premium streetwear customization website with a multi-step product configurato
 - `POST /api/admin/login` — admin login (returns Bearer token)
 - `POST /api/admin/logout` — admin logout
 - `GET /api/admin/me` — check admin session
-- `POST /api/create-order` — create order; uploads (payment proof, export files) and the Telegram notification are pushed onto a persistent retry outbox so they never silently fail
-- `POST /api/orders/:orderId/documents` — queue additional export files for upload via the outbox
-- `POST /api/orders/:orderId/documents/upload` — queue a single raw upload via the outbox
-- `POST /api/orders/:orderId/complete` — queue the Telegram order summary; outbox waits for all pending uploads to succeed before sending
+- `POST /api/create-order` — atomic submission. Body now carries delivery info, payment proof, every design export PNG, and the customer feedback. Uploads and the Telegram notification are pushed onto a persistent retry outbox so they never silently fail. Notification is gated until all uploads for that order succeed.
+- `POST /api/orders/:orderId/documents` and `/documents/upload` — legacy enqueue endpoints, still wired to the outbox.
+- `POST /api/orders/:orderId/complete` — legacy "send notification" endpoint, still wired to the outbox (the new client flow does not call it because feedback ships in `/create-order`).
 - Order outbox: `services/orderOutbox.ts` retries every pending upload and notification with exponential backoff (cap 60s) forever, persists state in the `store_data` JSONB row, and resumes on server restart.
+
+### Client-side order durability
+
+Submitting an order on the wearurway frontend is a durable, recoverable operation:
+
+- `lib/order-queue.ts` writes the full order payload (proof + export PNGs + feedback) to **IndexedDB** before posting `/api/create-order`. The record is only deleted when the server returns 200.
+- `submitQueuedOrder` retries the POST in the page with exponential backoff (cap 60s) until success.
+- `flushQueuedOrders` runs on every app boot (and on every browser `online` event) so any payload left over from a closed/disconnected session is replayed.
+- `public/order-sync-sw.js` is a Service Worker that listens for the `wearurway-order-sync` Background Sync tag (and a `wearurway-flush-orders` postMessage). When supported (Android Chrome / Edge / Samsung Internet), the OS replays the POST even with no tab open.
+- Net effect: once the user clicks Complete Order, even if they close the tab, lock the phone, or lose internet, the order completes the next time the device has connectivity.
 - `GET /api/admin/order-files` — list all orders with their stored file metadata (admin)
 - `DELETE /api/admin/order-files/:orderId` — delete order files from Object Storage + remove record (admin)
 

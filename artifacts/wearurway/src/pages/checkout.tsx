@@ -2,10 +2,16 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCustomizer } from "@/hooks/use-customizer";
-import { useCreateOrder, useGetOrderSettings } from "@workspace/api-client-react";
+import { useGetOrderSettings } from "@workspace/api-client-react";
 import { generateDesignExportBlobs, type DesignExportBlob } from "@/lib/design-export";
 import type { CreateOrderDesignJob } from "@workspace/api-client-react";
 import { trackEvent } from "@/lib/analytics";
+import {
+  saveQueuedOrder,
+  submitQueuedOrder,
+  type QueuedOrderFile,
+  type QueuedOrderPayload,
+} from "@/lib/order-queue";
 
 const FREE_SHIPPING_AREAS = ["6th of October", "Sheikh Zayed"];
 
@@ -42,51 +48,27 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-async function delay(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Could not read export blob"));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read export blob"));
+    reader.readAsDataURL(blob);
+  });
 }
 
-async function uploadSingleBlobWithRetry(
-  orderId: string,
-  file: DesignExportBlob,
-  maxAttempts = 8,
-) {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const url = `/api/orders/${orderId}/documents/upload?fileName=${encodeURIComponent(file.fileName)}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": file.contentType },
-        body: file.blob,
-      });
-      if (!res.ok) throw new Error("Upload failed");
-      return;
-    } catch {
-      if (attempt === maxAttempts) throw new Error(`Could not upload ${file.fileName} after multiple attempts`);
-      await delay(Math.min(2000 * attempt, 30000));
-    }
+async function exportBlobsToFiles(
+  blobs: DesignExportBlob[],
+): Promise<QueuedOrderFile[]> {
+  const out: QueuedOrderFile[] = [];
+  for (const file of blobs) {
+    const dataUrl = await blobToDataUrl(file.blob);
+    out.push({ fileName: file.fileName, dataUrl });
   }
-}
-
-async function uploadFilesWithRetry(orderId: string, files: DesignExportBlob[]) {
-  await Promise.all(files.map((file) => uploadSingleBlobWithRetry(orderId, file)));
-}
-
-async function notifyOrderCompleteWithRetry(orderId: string, feedback: string, maxAttempts = 30) {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const res = await fetch(`/api/orders/${orderId}/complete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ feedback: feedback.trim() || undefined }),
-      });
-      if (!res.ok) throw new Error("Notify failed");
-      return;
-    } catch {
-      if (attempt === maxAttempts) throw new Error("Could not send order notification after multiple attempts");
-      await delay(Math.min(2000 * attempt, 30000));
-    }
-  }
+  return out;
 }
 
 export default function Checkout() {
@@ -97,7 +79,6 @@ export default function Checkout() {
   const backPreview  = sessionStorage.getItem("ww_checkout_back")  || "";
   const productPrice = Number(sessionStorage.getItem("ww_checkout_price") || "550");
   const { data: orderSettings } = useGetOrderSettings();
-  const createOrder = useCreateOrder();
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
@@ -168,63 +149,80 @@ export default function Checkout() {
     setShowFeedbackPrompt(false);
     setSubmitError("");
     setSubmitting(true);
+    setUploadingFiles(true);
     try {
       const designJobText = sessionStorage.getItem("ww_checkout_design_job");
-      const designJob = designJobText ? JSON.parse(designJobText) as CreateOrderDesignJob : undefined;
-      const paymentProof = payment === "instapay" && proofFile
-        ? { fileName: proofFile.name, dataUrl: await fileToDataUrl(proofFile) }
+      const designJob = designJobText
+        ? (JSON.parse(designJobText) as CreateOrderDesignJob)
         : undefined;
-      const response = await createOrder.mutateAsync({
-        data: {
-          name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
-          phone: form.phone.replace(/\D/g, ""),
-          address: `Building ${form.building.trim()}, Floor ${form.floor.trim()}, Apt ${form.apartment.trim()}, ${form.street.trim()}, ${form.area.trim()}, ${form.city.trim()}`,
-          product: selectedProduct?.name ?? undefined,
-          fit: selectedFit?.name ?? undefined,
-          size: {
-            name: selectedSize?.name ?? "",
-            realWidth: selectedSize?.realWidth,
-            realHeight: selectedSize?.realHeight,
-          },
-          color: selectedColor?.name ?? "",
-          paymentMethod: payment,
-          productPrice,
-          shippingPrice: shippingCost,
-          total,
-          frontImage: frontPreview || undefined,
-          backImage: backPreview || undefined,
-          paymentProof,
-        },
-      });
 
-      const newOrderId = response.orderId;
+      // 1. Convert payment proof to a data URL up front.
+      const paymentProof =
+        payment === "instapay" && proofFile
+          ? { fileName: proofFile.name, dataUrl: await fileToDataUrl(proofFile) }
+          : undefined;
+
+      // 2. Generate the design export PNGs in the browser BEFORE we touch the
+      //    network. If the user disconnects after this point, the data is
+      //    already saved durably in IndexedDB by step 3.
+      let exportFiles: QueuedOrderFile[] = [];
+      if (designJob) {
+        const blobs = await generateDesignExportBlobs(designJob);
+        exportFiles = await exportBlobsToFiles(blobs);
+      }
+
+      const payload: QueuedOrderPayload = {
+        name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
+        phone: form.phone.replace(/\D/g, ""),
+        address: `Building ${form.building.trim()}, Floor ${form.floor.trim()}, Apt ${form.apartment.trim()}, ${form.street.trim()}, ${form.area.trim()}, ${form.city.trim()}`,
+        product: selectedProduct?.name ?? undefined,
+        fit: selectedFit?.name ?? undefined,
+        size: {
+          name: selectedSize?.name ?? "",
+          realWidth: selectedSize?.realWidth,
+          realHeight: selectedSize?.realHeight,
+        },
+        color: selectedColor?.name ?? "",
+        paymentMethod: payment,
+        productPrice,
+        shippingPrice: shippingCost,
+        total,
+        frontImage: frontPreview || undefined,
+        backImage: backPreview || undefined,
+        paymentProof,
+        exportFiles,
+        feedback: feedback.trim() || undefined,
+      };
+
+      // 3. Persist the entire payload to IndexedDB. From here on the order is
+      //    durable: even if the browser is closed before the POST succeeds,
+      //    the next page load will retry it (and a Service Worker will retry
+      //    in the background when supported).
+      const queueId = await saveQueuedOrder(payload);
+
+      // 4. Clear sessionStorage so a refresh doesn't re-prepare the same
+      //    design — the durable copy is already in IndexedDB.
       sessionStorage.removeItem("ww_checkout_front");
       sessionStorage.removeItem("ww_checkout_back");
       sessionStorage.removeItem("ww_checkout_price");
       sessionStorage.removeItem("ww_checkout_design_job");
 
+      // 5. Submit. submitQueuedOrder retries with exponential backoff for as
+      //    long as the page stays open; if the page closes mid-submit the
+      //    record stays in IndexedDB and is retried on next visit / by SW.
+      const newOrderId = await submitQueuedOrder(queueId);
+
       setOrderId(newOrderId);
       setSubmitting(false);
-      setUploadingFiles(true);
+      setUploadingFiles(false);
       setSubmitted(true);
       trackEvent("complete_order");
-
-      void (async () => {
-        try {
-          if (designJob) {
-            const exportFiles = await generateDesignExportBlobs(designJob);
-            if (exportFiles.length > 0) {
-              await uploadFilesWithRetry(newOrderId, exportFiles);
-            }
-          }
-          await notifyOrderCompleteWithRetry(newOrderId, feedback);
-        } finally {
-          setUploadingFiles(false);
-        }
-      })();
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Could not submit order. Please try again.");
+      setSubmitError(
+        error instanceof Error ? error.message : "Could not submit order. Please try again.",
+      );
       setSubmitting(false);
+      setUploadingFiles(false);
     }
   };
 
