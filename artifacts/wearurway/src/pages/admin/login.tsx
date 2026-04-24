@@ -19,7 +19,7 @@ export default function AdminLogin() {
 
   const [hasToken] = useState(() => !!getAdminToken());
   const { data: adminMe, isFetching: isCheckingAuth } = useGetAdminMe({
-    query: { enabled: hasToken },
+    query: { enabled: hasToken, queryKey: getGetAdminMeQueryKey() },
   });
 
   useEffect(() => {

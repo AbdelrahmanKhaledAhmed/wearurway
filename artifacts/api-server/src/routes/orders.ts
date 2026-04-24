@@ -70,7 +70,9 @@ function gcsOrderPrefix(orderId: string): string {
 
 async function telegramRequest(url: string, body: URLSearchParams) {
   const response = await fetch(url, { method: "POST", body });
-  const data = await response.json().catch(() => null);
+  const data = (await response.json().catch(() => null)) as
+    | { ok?: boolean; description?: string }
+    | null;
   if (!response.ok || !data?.ok) {
     const description = data?.description ? `: ${data.description}` : "";
     throw new Error(`Telegram request failed${description}`);

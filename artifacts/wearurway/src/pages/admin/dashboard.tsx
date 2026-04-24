@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useCustomizer } from "@/hooks/use-customizer";
 import {
-  useGetAdminMe,
+  useGetAdminMe, getGetAdminMeQueryKey,
   useGetProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, getGetProductsQueryKey,
   useGetFits, useCreateFit, useUpdateFit, useDeleteFit, getGetFitsQueryKey,
   useGetColors, useAddColor, useDeleteColor, getGetColorsQueryKey,
@@ -44,7 +44,7 @@ export default function AdminDashboard() {
   }, [hasToken, queryClient]);
 
   const { data: adminMe, isFetching: isAuthLoading, isError: isAuthError } = useGetAdminMe({
-    query: { enabled: hasToken },
+    query: { enabled: hasToken, queryKey: getGetAdminMeQueryKey() },
   });
   const logoutMutation = useAdminLogout();
 
@@ -59,7 +59,7 @@ export default function AdminDashboard() {
   }, [hasToken, adminMe, isAuthLoading, isAuthError, setLocation]);
 
   const handleLogout = () => {
-    logoutMutation.mutate({}, {
+    logoutMutation.mutate(undefined, {
       onSuccess: () => {
         clearAdminToken();
         queryClient.clear();
@@ -1067,7 +1067,7 @@ function MockupUploader({ label, generatedFilename, value, onChange }: {
 function MockupsManager() {
   const { data: products } = useGetProducts();
   const { data: fits } = useGetFits();
-  const { data: colors } = useGetColors("", { query: { enabled: false } });
+  const { data: colors } = useGetColors("", { query: { enabled: false, queryKey: getGetColorsQueryKey("") } });
 
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [selectedFitId, setSelectedFitId] = useState<string>("");

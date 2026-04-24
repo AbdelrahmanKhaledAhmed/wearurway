@@ -1529,6 +1529,7 @@ export default function Design() {
       selectedProduct={selectedProduct}
       selectedFit={selectedFit}
       selectedColor={selectedColor}
+      selectedSize={selectedSize}
     />
 
     </>
