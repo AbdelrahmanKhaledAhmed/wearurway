@@ -3,16 +3,6 @@ lockfileVersion: '9.0'
 settings:
   autoInstallPeers: false
   excludeLinksFromLockfile: false
-  minimumReleaseAge: 1440
-  minimumReleaseAgeExclude:
-    - '@replit/*'
-    - stripe-replit-sync
-  onlyBuiltDependencies:
-    - '@swc/core'
-    - esbuild
-    - msw
-    - sharp
-    - unrs-resolver
 
 catalogs:
   default:
