@@ -3,7 +3,5 @@ buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @workspace/api-s
 
 [deploy]
 startCommand = "pnpm --filter @workspace/api-server run start"
-healthcheckPath = "/api/healthz"
-healthcheckTimeout = 120
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
