@@ -197,4 +197,30 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
+  /* Slim, dark scrollbar for modal panels — matches the streetwear UI. */
+  .scrollbar-dark {
+    scrollbar-width: thin;
+    scrollbar-color: #1a1a1a transparent;
+  }
+  .scrollbar-dark::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-dark::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-dark::-webkit-scrollbar-thumb {
+    background-color: #1a1a1a;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .scrollbar-dark::-webkit-scrollbar-thumb:hover {
+    background-color: #2a2a2a;
+    background-clip: padding-box;
+  }
+  .scrollbar-dark::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }

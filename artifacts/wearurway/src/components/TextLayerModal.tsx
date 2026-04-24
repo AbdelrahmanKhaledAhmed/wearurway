@@ -394,7 +394,7 @@ export default function TextLayerModal({ onConfirm, onCancel }: Props) {
 
         {/* Phase: Font picker */}
         {phase === "pick" && (
-          <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="flex-1 overflow-y-auto scrollbar-dark px-6 py-4">
             {!fontsReady && (
               <p className="text-xs text-muted-foreground uppercase tracking-widest animate-pulse mb-4">
                 Loading fonts…
@@ -419,7 +419,7 @@ export default function TextLayerModal({ onConfirm, onCancel }: Props) {
 
         {/* Phase: Style editor */}
         {phase === "style" && selectedFont && styledOpts && (
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+          <div className="flex-1 overflow-y-auto scrollbar-dark px-6 py-4 space-y-5">
 
             {/* Live preview */}
             <div>
