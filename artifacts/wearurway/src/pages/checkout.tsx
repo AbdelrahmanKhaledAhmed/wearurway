@@ -5,6 +5,7 @@ import { useCustomizer } from "@/hooks/use-customizer";
 import { useCreateOrder, useGetOrderSettings } from "@workspace/api-client-react";
 import { generateDesignExportBlobs, type DesignExportBlob } from "@/lib/design-export";
 import type { CreateOrderDesignJob } from "@workspace/api-client-react";
+import { trackEvent } from "@/lib/analytics";
 
 const FREE_SHIPPING_AREAS = ["6th of October", "Sheikh Zayed"];
 
@@ -99,6 +100,8 @@ export default function Checkout() {
   const createOrder = useCreateOrder();
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+
+  useEffect(() => { trackEvent("view_checkout"); }, []);
   const [shipping, setShipping] = useState<ShippingOption>("wasslaha");
   const [payment, setPayment] = useState<PaymentMethod>("cod");
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -125,7 +128,11 @@ export default function Checkout() {
   }, [proofFile]);
 
   const setField = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm(prev => ({ ...prev, [key]: e.target.value }));
+    let value = e.target.value;
+    if (key === "phone") {
+      value = value.replace(/\D/g, "").slice(0, 11);
+    }
+    setForm(prev => ({ ...prev, [key]: value }));
     setErrors(prev => ({ ...prev, [key]: undefined }));
   };
 
@@ -133,7 +140,12 @@ export default function Checkout() {
     const errs: typeof errors = {};
     if (!form.firstName.trim()) errs.firstName = "Required";
     if (!form.lastName.trim())  errs.lastName  = "Required";
-    if (!form.phone.trim())     errs.phone     = "Required";
+    const phoneDigits = form.phone.replace(/\D/g, "");
+    if (!phoneDigits) {
+      errs.phone = "Required";
+    } else if (!/^01[0125]\d{8}$/.test(phoneDigits)) {
+      errs.phone = "Enter a valid Egyptian number (11 digits, e.g. 01012345678)";
+    }
     if (!form.city.trim())      errs.city      = "Required";
     if (!form.area.trim())      errs.area      = "Required";
     if (!form.street.trim())    errs.street    = "Required";
@@ -165,7 +177,7 @@ export default function Checkout() {
       const response = await createOrder.mutateAsync({
         data: {
           name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
-          phone: form.phone.trim(),
+          phone: form.phone.replace(/\D/g, ""),
           address: `Building ${form.building.trim()}, Floor ${form.floor.trim()}, Apt ${form.apartment.trim()}, ${form.street.trim()}, ${form.area.trim()}, ${form.city.trim()}`,
           product: selectedProduct?.name ?? undefined,
           fit: selectedFit?.name ?? undefined,
@@ -195,6 +207,7 @@ export default function Checkout() {
       setSubmitting(false);
       setUploadingFiles(true);
       setSubmitted(true);
+      trackEvent("complete_order");
 
       void (async () => {
         try {

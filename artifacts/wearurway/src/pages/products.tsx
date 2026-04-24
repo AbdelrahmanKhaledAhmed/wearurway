@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useGetProducts } from "@workspace/api-client-react";
 import { useCustomizer } from "@/hooks/use-customizer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { trackEvent } from "@/lib/analytics";
 
 export default function Products() {
   const [, setLocation] = useLocation();
@@ -12,6 +13,7 @@ export default function Products() {
 
   useEffect(() => {
     reset();
+    trackEvent("view_products");
   }, [reset]);
 
   const handleSelect = (product: any) => {

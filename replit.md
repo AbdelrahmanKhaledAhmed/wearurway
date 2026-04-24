@@ -123,3 +123,23 @@ A premium streetwear customization website with a multi-step product configurato
 - Size availability, coming-soon state, and height/weight ranges are included in the API schema so admin controls persist and storefront size cards remain selectable when available.
 - `POST /api/create-order` returns the `WW-xxxxx` order ID immediately, then asynchronously saves order documents (payment proof, export PNGs) to Object Storage under `orders/<orderId>/` and sends a Telegram summary message.
 - Image uploads: click "Upload" in any image field → stored in Object Storage, URL auto-filled
+
+
+### Phone Validation (Egyptian)
+
+- Checkout phone field strips non-digits as user types and limits to 11 chars
+- Validates against `/^01[0125]\d{8}$/` (must be 11 digits, starting with 010/011/012/015)
+- Cleaned phone (digits-only) is sent to the API
+
+### Analytics (Light Funnel Tracking)
+
+- Backend: `analyticsEvents: Record<string, number>` on the store; persists in Postgres
+- Endpoints:
+  - `POST /api/analytics/event` — public, body `{name}`, increments counter (only allows 8 known event names)
+  - `GET /api/admin/analytics` — admin-only, returns counters
+  - `POST /api/admin/analytics/reset` — admin-only, zeroes all counters
+- Client helper: `artifacts/wearurway/src/lib/analytics.ts` exports `trackEvent(name)`
+  - Uses `sessionStorage` to dedupe per session (refreshes do not double-count)
+  - Uses `navigator.sendBeacon` when available so navigation doesn't block analytics
+- Tracked steps (the funnel): `view_landing`, `view_products`, `view_fits`, `view_colors`, `view_sizes`, `view_designer`, `view_checkout`, `complete_order`
+- Admin "analytics" tab shows the funnel with bars, % of step 1, and per-step drop-off, plus a Reset button

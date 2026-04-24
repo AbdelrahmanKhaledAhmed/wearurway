@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useGetFits } from "@workspace/api-client-react";
 import { useCustomizer } from "@/hooks/use-customizer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { trackEvent } from "@/lib/analytics";
 
 export default function Fits() {
   const [, setLocation] = useLocation();
@@ -17,6 +18,8 @@ export default function Fits() {
   useEffect(() => {
     if (!productId && !selectedProduct) {
       setLocation("/products");
+    } else {
+      trackEvent("view_fits");
     }
   }, [productId, selectedProduct, setLocation]);
 

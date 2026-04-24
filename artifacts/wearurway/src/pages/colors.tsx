@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useGetColors, getGetColorsQueryKey } from "@workspace/api-client-react";
 import { useCustomizer } from "@/hooks/use-customizer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { trackEvent } from "@/lib/analytics";
 
 export default function Colors() {
   const [, setLocation] = useLocation();
@@ -19,6 +20,8 @@ export default function Colors() {
   useEffect(() => {
     if (!fitId && !selectedFit) {
       setLocation("/fits");
+    } else {
+      trackEvent("view_colors");
     }
   }, [fitId, selectedFit, setLocation]);
 

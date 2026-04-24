@@ -92,7 +92,7 @@ export default function AdminDashboard() {
 
         <Tabs defaultValue="products" className="w-full">
           <TabsList className="mb-12 rounded-none border-b border-border bg-transparent h-auto p-0 flex space-x-8 overflow-x-auto justify-start w-full">
-            {["products", "fits", "colors", "sizes", "mockups", "order files", "settings", "fonts", "system"].map(tab => (
+            {["products", "fits", "colors", "sizes", "mockups", "order files", "settings", "fonts", "analytics", "system"].map(tab => (
               <TabsTrigger
                 key={tab}
                 value={tab}
@@ -110,6 +110,7 @@ export default function AdminDashboard() {
           <TabsContent value="order files"><OrderFilesManager /></TabsContent>
           <TabsContent value="settings"><OrderSettingsManager /></TabsContent>
           <TabsContent value="fonts"><FontsManager /></TabsContent>
+          <TabsContent value="analytics"><AnalyticsManager /></TabsContent>
           <TabsContent value="system"><SystemManager /></TabsContent>
         </Tabs>
       </motion.div>
@@ -1744,6 +1745,143 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
       <span className={`w-1.5 h-1.5 rounded-full ${ok ? "bg-emerald-500" : "bg-red-500"}`} />
       {label}
     </span>
+  );
+}
+
+interface AnalyticsResponse { events: Record<string, number>; }
+
+const FUNNEL_STEPS: { key: string; label: string }[] = [
+  { key: "view_landing",   label: "Landing page" },
+  { key: "view_products",  label: "Picked product" },
+  { key: "view_fits",      label: "Picked fit" },
+  { key: "view_colors",    label: "Picked color" },
+  { key: "view_sizes",     label: "Picked size" },
+  { key: "view_designer",  label: "Opened designer" },
+  { key: "view_checkout",  label: "Reached checkout" },
+  { key: "complete_order", label: "Completed order" },
+];
+
+function AnalyticsManager() {
+  const [data, setData] = useState<AnalyticsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [resetting, setResetting] = useState(false);
+  const { toast } = useToast();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const token = getAdminToken();
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch("/api/admin/analytics", { headers });
+      if (res.status === 401) throw new Error("Session expired. Please log out and log in again.");
+      if (!res.ok) throw new Error("Failed to load analytics");
+      const json = (await res.json()) as AnalyticsResponse;
+      setData(json);
+    } catch (err) {
+      setError(String(err));
+      toast({ title: "Could not load analytics" });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleReset = async () => {
+    if (!confirm("Reset all analytics counters to zero? This cannot be undone.")) return;
+    setResetting(true);
+    try {
+      const token = getAdminToken();
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch("/api/admin/analytics/reset", { method: "POST", headers });
+      if (!res.ok) throw new Error("Reset failed");
+      toast({ title: "Analytics reset" });
+      await load();
+    } catch (err) {
+      toast({ title: "Reset failed", description: String(err) });
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const events = data?.events ?? {};
+  const topCount = Math.max(events[FUNNEL_STEPS[0].key] ?? 0, 1);
+
+  return (
+    <div className="space-y-10 max-w-3xl">
+      <div>
+        <div className="flex items-end justify-between mb-1">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Funnel</h2>
+          <button onClick={load} className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors">
+            ↻ Refresh
+          </button>
+        </div>
+        <p className="text-sm text-muted-foreground mb-6">
+          How many unique sessions reached each step. Each session is counted once per step.
+        </p>
+
+        {loading ? (
+          <p className="text-xs uppercase tracking-widest text-muted-foreground animate-pulse">Loading...</p>
+        ) : error ? (
+          <p className="text-sm text-destructive">{error}</p>
+        ) : (
+          <div className="space-y-2">
+            {FUNNEL_STEPS.map((step, i) => {
+              const count = events[step.key] ?? 0;
+              const prevCount = i > 0 ? (events[FUNNEL_STEPS[i - 1].key] ?? 0) : count;
+              const dropPct = prevCount > 0 && i > 0
+                ? Math.round(((prevCount - count) / prevCount) * 100)
+                : 0;
+              const conversionFromTop = topCount > 0 ? Math.round((count / topCount) * 100) : 0;
+              const widthPct = topCount > 0 ? Math.max((count / topCount) * 100, 0) : 0;
+              return (
+                <div key={step.key} className="border border-border p-4">
+                  <div className="flex items-baseline justify-between mb-2">
+                    <p className="text-sm font-medium uppercase tracking-widest">{i + 1}. {step.label}</p>
+                    <p className="text-2xl font-bold tabular-nums">{count}</p>
+                  </div>
+                  <div className="h-1.5 bg-muted/40 mb-2">
+                    <div
+                      className="h-full bg-foreground transition-all"
+                      style={{ width: `${widthPct}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
+                    <span>{conversionFromTop}% of step 1</span>
+                    {i > 0 && (
+                      <span className={dropPct > 50 ? "text-destructive" : ""}>
+                        {dropPct >= 0 ? `${dropPct}% drop-off from previous` : `+${-dropPct}% vs previous`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="border border-border p-5 space-y-3 bg-muted/5">
+        <p className="text-xs font-bold uppercase tracking-widest">How this works</p>
+        <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
+          <li>Each visitor's browser fires one event per step per session — refreshes don't inflate the numbers.</li>
+          <li>The biggest drop-off tells you where customers are quitting. Investigate that step first.</li>
+          <li>Counters live in the database and survive restarts and redeployments.</li>
+        </ul>
+        <div className="pt-2">
+          <Button
+            variant="ghost"
+            onClick={handleReset}
+            disabled={resetting || loading}
+            className="text-xs uppercase tracking-widest rounded-none text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-2" /> {resetting ? "Resetting..." : "Reset all counters"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 

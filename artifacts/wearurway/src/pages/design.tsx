@@ -10,6 +10,7 @@ import AddImageModal from "@/components/AddImageModal";
 import OrderReviewModal from "@/components/OrderReviewModal";
 import PinterestImportButton from "@/components/PinterestImportButton";
 import { generateDesignExportFiles } from "@/lib/design-export";
+import { trackEvent } from "@/lib/analytics";
 
 interface BBox { x: number; y: number; width: number; height: number }
 
@@ -144,8 +145,10 @@ export default function Design() {
   useEffect(() => {
     if (!selectedProduct || !selectedFit || !selectedColor) {
       setLocation("/products");
+    } else if (!isAdminPreview) {
+      trackEvent("view_designer");
     }
-  }, [selectedProduct, selectedFit, selectedColor, setLocation]);
+  }, [selectedProduct, selectedFit, selectedColor, setLocation, isAdminPreview]);
 
   const savedDesignLoaded = useRef(false);
 
