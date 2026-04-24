@@ -93,15 +93,17 @@ A premium streetwear customization website with a multi-step product configurato
 - `POST /api/orders/:orderId/complete` — legacy "send notification" endpoint, still wired to the outbox (the new client flow does not call it because feedback ships in `/create-order`).
 - Order outbox: `services/orderOutbox.ts` retries every pending upload and notification with exponential backoff (cap 60s) forever, persists state in the `store_data` JSONB row, and resumes on server restart.
 
-### Client-side order durability
+### Client-side order durability (instant success + background work)
 
-Submitting an order on the wearurway frontend is a durable, recoverable operation:
+Submitting an order is split into two phases. The customer sees the success screen the instant they tap Complete Order; everything else happens in the background and survives page-close, browser-close, and offline.
 
-- `lib/order-queue.ts` writes the full order payload (proof + export PNGs + feedback) to **IndexedDB** before posting `/api/create-order`. The record is only deleted when the server returns 200.
-- `submitQueuedOrder` retries the POST in the page with exponential backoff (cap 60s) until success.
-- `flushQueuedOrders` runs on every app boot (and on every browser `online` event) so any payload left over from a closed/disconnected session is replayed.
-- `public/order-sync-sw.js` is a Service Worker that listens for the `wearurway-order-sync` Background Sync tag (and a `wearurway-flush-orders` postMessage). When supported (Android Chrome / Edge / Samsung Internet), the OS replays the POST even with no tab open.
-- Net effect: once the user clicks Complete Order, even if they close the tab, lock the phone, or lose internet, the order completes the next time the device has connectivity.
+- `lib/order-queue.ts` stores two record kinds in the IndexedDB DB `wearurway-order-queue` / store `pending-orders`:
+  - `kind: "spec"` — small record with customer info, payment proof data URL, design job spec (layer JSON, no rendered images yet), feedback, and a **client-generated order id** (`WW-XXXXXXXX`). Saved via `saveSpecQueuedOrder` in tens of ms.
+  - `kind: "submit"` — full payload with rendered export PNG data URLs, ready to POST.
+- `flushQueuedOrders` walks the queue: for `spec` records it calls `generateDesignExportBlobs` to render the design PNGs, upgrades the record to `submit` kind, then POSTs `/api/create-order`. Both phases retry forever with exponential backoff (cap 60 s). Called on every app boot and every `online` event.
+- The server treats `body.orderId` as an idempotency key — repeat POSTs never create duplicate orders or duplicate Telegram messages.
+- `public/order-sync-sw.js` is a Service Worker that drains `submit`-kind records on the `wearurway-order-sync` Background Sync tag, so retries continue with no tab open (Chromium-based browsers). It skips `spec`-kind records because Service Workers can't render Canvas; those wait for the next time a tab is open.
+- Net effect: once the customer taps Complete Order, the success screen appears within ~200 ms, and the order is guaranteed to reach R2 + Telegram even if they immediately close the tab, lock the phone, or stay offline for hours.
 - `GET /api/admin/order-files` — list all orders with their stored file metadata (admin)
 - `DELETE /api/admin/order-files/:orderId` — delete order files from Object Storage + remove record (admin)
 

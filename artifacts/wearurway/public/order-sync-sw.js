@@ -141,6 +141,11 @@ async function drainQueue() {
     return;
   }
   for (const record of records) {
+    // The Service Worker can't render Canvas, so spec-kind records (which
+    // still need image rendering) are skipped here. The next time a tab is
+    // open the in-page flush will render them and turn them into submit-kind
+    // records, which we *can* drive from here.
+    if (!record || record.kind !== "submit" || !record.payload) continue;
     const result = await postOrder(record.payload);
     if (result.ok) {
       try {

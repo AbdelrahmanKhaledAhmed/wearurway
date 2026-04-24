@@ -1,18 +1,44 @@
 /**
- * Durable client-side order queue.
+ * Durable, two-phase client-side order queue.
  *
- * The full order payload (delivery info + payment proof + design export blobs +
- * feedback) is written to IndexedDB *before* we POST /api/create-order.
- * It only gets removed after the server confirms.
+ * The customer should see the success screen the *instant* they tap Complete
+ * Order. Heavy work (image rendering, network upload, server processing) must
+ * happen invisibly in the background and survive the page closing, the browser
+ * closing, and the device going offline.
  *
- * If the user closes the page, loses internet, or the request fails partway,
- * we still have the payload sitting in IndexedDB and can resume it:
- *   - On every app boot we call `flushQueuedOrders()` which retries any
- *     unsent payloads in the background.
- *   - When the browser supports Service Worker Background Sync (Android
- *     Chrome, Edge), we register a sync that lets the OS replay the request
- *     even with no tab open.
+ * To make that work the queue stores records in two "kinds":
+ *
+ *   1. `kind: "spec"` — the small, instantly-savable record:
+ *        order id (generated client-side so we can show it immediately),
+ *        customer + product info, payment proof data URL, design job spec,
+ *        feedback. Saving this to IndexedDB takes ~tens of milliseconds even
+ *        on slow phones because there are no rendered PNGs in it yet.
+ *
+ *   2. `kind: "submit"` — the fully-prepared payload, including the rendered
+ *        export PNGs as data URLs, ready to POST to /api/create-order.
+ *
+ * The flow:
+ *   - `saveSpecQueuedOrder` writes the spec record and returns the order id.
+ *     The checkout page then immediately shows the success screen.
+ *   - `flushQueuedOrders` (called on app boot, on `online`, and right after
+ *     the spec is saved) walks the queue:
+ *       • for each `spec` record  → render the design exports, upgrade the
+ *         record to `submit` kind in IndexedDB, then…
+ *       • for each `submit` record → POST it to the server, retrying with
+ *         exponential backoff forever, and only delete the record once the
+ *         server returns 200.
+ *   - The Service Worker (`/order-sync-sw.js`) drains `submit` records when
+ *     the OS fires a Background Sync, so retries continue with no tab open.
+ *     The SW cannot render images, so any `spec` record waits for the next
+ *     time a tab opens.
+ *
+ * The server treats the client-supplied order id as an idempotency key: if it
+ * already has an order with that id it returns 200 immediately, so a POST that
+ * reaches the server but whose response is lost will not create a duplicate.
  */
+
+import { generateDesignExportBlobs, type DesignExportBlob } from "./design-export";
+import type { CreateOrderDesignJob } from "@workspace/api-client-react";
 
 const DB_NAME = "wearurway-order-queue";
 const DB_VERSION = 1;
@@ -25,7 +51,8 @@ export interface QueuedOrderFile {
   dataUrl: string;
 }
 
-export interface QueuedOrderPayload {
+/** Customer + product info shared between the spec and submit records. */
+export interface QueuedOrderCustomer {
   name: string;
   phone: string;
   address: string;
@@ -39,13 +66,33 @@ export interface QueuedOrderPayload {
   total: number;
   frontImage?: string;
   backImage?: string;
+}
+
+/** The full payload that gets POSTed to /api/create-order. */
+export interface QueuedOrderPayload extends QueuedOrderCustomer {
+  orderId: string;
   paymentProof?: QueuedOrderFile;
   exportFiles?: QueuedOrderFile[];
   feedback?: string;
 }
 
-export interface QueuedOrderRecord {
+export interface QueuedOrderSpecRecord {
   id: string;
+  kind: "spec";
+  orderId: string;
+  customer: QueuedOrderCustomer;
+  paymentProof?: QueuedOrderFile;
+  designJob?: CreateOrderDesignJob;
+  feedback?: string;
+  attempts: number;
+  lastError?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QueuedOrderSubmitRecord {
+  id: string;
+  kind: "submit";
   payload: QueuedOrderPayload;
   attempts: number;
   lastError?: string;
@@ -53,9 +100,21 @@ export interface QueuedOrderRecord {
   updatedAt: string;
 }
 
-function makeId(): string {
+export type QueuedOrderRecord = QueuedOrderSpecRecord | QueuedOrderSubmitRecord;
+
+function makeQueueId(): string {
   const random = Math.random().toString(36).slice(2, 10);
   return `${Date.now().toString(36)}-${random}`;
+}
+
+/**
+ * Generate a customer-facing order id on the client. Long enough that
+ * collisions are negligible across the lifetime of the brand, while still
+ * looking friendly (e.g. WW-A4F2K8B1).
+ */
+export function generateOrderId(): string {
+  const part = () => Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `WW-${part()}${part()}`;
 }
 
 function openDB(): Promise<IDBDatabase> {
@@ -115,18 +174,38 @@ function reqToPromise<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
-export async function saveQueuedOrder(payload: QueuedOrderPayload): Promise<string> {
-  const id = makeId();
+export interface SaveSpecArgs {
+  customer: QueuedOrderCustomer;
+  paymentProof?: QueuedOrderFile;
+  designJob?: CreateOrderDesignJob;
+  feedback?: string;
+}
+
+/**
+ * Persist a spec record to IndexedDB. This is the only step the user actually
+ * waits for after tapping Complete Order — once it resolves the order is
+ * durable and the success screen can be shown.
+ */
+export async function saveSpecQueuedOrder(
+  args: SaveSpecArgs,
+): Promise<{ queueId: string; orderId: string }> {
+  const queueId = makeQueueId();
+  const orderId = generateOrderId();
   const now = new Date().toISOString();
-  const record: QueuedOrderRecord = {
-    id,
-    payload,
+  const record: QueuedOrderSpecRecord = {
+    id: queueId,
+    kind: "spec",
+    orderId,
+    customer: args.customer,
+    paymentProof: args.paymentProof,
+    designJob: args.designJob,
+    feedback: args.feedback,
     attempts: 0,
     createdAt: now,
     updatedAt: now,
   };
   await withStore("readwrite", (store) => reqToPromise(store.put(record)));
-  return id;
+  return { queueId, orderId };
 }
 
 export async function loadQueuedOrders(): Promise<QueuedOrderRecord[]> {
@@ -142,10 +221,7 @@ export async function removeQueuedOrder(id: string): Promise<void> {
   await withStore("readwrite", (store) => reqToPromise(store.delete(id)));
 }
 
-export async function bumpQueuedOrderAttempt(
-  id: string,
-  error: string,
-): Promise<void> {
+async function bumpAttempt(id: string, error: string): Promise<void> {
   await withStore("readwrite", async (store) => {
     const existing = (await reqToPromise(store.get(id))) as
       | QueuedOrderRecord
@@ -158,11 +234,32 @@ export async function bumpQueuedOrderAttempt(
   });
 }
 
-const inFlight = new Set<string>();
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Could not read blob"));
+    };
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Could not read blob"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function exportBlobsToFiles(
+  blobs: DesignExportBlob[],
+): Promise<QueuedOrderFile[]> {
+  const out: QueuedOrderFile[] = [];
+  for (const file of blobs) {
+    const dataUrl = await blobToDataUrl(file.blob);
+    out.push({ fileName: file.fileName, dataUrl });
+  }
+  return out;
+}
 
 interface SubmitResult {
   ok: boolean;
-  orderId?: string;
   error?: string;
   retriable: boolean;
 }
@@ -174,16 +271,10 @@ async function postOrder(payload: QueuedOrderPayload): Promise<SubmitResult> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (res.ok) {
-      const data = (await res.json().catch(() => null)) as
-        | { orderId?: string }
-        | null;
-      return { ok: true, orderId: data?.orderId, retriable: false };
-    }
+    if (res.ok) return { ok: true, retriable: false };
     if (res.status >= 500) {
       return { ok: false, error: `Server ${res.status}`, retriable: true };
     }
-    // 4xx — payload is bad, no point retrying
     let message = `HTTP ${res.status}`;
     try {
       const data = (await res.json()) as { error?: string };
@@ -193,7 +284,6 @@ async function postOrder(payload: QueuedOrderPayload): Promise<SubmitResult> {
     }
     return { ok: false, error: message, retriable: false };
   } catch (err) {
-    // Network / offline / aborted
     return {
       ok: false,
       error: err instanceof Error ? err.message : String(err),
@@ -206,53 +296,101 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Submit a queued order with persistent retry while the page is open.
- * Resolves once the order is accepted by the server (and removed from the
- * queue). Rejects only on a non-retriable error (4xx) — in which case the
- * record is also removed because we cannot retry it usefully.
- *
- * If the page is closed mid-submit the next `flushQueuedOrders()` call (on
- * the next visit) will pick the same record up again.
- */
-export async function submitQueuedOrder(id: string): Promise<string> {
-  if (inFlight.has(id)) {
-    throw new Error("Order is already being submitted");
-  }
-  inFlight.add(id);
-  try {
-    const records = await loadQueuedOrders();
-    const record = records.find((r) => r.id === id);
-    if (!record) throw new Error("Queued order not found");
+const renderInFlight = new Set<string>();
+const submitInFlight = new Set<string>();
 
+async function upgradeSpecToSubmit(
+  record: QueuedOrderSpecRecord,
+): Promise<QueuedOrderSubmitRecord> {
+  let exportFiles: QueuedOrderFile[] = [];
+  if (record.designJob) {
+    const blobs = await generateDesignExportBlobs(record.designJob);
+    exportFiles = await exportBlobsToFiles(blobs);
+  }
+  const payload: QueuedOrderPayload = {
+    ...record.customer,
+    orderId: record.orderId,
+    paymentProof: record.paymentProof,
+    exportFiles,
+    feedback: record.feedback,
+  };
+  const submitRecord: QueuedOrderSubmitRecord = {
+    id: record.id,
+    kind: "submit",
+    payload,
+    attempts: 0,
+    createdAt: record.createdAt,
+    updatedAt: new Date().toISOString(),
+  };
+  await withStore("readwrite", (store) => reqToPromise(store.put(submitRecord)));
+  return submitRecord;
+}
+
+async function processSpecRecord(record: QueuedOrderSpecRecord): Promise<void> {
+  if (renderInFlight.has(record.id)) return;
+  renderInFlight.add(record.id);
+  try {
+    let attempt = 0;
+    while (true) {
+      attempt += 1;
+      try {
+        const submitRecord = await upgradeSpecToSubmit(record);
+        void processSubmitRecord(submitRecord);
+        return;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        await bumpAttempt(record.id, message).catch(() => {});
+        const wait = Math.min(60_000, 1000 * 2 ** Math.min(attempt, 8));
+        await delay(wait);
+      }
+    }
+  } finally {
+    renderInFlight.delete(record.id);
+  }
+}
+
+async function processSubmitRecord(
+  record: QueuedOrderSubmitRecord,
+): Promise<void> {
+  if (submitInFlight.has(record.id)) return;
+  submitInFlight.add(record.id);
+  try {
     let attempt = 0;
     while (true) {
       attempt += 1;
       const result = await postOrder(record.payload);
-      if (result.ok && result.orderId) {
-        await removeQueuedOrder(id);
-        return result.orderId;
+      if (result.ok) {
+        await removeQueuedOrder(record.id).catch(() => {});
+        return;
       }
       const message = result.error ?? "Unknown error";
-      await bumpQueuedOrderAttempt(id, message);
+      await bumpAttempt(record.id, message).catch(() => {});
       if (!result.retriable) {
-        await removeQueuedOrder(id);
-        throw new Error(message);
+        // 4xx — payload is structurally bad and retrying won't help. Log
+        // loudly and drop so the queue doesn't loop forever; the server side
+        // also logs the rejected payload for the admin to recover manually.
+        // eslint-disable-next-line no-console
+        console.error(
+          "[order-queue] Order dropped non-retriably:",
+          record.payload.orderId,
+          message,
+        );
+        await removeQueuedOrder(record.id).catch(() => {});
+        return;
       }
-      // Ask the SW to take over too (so retries continue even if the tab dies)
       void registerBackgroundSync();
       const wait = Math.min(60_000, 1000 * 2 ** Math.min(attempt, 8));
       await delay(wait);
     }
   } finally {
-    inFlight.delete(id);
+    submitInFlight.delete(record.id);
   }
 }
 
 /**
- * Drain the queue: kick off a submit for every pending payload that isn't
- * already being processed. Resolves immediately; submissions continue in the
- * background. Safe to call multiple times.
+ * Drain the queue: process every pending record. For spec records we render
+ * then submit; for submit records we post. Returns immediately — work
+ * continues in the background. Safe to call multiple times concurrently.
  */
 export async function flushQueuedOrders(): Promise<void> {
   let records: QueuedOrderRecord[];
@@ -262,11 +400,11 @@ export async function flushQueuedOrders(): Promise<void> {
     return;
   }
   for (const record of records) {
-    if (inFlight.has(record.id)) continue;
-    void submitQueuedOrder(record.id).catch(() => {
-      // Errors are already persisted on the record; the next flush will retry
-      // unless the error was non-retriable, in which case the record is gone.
-    });
+    if (record.kind === "spec") {
+      void processSpecRecord(record).catch(() => {});
+    } else {
+      void processSubmitRecord(record).catch(() => {});
+    }
   }
 }
 

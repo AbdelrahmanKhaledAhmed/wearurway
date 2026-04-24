@@ -25,6 +25,7 @@ interface CreateOrderFile {
 }
 
 interface CreateOrderBody {
+  orderId?: string;
   name?: string;
   phone?: string;
   address?: string;
@@ -42,6 +43,8 @@ interface CreateOrderBody {
   exportFiles?: CreateOrderFile[];
   feedback?: string;
 }
+
+const CLIENT_ORDER_ID_RE = /^WW-[A-Z0-9-]{4,32}$/;
 
 interface UploadOrderDocumentsBody {
   exportFiles?: CreateOrderFile[];
@@ -108,6 +111,15 @@ function registerOrderFolder(
 router.post("/create-order", (req, res) => {
   const body = req.body as CreateOrderBody;
 
+  // Idempotency: if the client supplied an order id we already have, this is
+  // a retry of a request whose response was lost. Return success without
+  // re-doing anything so we never create a duplicate order or re-trigger a
+  // duplicate Telegram notification.
+  if (body.orderId && getStore().orders[body.orderId]) {
+    res.json({ orderId: body.orderId });
+    return;
+  }
+
   if (
     !body.name ||
     !body.phone ||
@@ -144,7 +156,10 @@ router.post("/create-order", (req, res) => {
     return;
   }
 
-  const orderId = generateOrderId();
+  const orderId =
+    body.orderId && CLIENT_ORDER_ID_RE.test(body.orderId)
+      ? body.orderId
+      : generateOrderId();
 
   const orderRecord: OrderRecord = {
     orderId,

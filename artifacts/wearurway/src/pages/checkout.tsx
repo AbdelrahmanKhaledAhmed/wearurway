@@ -3,14 +3,13 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCustomizer } from "@/hooks/use-customizer";
 import { useGetOrderSettings } from "@workspace/api-client-react";
-import { generateDesignExportBlobs, type DesignExportBlob } from "@/lib/design-export";
 import type { CreateOrderDesignJob } from "@workspace/api-client-react";
 import { trackEvent } from "@/lib/analytics";
 import {
-  saveQueuedOrder,
-  submitQueuedOrder,
-  type QueuedOrderFile,
-  type QueuedOrderPayload,
+  saveSpecQueuedOrder,
+  flushQueuedOrders,
+  registerBackgroundSync,
+  type QueuedOrderCustomer,
 } from "@/lib/order-queue";
 
 const FREE_SHIPPING_AREAS = ["6th of October", "Sheikh Zayed"];
@@ -48,29 +47,6 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") resolve(reader.result);
-      else reject(new Error("Could not read export blob"));
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("Could not read export blob"));
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function exportBlobsToFiles(
-  blobs: DesignExportBlob[],
-): Promise<QueuedOrderFile[]> {
-  const out: QueuedOrderFile[] = [];
-  for (const file of blobs) {
-    const dataUrl = await blobToDataUrl(file.blob);
-    out.push({ fileName: file.fileName, dataUrl });
-  }
-  return out;
-}
-
 export default function Checkout() {
   const [, setLocation] = useLocation();
   const { selectedProduct, selectedFit, selectedColor, selectedSize, reset } = useCustomizer();
@@ -92,7 +68,6 @@ export default function Checkout() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [orderId, setOrderId] = useState("");
-  const [uploadingFiles, setUploadingFiles] = useState(false);
   const [showRefundPolicy, setShowRefundPolicy] = useState(false);
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
@@ -149,29 +124,21 @@ export default function Checkout() {
     setShowFeedbackPrompt(false);
     setSubmitError("");
     setSubmitting(true);
-    setUploadingFiles(true);
     try {
       const designJobText = sessionStorage.getItem("ww_checkout_design_job");
       const designJob = designJobText
         ? (JSON.parse(designJobText) as CreateOrderDesignJob)
         : undefined;
 
-      // 1. Convert payment proof to a data URL up front.
+      // 1. Read the (small) payment proof to a data URL. This is the only
+      //    blocking I/O the customer waits for — typically <200ms even on
+      //    a phone, since it's just a screenshot.
       const paymentProof =
         payment === "instapay" && proofFile
           ? { fileName: proofFile.name, dataUrl: await fileToDataUrl(proofFile) }
           : undefined;
 
-      // 2. Generate the design export PNGs in the browser BEFORE we touch the
-      //    network. If the user disconnects after this point, the data is
-      //    already saved durably in IndexedDB by step 3.
-      let exportFiles: QueuedOrderFile[] = [];
-      if (designJob) {
-        const blobs = await generateDesignExportBlobs(designJob);
-        exportFiles = await exportBlobsToFiles(blobs);
-      }
-
-      const payload: QueuedOrderPayload = {
+      const customer: QueuedOrderCustomer = {
         name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
         phone: form.phone.replace(/\D/g, ""),
         address: `Building ${form.building.trim()}, Floor ${form.floor.trim()}, Apt ${form.apartment.trim()}, ${form.street.trim()}, ${form.area.trim()}, ${form.city.trim()}`,
@@ -189,40 +156,46 @@ export default function Checkout() {
         total,
         frontImage: frontPreview || undefined,
         backImage: backPreview || undefined,
-        paymentProof,
-        exportFiles,
-        feedback: feedback.trim() || undefined,
       };
 
-      // 3. Persist the entire payload to IndexedDB. From here on the order is
-      //    durable: even if the browser is closed before the POST succeeds,
-      //    the next page load will retry it (and a Service Worker will retry
-      //    in the background when supported).
-      const queueId = await saveQueuedOrder(payload);
+      // 2. Save the spec to IndexedDB. Heavy work (rendering the design
+      //    export PNGs, uploading, notifying Telegram) is intentionally NOT
+      //    done here — it's deferred to the background queue worker. As soon
+      //    as this resolves the order is durable and the customer can be
+      //    shown the success screen, even if they disconnect immediately.
+      const { orderId: newOrderId } = await saveSpecQueuedOrder({
+        customer,
+        paymentProof,
+        designJob,
+        feedback: feedback.trim() || undefined,
+      });
 
-      // 4. Clear sessionStorage so a refresh doesn't re-prepare the same
+      // 3. Clear sessionStorage so a refresh doesn't re-prepare the same
       //    design — the durable copy is already in IndexedDB.
       sessionStorage.removeItem("ww_checkout_front");
       sessionStorage.removeItem("ww_checkout_back");
       sessionStorage.removeItem("ww_checkout_price");
       sessionStorage.removeItem("ww_checkout_design_job");
 
-      // 5. Submit. submitQueuedOrder retries with exponential backoff for as
-      //    long as the page stays open; if the page closes mid-submit the
-      //    record stays in IndexedDB and is retried on next visit / by SW.
-      const newOrderId = await submitQueuedOrder(queueId);
-
+      // 4. Show the success screen IMMEDIATELY with the order id we just
+      //    generated client-side. The server treats that id as an
+      //    idempotency key so retries from the queue can never duplicate.
       setOrderId(newOrderId);
       setSubmitting(false);
-      setUploadingFiles(false);
       setSubmitted(true);
       trackEvent("complete_order");
+
+      // 5. Kick off background processing — render the design exports, POST
+      //    to /api/create-order, retry forever on failure. Don't await; this
+      //    runs while the customer enjoys the success screen, navigates
+      //    away, or even closes the tab (Service Worker takes over).
+      void flushQueuedOrders();
+      void registerBackgroundSync();
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Could not submit order. Please try again.",
       );
       setSubmitting(false);
-      setUploadingFiles(false);
     }
   };
 
