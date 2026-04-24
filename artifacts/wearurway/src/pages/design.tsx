@@ -1135,9 +1135,9 @@ export default function Design() {
                             <button
                               onClick={() => startEditLayer(layer)}
                               className="w-full text-xs py-1.5 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold"
-                              title="Edit image"
+                              title={layer.kind === "text" ? "Edit text" : "Edit image"}
                             >
-                              ✏ Edit Image
+                              ✏ {layer.kind === "text" ? "Edit Text" : "Edit Image"}
                             </button>
                             <div className="flex gap-1.5">
                               <button
