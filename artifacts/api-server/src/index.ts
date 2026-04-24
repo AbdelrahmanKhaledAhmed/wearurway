@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { initStore } from "./data/store.js";
+import { initStore, flushPendingSaves } from "./data/store.js";
+import { initAnalytics } from "./services/analyticsStore.js";
 import { cleanupExpiredDesigns } from "./routes/shared-designs.js";
 import { startOrderOutbox } from "./services/orderOutbox.js";
 import http from "node:http";
@@ -24,6 +25,7 @@ process.on("unhandledRejection", (reason) => {
 
 async function main() {
   await initStore();
+  await initAnalytics();
 
   const server = http.createServer(app);
 
@@ -43,7 +45,12 @@ async function main() {
 
   process.on("SIGTERM", () => {
     logger.info("SIGTERM received — shutting down gracefully");
-    server.close(() => {
+    server.close(async () => {
+      try {
+        await flushPendingSaves();
+      } catch (err) {
+        logger.error({ err }, "Failed to flush pending DB saves on shutdown");
+      }
       logger.info("Server closed");
       process.exit(0);
     });

@@ -1,6 +1,11 @@
 import { Router, type IRouter } from "express";
-import { getStore, updateStore } from "../data/store.js";
+import {
+  incrementAnalyticsEvent,
+  getAnalyticsEvents,
+  resetAnalyticsEvents,
+} from "../services/analyticsStore.js";
 import { isAdminAuthenticated } from "./admin.js";
+import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 
@@ -22,32 +27,40 @@ router.post("/analytics/event", (req, res) => {
     res.status(204).end();
     return;
   }
-  updateStore((store) => {
-    const current = store.analyticsEvents?.[name] ?? 0;
-    if (!store.analyticsEvents) store.analyticsEvents = {};
-    store.analyticsEvents[name] = current + 1;
-  });
+  // Respond immediately. The single-row upsert is cheap and fire-and-forget
+  // so visitors never wait on the analytics write.
   res.status(204).end();
-});
-
-router.get("/admin/analytics", (req, res) => {
-  if (!isAdminAuthenticated(req as Parameters<typeof isAdminAuthenticated>[0])) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  const events = getStore().analyticsEvents ?? {};
-  res.json({ events });
-});
-
-router.post("/admin/analytics/reset", (req, res) => {
-  if (!isAdminAuthenticated(req as Parameters<typeof isAdminAuthenticated>[0])) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  updateStore((store) => {
-    store.analyticsEvents = {};
+  void incrementAnalyticsEvent(name).catch((err) => {
+    logger.warn({ err, name }, "Failed to record analytics event");
   });
-  res.json({ success: true });
+});
+
+router.get("/admin/analytics", async (req, res) => {
+  if (!isAdminAuthenticated(req as Parameters<typeof isAdminAuthenticated>[0])) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  try {
+    const events = await getAnalyticsEvents();
+    res.json({ events });
+  } catch (err) {
+    logger.error({ err }, "Failed to read analytics events");
+    res.status(500).json({ error: "Could not read analytics" });
+  }
+});
+
+router.post("/admin/analytics/reset", async (req, res) => {
+  if (!isAdminAuthenticated(req as Parameters<typeof isAdminAuthenticated>[0])) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  try {
+    await resetAnalyticsEvents();
+    res.json({ success: true });
+  } catch (err) {
+    logger.error({ err }, "Failed to reset analytics events");
+    res.status(500).json({ error: "Could not reset analytics" });
+  }
 });
 
 export default router;

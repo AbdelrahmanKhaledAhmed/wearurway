@@ -53,7 +53,7 @@ A premium streetwear customization website with a multi-step product configurato
 ### Backend (artifacts/api-server)
 
 - Express 5 API — fully migrated to persistent storage (no more db.json)
-- **Store**: PostgreSQL `store_data` table with a single JSONB row (`key='main'`); in-memory cache with async upsert via `store.ts`
+- **Store**: PostgreSQL `store_data` table with a single JSONB row (`key='main'`); in-memory cache with **coalesced** async upsert via `store.ts`. `updateStore` mutates the in-memory copy and marks the row dirty; a single debounced (~250ms) save flushes per window, with at most one follow-up save queued while a write is in flight. `flushPendingSaves()` is called on SIGTERM so the last batch is never lost.
 - **File storage**: Replit Object Storage (GCS-backed) via `lib/objectStorage.ts` (`uploadBuffer`, `deleteObject`, `objectExists`, `streamObject`)
   - Mockup images: `uploads/mockups/`
   - Shared layer uploads: `uploads/shared-layers/`
@@ -146,7 +146,7 @@ Submitting an order is split into two phases. The customer sees the success scre
 
 ### Analytics (Light Funnel Tracking)
 
-- Backend: `analyticsEvents: Record<string, number>` on the store; persists in Postgres
+- Backend: dedicated `analytics_events(name TEXT PRIMARY KEY, count BIGINT)` table — each event is a single one-row upsert (`INSERT … ON CONFLICT DO UPDATE`), not a rewrite of the main JSONB store row. Legacy counters from the old `store.analyticsEvents` blob are migrated into this table on startup via `services/analyticsStore.ts`.
 - Endpoints:
   - `POST /api/analytics/event` — public, body `{name}`, increments counter (only allows 8 known event names)
   - `GET /api/admin/analytics` — admin-only, returns counters

@@ -287,11 +287,74 @@ export function getStore(): Store {
   return store;
 }
 
+// ── Coalesced persistence ────────────────────────────────────────────────────
+//
+// Every state mutation lives in one big JSONB row, so writing it on every
+// single `updateStore` call (often many per request, plus background outbox
+// progress) creates severe write amplification. Instead we mark the store
+// "dirty" on each update and flush at most one write per `SAVE_DEBOUNCE_MS`
+// window. While a save is in flight further dirty marks queue exactly one
+// follow-up save, so a burst of N updates produces 1–2 writes instead of N.
+
+const SAVE_DEBOUNCE_MS = 250;
+
+let dirty = false;
+let saveTimer: NodeJS.Timeout | null = null;
+let saveInFlight: Promise<void> | null = null;
+
+function scheduleSave(): void {
+  dirty = true;
+  if (saveTimer || saveInFlight) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    void runSave();
+  }, SAVE_DEBOUNCE_MS);
+  if (typeof saveTimer.unref === "function") saveTimer.unref();
+}
+
+async function runSave(): Promise<void> {
+  if (!dirty) return;
+  dirty = false;
+  const snapshot = store;
+  saveInFlight = saveToDB(snapshot)
+    .catch((err) => {
+      // Re-mark dirty so the next tick retries.
+      dirty = true;
+      console.error("[store] Failed to persist to DB:", err);
+    })
+    .finally(() => {
+      saveInFlight = null;
+      // If more updates landed during the in-flight save, schedule again.
+      if (dirty) scheduleSave();
+    });
+  await saveInFlight;
+}
+
 export function updateStore(updater: (s: Store) => void): void {
   updater(store);
-  saveToDB(store).catch((err) =>
-    console.error("[store] Failed to persist to DB:", err)
-  );
+  scheduleSave();
+}
+
+/**
+ * Force any pending coalesced write to be persisted now and wait for it.
+ * Call from SIGTERM handlers so a clean shutdown doesn't drop the last
+ * batch of changes.
+ */
+export async function flushPendingSaves(): Promise<void> {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  if (saveInFlight) {
+    try {
+      await saveInFlight;
+    } catch {
+      // already logged inside runSave
+    }
+  }
+  if (dirty) {
+    await runSave();
+  }
 }
 
 export function generateId(): string {
