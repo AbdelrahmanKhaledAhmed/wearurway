@@ -42,7 +42,7 @@ router.get("/admin/system/config", (req, res) => {
     database: {
       provider: isSupabase ? "Supabase (PostgreSQL)" : "PostgreSQL",
       configured: !!dbUrl,
-      connectionVariable: "config.database.url (src/config.ts)",
+      connectionVariable: "DATABASE_URL",
     },
     storage: {
       provider: "Cloudflare R2",

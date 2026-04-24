@@ -8,11 +8,11 @@ let activeProvider = "Unknown";
 
 function getPool(): InstanceType<typeof Pool> {
   if (!pool) {
-    const connectionString = config.database.url || process.env.DATABASE_URL;
+    const connectionString = config.database.url;
 
     if (!connectionString) {
       throw new Error(
-        "No database connection string found. Set config.database.url in src/config.ts."
+        "No database connection string found. Set the DATABASE_URL environment variable."
       );
     }
 

@@ -14,7 +14,7 @@ function getR2Config() {
 
   if (!accountId || !accessKeyId || !secretAccessKey || !bucketName) {
     throw new Error(
-      "Missing Cloudflare R2 configuration. Set values in src/config.ts under config.r2"
+      "Missing Cloudflare R2 configuration. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET_NAME environment variables."
     );
   }
 
