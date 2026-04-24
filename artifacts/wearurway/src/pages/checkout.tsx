@@ -96,6 +96,7 @@ export default function Checkout() {
   const [submitError, setSubmitError] = useState("");
   const [orderId, setOrderId] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [showRefundPolicy, setShowRefundPolicy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const shippingCost = shipping === "free" ? 0 : (orderSettings?.shippingPrice ?? 85);
@@ -254,7 +255,7 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-[#0b0b0b] text-white">
-      <div className="max-w-6xl mx-auto px-6 py-10">
+      <div className="max-w-6xl mx-auto px-6 pt-20 pb-10">
 
         {/* Page heading */}
         <div className="mb-10">
@@ -411,6 +412,15 @@ export default function Checkout() {
             <div className="lg:hidden pt-6 mt-2 border-t border-white/10">
               <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleSubmit} />
               {submitError && <p className="text-xs text-red-400 mt-3">{submitError}</p>}
+              <div className="mt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowRefundPolicy(true)}
+                  className="text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
+                >
+                  Refund Policy
+                </button>
+              </div>
             </div>
 
           </div>
@@ -490,11 +500,57 @@ export default function Checkout() {
             <div className="hidden lg:block pt-4 mt-2">
               <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleSubmit} />
               {submitError && <p className="text-xs text-red-400 mt-3">{submitError}</p>}
+              <div className="mt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowRefundPolicy(true)}
+                  className="text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
+                >
+                  Refund Policy
+                </button>
+              </div>
             </div>
 
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {showRefundPolicy && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowRefundPolicy(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.18 }}
+              className="w-full max-w-md bg-[#141414] border border-white/10 p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-[10px] tracking-[0.3em] text-white/40 uppercase mb-2">Policy</p>
+              <h3 className="text-lg font-black uppercase tracking-[0.06em] mb-4" style={{ fontFamily: "monospace" }}>
+                Refund Policy
+              </h3>
+              <p className="text-sm text-white/70 leading-relaxed">
+                Unfortunately, we do not offer returns or exchanges because this T-shirt is custom-made specifically for you. However, you can refuse to receive the order if the print is not as you designed or requested, or if you are not satisfied with the material.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowRefundPolicy(false)}
+                className="mt-6 w-full py-3 font-black uppercase tracking-[0.2em] text-xs transition-all active:scale-[0.98]"
+                style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
+              >
+                Got It
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
