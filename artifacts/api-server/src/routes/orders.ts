@@ -1,10 +1,12 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, raw } from "express";
 import { getStore, updateStore, type OrderRecord } from "../data/store.js";
 import { uploadBuffer, deleteObject } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
 import { isAdminAuthenticated } from "./admin.js";
 
 const router: IRouter = Router();
+
+const RAW_UPLOAD_LIMIT = "60mb";
 
 interface CreateOrderSize {
   name?: string;
@@ -76,18 +78,34 @@ async function telegramRequest(url: string, body: URLSearchParams) {
 }
 
 async function saveFilesToOrderFolder(orderId: string, files: CreateOrderFile[]): Promise<string[]> {
-  const saved: string[] = [];
+  const prepared = files
+    .filter((f): f is { fileName: string; dataUrl: string } => Boolean(f.fileName && f.dataUrl))
+    .map((file) => {
+      const { mimeType, buffer } = parseDataUrl(file.dataUrl);
+      const hasExtension = /\.[a-z0-9]+$/i.test(file.fileName);
+      const fileName = safeFileName(hasExtension ? file.fileName : `${file.fileName}${extensionForMime(mimeType)}`);
+      return { fileName, mimeType, buffer };
+    });
 
-  for (const file of files) {
-    if (!file.fileName || !file.dataUrl) continue;
-    const { mimeType, buffer } = parseDataUrl(file.dataUrl);
-    const hasExtension = /\.[a-z0-9]+$/i.test(file.fileName);
-    const fileName = safeFileName(hasExtension ? file.fileName : `${file.fileName}${extensionForMime(mimeType)}`);
-    await uploadBuffer(`${gcsOrderPrefix(orderId)}/${fileName}`, buffer, mimeType);
-    saved.push(fileName);
-  }
+  await Promise.all(
+    prepared.map(({ fileName, mimeType, buffer }) =>
+      uploadBuffer(`${gcsOrderPrefix(orderId)}/${fileName}`, buffer, mimeType)
+    )
+  );
 
-  return saved;
+  return prepared.map((p) => p.fileName);
+}
+
+async function uploadSingleRawFile(
+  orderId: string,
+  fileName: string,
+  buffer: Buffer,
+  contentType: string,
+): Promise<string> {
+  const hasExtension = /\.[a-z0-9]+$/i.test(fileName);
+  const finalName = safeFileName(hasExtension ? fileName : `${fileName}${extensionForMime(contentType)}`);
+  await uploadBuffer(`${gcsOrderPrefix(orderId)}/${finalName}`, buffer, contentType);
+  return finalName;
 }
 
 function registerOrderFolder(orderId: string, details: { customerName?: string; phone?: string; files?: string[] }) {
@@ -230,6 +248,43 @@ router.post("/create-order", (req, res) => {
   void saveOrderDocuments(orderId, initialFiles, { customerName: body.name, phone: body.phone })
     .catch((error) => logger.error({ err: error, orderId }, "Failed to save order documents"));
 });
+
+router.post(
+  "/orders/:orderId/documents/upload",
+  raw({ type: "*/*", limit: RAW_UPLOAD_LIMIT }),
+  (req, res) => {
+    const orderId = req.params.orderId;
+    const record = getStore().orderFiles[orderId];
+    if (!record) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
+
+    const fileNameRaw = typeof req.query.fileName === "string" ? req.query.fileName : "";
+    const fileName = fileNameRaw.trim();
+    if (!fileName) {
+      res.status(400).json({ error: "fileName query parameter is required" });
+      return;
+    }
+
+    const contentType = (req.headers["content-type"] as string | undefined)?.split(";")[0].trim() || "application/octet-stream";
+    const body = req.body;
+    if (!Buffer.isBuffer(body) || body.length === 0) {
+      res.status(400).json({ error: "Empty upload body" });
+      return;
+    }
+
+    void uploadSingleRawFile(orderId, fileName, body, contentType)
+      .then((savedName) => {
+        registerOrderFolder(orderId, { files: [savedName] });
+        res.json({ orderId, fileName: savedName });
+      })
+      .catch((error) => {
+        logger.error({ err: error, orderId, fileName }, "Failed to upload single order file");
+        res.status(500).json({ error: "Failed to save order file" });
+      });
+  },
+);
 
 router.post("/orders/:orderId/documents", (req, res) => {
   const orderId = req.params.orderId;

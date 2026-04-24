@@ -17,6 +17,12 @@ export interface DesignExportFile {
   dataUrl: string;
 }
 
+export interface DesignExportBlob {
+  fileName: string;
+  blob: Blob;
+  contentType: string;
+}
+
 interface GenerateDesignExportFilesOptions {
   frontLayers: DesignLayerForExport[];
   backLayers: DesignLayerForExport[];
@@ -121,6 +127,12 @@ function drawContain(
   ctx.drawImage(img, dx, dy, dw, dh);
 }
 
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
+  return new Promise(resolve => {
+    canvas.toBlob(blob => resolve(blob), "image/png");
+  });
+}
+
 function canvasToDataUrl(canvas: HTMLCanvasElement): Promise<string | null> {
   return new Promise(resolve => {
     canvas.toBlob(blob => {
@@ -223,6 +235,104 @@ export async function generateDesignExportFiles({
       finalCtx.drawImage(layerCanvas, 0, 0);
       const mockupDataUrl = await canvasToDataUrl(trimCanvas(finalCanvas));
       if (mockupDataUrl) files.push({ fileName: mockupFileName, dataUrl: mockupDataUrl });
+    }
+  };
+
+  await exportComposite(frontVisible, frontMockupImage, "design-front.png", "mockup-front.png");
+  await exportComposite(backVisible, backMockupImage, "design-back.png", "mockup-back.png");
+  return files;
+}
+
+export async function generateDesignExportBlobs({
+  frontLayers,
+  backLayers,
+  mockupSize,
+  frontMockupImage,
+  backMockupImage,
+}: GenerateDesignExportFilesOptions): Promise<DesignExportBlob[]> {
+  const files: DesignExportBlob[] = [];
+  const frontVisible = frontLayers.filter(l => l.visible);
+  const backVisible = backLayers.filter(l => l.visible);
+
+  const exportComposite = async (
+    visibleLayers: DesignLayerForExport[],
+    shirtUrl: string | undefined,
+    designFileName: string,
+    mockupFileName: string,
+  ) => {
+    const shirtImg = shirtUrl ? await loadImg(shirtUrl) : null;
+    if (visibleLayers.length === 0 && !shirtImg) return;
+    const loaded = (
+      await Promise.all(visibleLayers.map(async l => ({ l, img: await loadImg(l.imageUrl) })))
+    ).filter((x): x is { l: DesignLayerForExport; img: HTMLImageElement } => x.img !== null);
+    if (visibleLayers.length > 0 && loaded.length < visibleLayers.length) {
+      console.warn(
+        `[design-export] ${visibleLayers.length - loaded.length} of ${visibleLayers.length} ` +
+          `layers failed to load for ${designFileName}`,
+      );
+    }
+
+    const MAX_CANVAS_PX = 16384;
+    const scaleForMinimum = 4000 / mockupSize;
+    const scaleForShirt = shirtImg ? shirtImg.naturalWidth / mockupSize : 0;
+    let SCALE = Math.max(scaleForShirt, scaleForMinimum);
+    for (const { l, img } of loaded) {
+      const { width: dw } = getRatioLockedSize(l, l.width);
+      SCALE = Math.max(SCALE, img.naturalWidth / dw);
+    }
+    if (mockupSize * SCALE > MAX_CANVAS_PX || mockupSize * (4 / 3) * SCALE > MAX_CANVAS_PX) {
+      SCALE = Math.min(MAX_CANVAS_PX / mockupSize, MAX_CANVAS_PX / (mockupSize * (4 / 3)));
+    }
+
+    const exportW = Math.round(mockupSize * SCALE);
+    const exportH = Math.round(mockupSize * (4 / 3) * SCALE);
+    const makeCanvas = () => {
+      const c = document.createElement("canvas");
+      c.width = exportW;
+      c.height = exportH;
+      return c;
+    };
+    const setupCtx = (c: HTMLCanvasElement) => {
+      const ctx = c.getContext("2d")!;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      return ctx;
+    };
+
+    const layerCanvas = makeCanvas();
+    const layerCtx = setupCtx(layerCanvas);
+    for (const { l: layer, img } of loaded) {
+      const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
+      const exportLayerW = displayW * SCALE;
+      const exportLayerH = displayH * SCALE;
+      const cx = (layer.x + displayW / 2) * SCALE;
+      const cy = (layer.y + displayH / 2) * SCALE;
+      const angle = (layer.rotation * Math.PI) / 180;
+      layerCtx.save();
+      layerCtx.translate(cx, cy);
+      layerCtx.rotate(angle);
+      layerCtx.drawImage(img, -exportLayerW / 2, -exportLayerH / 2, exportLayerW, exportLayerH);
+      layerCtx.restore();
+    }
+
+    if (shirtImg) {
+      layerCtx.globalCompositeOperation = "destination-in";
+      drawContain(layerCtx, shirtImg, exportW, exportH);
+      layerCtx.globalCompositeOperation = "source-over";
+    }
+
+    if (loaded.length > 0) {
+      const designBlob = await canvasToBlob(trimCanvas(layerCanvas));
+      if (designBlob) files.push({ fileName: designFileName, blob: designBlob, contentType: "image/png" });
+    }
+
+    if (shirtImg) {
+      const finalCanvas = makeCanvas();
+      const finalCtx = setupCtx(finalCanvas);
+      drawContain(finalCtx, shirtImg, exportW, exportH);
+      finalCtx.drawImage(layerCanvas, 0, 0);
+      const mockupBlob = await canvasToBlob(trimCanvas(finalCanvas));
+      if (mockupBlob) files.push({ fileName: mockupFileName, blob: mockupBlob, contentType: "image/png" });
     }
   };
 

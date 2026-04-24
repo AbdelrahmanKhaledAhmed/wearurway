@@ -21,13 +21,18 @@ function getR2Config() {
   return { accountId, accessKeyId, secretAccessKey, bucketName, publicUrl };
 }
 
+let cachedClient: S3Client | null = null;
+
 function getClient(): S3Client {
+  if (cachedClient) return cachedClient;
   const { accountId, accessKeyId, secretAccessKey } = getR2Config();
-  return new S3Client({
+  cachedClient = new S3Client({
     region: "auto",
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
+    maxAttempts: 4,
   });
+  return cachedClient;
 }
 
 function getBucket(): string {

@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCustomizer } from "@/hooks/use-customizer";
 import { useCreateOrder, useGetOrderSettings } from "@workspace/api-client-react";
-import { generateDesignExportFiles, type DesignExportFile } from "@/lib/design-export";
+import { generateDesignExportBlobs, type DesignExportBlob } from "@/lib/design-export";
 import type { CreateOrderDesignJob } from "@workspace/api-client-react";
 
 const FREE_SHIPPING_AREAS = ["6th of October", "Sheikh Zayed"];
@@ -45,21 +45,30 @@ async function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function uploadFilesWithRetry(orderId: string, files: DesignExportFile[], maxAttempts = 30) {
+async function uploadSingleBlobWithRetry(
+  orderId: string,
+  file: DesignExportBlob,
+  maxAttempts = 8,
+) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const res = await fetch(`/api/orders/${orderId}/documents`, {
+      const url = `/api/orders/${orderId}/documents/upload?fileName=${encodeURIComponent(file.fileName)}`;
+      const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ exportFiles: files }),
+        headers: { "Content-Type": file.contentType },
+        body: file.blob,
       });
       if (!res.ok) throw new Error("Upload failed");
       return;
     } catch {
-      if (attempt === maxAttempts) throw new Error("Could not upload design files after multiple attempts");
+      if (attempt === maxAttempts) throw new Error(`Could not upload ${file.fileName} after multiple attempts`);
       await delay(Math.min(2000 * attempt, 30000));
     }
   }
+}
+
+async function uploadFilesWithRetry(orderId: string, files: DesignExportBlob[]) {
+  await Promise.all(files.map((file) => uploadSingleBlobWithRetry(orderId, file)));
 }
 
 async function notifyOrderCompleteWithRetry(orderId: string, feedback: string, maxAttempts = 30) {
@@ -190,7 +199,7 @@ export default function Checkout() {
       void (async () => {
         try {
           if (designJob) {
-            const exportFiles = await generateDesignExportFiles(designJob);
+            const exportFiles = await generateDesignExportBlobs(designJob);
             if (exportFiles.length > 0) {
               await uploadFilesWithRetry(newOrderId, exportFiles);
             }
