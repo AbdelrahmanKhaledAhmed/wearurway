@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { useAdminLogin } from "@workspace/api-client-react";
+import { useAdminLogin, useGetAdminMe } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetAdminMeQueryKey } from "@workspace/api-client-react";
-import { setAdminToken } from "@/lib/admin-token";
+import { setAdminToken, getAdminToken } from "@/lib/admin-token";
 
 export default function AdminLogin() {
   const [password, setPassword] = useState("");
@@ -16,6 +16,17 @@ export default function AdminLogin() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const [hasToken] = useState(() => !!getAdminToken());
+  const { data: adminMe, isFetching: isCheckingAuth } = useGetAdminMe({
+    query: { enabled: hasToken },
+  });
+
+  useEffect(() => {
+    if (hasToken && adminMe?.authenticated) {
+      setLocation("/admin/dashboard");
+    }
+  }, [hasToken, adminMe, setLocation]);
 
   const loginMutation = useAdminLogin({
     mutation: {
@@ -47,6 +58,14 @@ export default function AdminLogin() {
     if (!password.trim()) return;
     loginMutation.mutate({ data: { password } });
   };
+
+  if (hasToken && (isCheckingAuth || adminMe?.authenticated)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-sm uppercase tracking-widest text-muted-foreground animate-pulse">Verifying...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
