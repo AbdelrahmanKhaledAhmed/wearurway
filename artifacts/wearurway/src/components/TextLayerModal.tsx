@@ -22,18 +22,26 @@ const PREVIEW_FONT_SIZE = 38;
 
 // ─── Font loader (cached per family) ─────────────────────────────────────────
 const loadedFonts = new Set<string>();
+const failedFonts = new Set<string>();
 async function ensureFontLoaded(font: FontConfig): Promise<void> {
   if (loadedFonts.has(font.family)) return;
   const base = import.meta.env.BASE_URL ?? "/";
   const url = `${base}fonts/${font.filename}`.replace(/\/\//g, "/");
-  const face = new FontFace(font.family, `url(${url})`);
-  await face.load();
-  document.fonts.add(face);
-  loadedFonts.add(font.family);
+  try {
+    const face = new FontFace(font.family, `url(${url})`);
+    await face.load();
+    document.fonts.add(face);
+    loadedFonts.add(font.family);
+  } catch (err) {
+    if (!failedFonts.has(font.family)) {
+      failedFonts.add(font.family);
+      console.warn(`[fonts] Failed to load "${font.name}" (${font.filename}):`, err);
+    }
+  }
 }
 
 async function ensureAllFontsLoaded(): Promise<void> {
-  await Promise.all(CUSTOM_FONTS.map(ensureFontLoaded));
+  await Promise.allSettled(CUSTOM_FONTS.map(ensureFontLoaded));
 }
 
 // ─── Pixel bounds helper ──────────────────────────────────────────────────────
