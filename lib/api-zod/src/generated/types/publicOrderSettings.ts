@@ -13,5 +13,6 @@ export interface PublicOrderSettings {
   frontOnlyPrice: number;
   frontBackPrice: number;
   instaPayPhone: string;
+  contactPhone?: string;
   showExportButton?: boolean;
 }

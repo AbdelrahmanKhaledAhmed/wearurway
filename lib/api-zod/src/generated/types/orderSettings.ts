@@ -13,6 +13,7 @@ export interface OrderSettings {
   frontOnlyPrice: number;
   frontBackPrice: number;
   instaPayPhone: string;
+  contactPhone?: string;
   telegramChatId?: string;
   telegramBotToken?: string;
   showExportButton?: boolean;

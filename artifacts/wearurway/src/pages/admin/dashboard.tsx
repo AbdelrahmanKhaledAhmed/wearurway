@@ -1556,6 +1556,7 @@ function OrderSettingsManager() {
     frontOnlyPrice: 550,
     frontBackPrice: 700,
     instaPayPhone: "01069383482",
+    contactPhone: "01069383482",
     telegramChatId: "",
     telegramBotToken: "",
   });
@@ -1569,6 +1570,7 @@ function OrderSettingsManager() {
       frontOnlyPrice: settings.frontOnlyPrice,
       frontBackPrice: settings.frontBackPrice,
       instaPayPhone: settings.instaPayPhone,
+      contactPhone: settings.contactPhone ?? settings.instaPayPhone ?? "",
       telegramChatId: settings.telegramChatId ?? "",
       telegramBotToken: settings.telegramBotToken ?? "",
     });
@@ -1622,9 +1624,21 @@ function OrderSettingsManager() {
               <Input type="number" value={form.frontBackPrice} onChange={setNumber("frontBackPrice")} className="rounded-none" />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label className="text-xs uppercase tracking-widest">InstaPay Phone Number</Label>
-            <Input value={form.instaPayPhone} onChange={setText("instaPayPhone")} className="rounded-none" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-widest">InstaPay Phone Number</Label>
+              <Input value={form.instaPayPhone} onChange={setText("instaPayPhone")} className="rounded-none" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-widest">Contact Us Phone (WhatsApp)</Label>
+              <Input
+                value={form.contactPhone}
+                onChange={setText("contactPhone")}
+                placeholder="01069383482"
+                className="rounded-none"
+              />
+              <p className="text-[10px] text-muted-foreground">Used for the "Contact Us" link in checkout. Egyptian number, e.g. 01069383482.</p>
+            </div>
           </div>
         </div>
       </div>

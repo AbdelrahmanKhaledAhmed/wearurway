@@ -42,6 +42,7 @@ router.put("/admin/order-settings", (req, res) => {
       frontOnlyPrice: Number(body.frontOnlyPrice ?? store.orderSettings.frontOnlyPrice),
       frontBackPrice: Number(body.frontBackPrice ?? store.orderSettings.frontBackPrice),
       instaPayPhone: body.instaPayPhone ?? store.orderSettings.instaPayPhone,
+      contactPhone: body.contactPhone ?? store.orderSettings.contactPhone,
       telegramChatId: body.telegramChatId ?? store.orderSettings.telegramChatId,
       telegramBotToken: body.telegramBotToken ?? store.orderSettings.telegramBotToken,
       showExportButton: body.showExportButton !== undefined ? body.showExportButton : store.orderSettings.showExportButton,

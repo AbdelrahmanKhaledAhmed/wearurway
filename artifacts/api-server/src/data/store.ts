@@ -100,6 +100,7 @@ export interface OrderSettings {
   frontOnlyPrice: number;
   frontBackPrice: number;
   instaPayPhone: string;
+  contactPhone?: string;
   telegramChatId?: string;
   telegramBotToken?: string;
   showExportButton?: boolean;
@@ -156,6 +157,7 @@ const DEFAULT_STORE: Store = {
     frontOnlyPrice: 550,
     frontBackPrice: 700,
     instaPayPhone: "01069383482",
+    contactPhone: "01069383482",
   },
   products: [
     { id: "tshirt", name: "T-Shirt", available: true, comingSoon: false },

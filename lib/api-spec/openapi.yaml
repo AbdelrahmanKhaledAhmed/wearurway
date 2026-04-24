@@ -763,6 +763,8 @@ components:
           type: number
         instaPayPhone:
           type: string
+        contactPhone:
+          type: string
         showExportButton:
           type: boolean
       required: [shippingCompanyName, shippingDescription, shippingPrice, frontOnlyPrice, frontBackPrice, instaPayPhone]
@@ -781,6 +783,8 @@ components:
         frontBackPrice:
           type: number
         instaPayPhone:
+          type: string
+        contactPhone:
           type: string
         telegramChatId:
           type: string

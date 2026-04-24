@@ -425,6 +425,7 @@ export const GetOrderSettingsResponse = zod.object({
   frontOnlyPrice: zod.number(),
   frontBackPrice: zod.number(),
   instaPayPhone: zod.string(),
+  contactPhone: zod.string().optional(),
   showExportButton: zod.boolean().optional(),
 });
 
@@ -530,6 +531,7 @@ export const GetAdminOrderSettingsResponse = zod.object({
   frontOnlyPrice: zod.number(),
   frontBackPrice: zod.number(),
   instaPayPhone: zod.string(),
+  contactPhone: zod.string().optional(),
   telegramChatId: zod.string().optional(),
   telegramBotToken: zod.string().optional(),
   showExportButton: zod.boolean().optional(),
@@ -545,6 +547,7 @@ export const UpdateAdminOrderSettingsBody = zod.object({
   frontOnlyPrice: zod.number(),
   frontBackPrice: zod.number(),
   instaPayPhone: zod.string(),
+  contactPhone: zod.string().optional(),
   telegramChatId: zod.string().optional(),
   telegramBotToken: zod.string().optional(),
   showExportButton: zod.boolean().optional(),
@@ -557,6 +560,7 @@ export const UpdateAdminOrderSettingsResponse = zod.object({
   frontOnlyPrice: zod.number(),
   frontBackPrice: zod.number(),
   instaPayPhone: zod.string(),
+  contactPhone: zod.string().optional(),
   telegramChatId: zod.string().optional(),
   telegramBotToken: zod.string().optional(),
   showExportButton: zod.boolean().optional(),
