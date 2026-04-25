@@ -1,40 +1,27 @@
 /**
- * Durable, two-phase client-side order queue.
+ * Durable, single-shot client-side order queue.
  *
- * The customer should see the success screen the *instant* they tap Complete
- * Order. Heavy work (image rendering, network upload, server processing) must
- * happen invisibly in the background and survive the page closing, the browser
- * closing, and the device going offline.
+ * Contract with the server:
+ *   When `/api/create-order` returns HTTP 200 with an orderId, the order is
+ *   FULLY accepted. The server is from that point solo-responsible for:
+ *     - uploading the rendered design files to object storage,
+ *     - sending the Telegram notification to the admin.
+ *   The client may close, the phone may die, the network may drop — none of
+ *   that affects the order anymore. This is the entire point of the server
+ *   outbox: every file the client posted lives in `pendingUploads` and gets
+ *   drained with retries; the notification is only released once those drain.
  *
- * To make that work the queue stores records in two "kinds":
+ * To honour that contract, the client renders the design exports IN the
+ * foreground and includes them in the same POST as the customer info and
+ * payment proof. The "Preparing Your Order" popup stays up for the duration —
+ * once it closes the customer can do whatever they want.
  *
- *   1. `kind: "spec"` — the small, instantly-savable record:
- *        order id (generated client-side so we can show it immediately),
- *        customer + product info, payment proof data URL, design job spec,
- *        feedback. Saving this to IndexedDB takes ~tens of milliseconds even
- *        on slow phones because there are no rendered PNGs in it yet.
- *
- *   2. `kind: "submit"` — the fully-prepared payload, including the rendered
- *        export PNGs as data URLs, ready to POST to /api/create-order.
- *
- * The flow:
- *   - `saveSpecQueuedOrder` writes the spec record and returns the order id.
- *     The checkout page then immediately shows the success screen.
- *   - `flushQueuedOrders` (called on app boot, on `online`, and right after
- *     the spec is saved) walks the queue:
- *       • for each `spec` record  → render the design exports, upgrade the
- *         record to `submit` kind in IndexedDB, then…
- *       • for each `submit` record → POST it to the server, retrying with
- *         exponential backoff forever, and only delete the record once the
- *         server returns 200.
- *   - The Service Worker (`/order-sync-sw.js`) drains `submit` records when
- *     the OS fires a Background Sync, so retries continue with no tab open.
- *     The SW cannot render images, so any `spec` record waits for the next
- *     time a tab opens.
- *
- * The server treats the client-supplied order id as an idempotency key: if it
- * already has an order with that id it returns 200 immediately, so a POST that
- * reaches the server but whose response is lost will not create a duplicate.
+ * Durability before HTTP 200:
+ *   We save a `spec` record to IndexedDB BEFORE we start rendering. That way
+ *   if the tab dies mid-render or mid-POST we can re-render and re-POST on
+ *   the next visit (or via Service Worker Background Sync) without losing
+ *   the customer's input. The server treats the client-supplied orderId as
+ *   an idempotency key, so re-posting the same order is safe.
  */
 
 import { generateDesignExportBlobs, type DesignExportBlob } from "./design-export";
@@ -51,7 +38,7 @@ export interface QueuedOrderFile {
   dataUrl: string;
 }
 
-/** Customer + product info shared between the spec and submit records. */
+/** Customer + product info shared between every record. */
 export interface QueuedOrderCustomer {
   name: string;
   phone: string;
@@ -76,6 +63,11 @@ export interface QueuedOrderPayload extends QueuedOrderCustomer {
   feedback?: string;
 }
 
+/**
+ * The only record kind the queue uses now. Holds everything the client needs
+ * to (re)render and (re)post the order. Designed to be cheap to write — there
+ * are no rendered PNGs in here, only the small design spec.
+ */
 export interface QueuedOrderSpecRecord {
   id: string;
   kind: "spec";
@@ -84,18 +76,17 @@ export interface QueuedOrderSpecRecord {
   paymentProof?: QueuedOrderFile;
   designJob?: CreateOrderDesignJob;
   feedback?: string;
-  /** /api/create-order returned 200 — the order exists on the server. */
-  serverAcknowledged?: boolean;
-  /** All rendered design files have been uploaded to the server. */
-  documentsUploaded?: boolean;
-  /** /api/orders/:orderId/complete returned 200 — Telegram notification queued. */
-  completed?: boolean;
   attempts: number;
   lastError?: string;
   createdAt: string;
   updatedAt: string;
 }
 
+/**
+ * Kept for IndexedDB backward compatibility — older clients may have records
+ * of this shape sitting in their queue. The new code drops them on boot
+ * (see `flushQueuedOrders`) so they don't replay forever.
+ */
 export interface QueuedOrderSubmitRecord {
   id: string;
   kind: "submit";
@@ -188,9 +179,8 @@ export interface SaveSpecArgs {
 }
 
 /**
- * Persist a spec record to IndexedDB. This is the only step the user actually
- * waits for after tapping Complete Order — once it resolves the order is
- * durable and the success screen can be shown.
+ * Persist a spec record to IndexedDB. Cheap (no rendered PNGs in here) so
+ * it's safe to do on the click handler before rendering starts.
  */
 export async function saveSpecQueuedOrder(
   args: SaveSpecArgs,
@@ -240,18 +230,15 @@ async function bumpAttempt(id: string, error: string): Promise<void> {
   });
 }
 
-async function patchSpecRecord(
-  id: string,
-  patch: Partial<QueuedOrderSpecRecord>,
-): Promise<void> {
-  await withStore("readwrite", async (store) => {
-    const existing = (await reqToPromise(store.get(id))) as
-      | QueuedOrderRecord
-      | undefined;
-    if (!existing || existing.kind !== "spec") return;
-    Object.assign(existing, patch);
-    existing.updatedAt = new Date().toISOString();
-    await reqToPromise(store.put(existing));
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Could not read blob"));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read blob"));
+    reader.readAsDataURL(blob);
   });
 }
 
@@ -261,57 +248,56 @@ interface SubmitResult {
   retriable: boolean;
 }
 
-interface CreateOrderRequestBody extends QueuedOrderCustomer {
-  orderId: string;
-  paymentProof?: QueuedOrderFile;
-  feedback?: string;
-  /** Tells the server to wait for the per-file uploads + /complete call. */
-  documentsPending: boolean;
-}
-
 /**
- * The lightweight foreground call: customer info + payment proof screenshot.
- * NO rendered design files — those are uploaded later in the background.
+ * Render the design exports and POST the entire order — customer info,
+ * payment proof, AND the rendered design PNGs — in a single request. Returns
+ * only after the server confirms (200) or fails. On 200 the server has the
+ * full payload sitting in its outbox and the client has zero further work.
  */
-async function postCreateOrder(
-  record: QueuedOrderSpecRecord,
-): Promise<SubmitResult> {
-  const body: CreateOrderRequestBody = {
+async function renderAndSubmit(record: QueuedOrderSpecRecord): Promise<SubmitResult> {
+  let blobs: DesignExportBlob[];
+  try {
+    blobs = record.designJob
+      ? await generateDesignExportBlobs(record.designJob)
+      : [];
+  } catch (err) {
+    // Render failures are usually transient (image fetch flaked out, OOM on
+    // a low-end phone) so treat them as retriable.
+    return {
+      ok: false,
+      error: `render failed: ${err instanceof Error ? err.message : String(err)}`,
+      retriable: true,
+    };
+  }
+
+  let exportFiles: QueuedOrderFile[];
+  try {
+    exportFiles = await Promise.all(
+      blobs.map(async (b) => ({
+        fileName: b.fileName,
+        dataUrl: await blobToDataUrl(b.blob),
+      })),
+    );
+  } catch (err) {
+    return {
+      ok: false,
+      error: `encode failed: ${err instanceof Error ? err.message : String(err)}`,
+      retriable: true,
+    };
+  }
+
+  const payload: QueuedOrderPayload = {
     orderId: record.orderId,
     ...record.customer,
     paymentProof: record.paymentProof,
+    exportFiles,
     feedback: record.feedback,
-    documentsPending: !!record.designJob,
   };
+
   return doFetch("/api/create-order", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
-/** Raw upload of one rendered design file. */
-async function uploadDesignFile(
-  orderId: string,
-  blob: DesignExportBlob,
-): Promise<SubmitResult> {
-  const url = `/api/orders/${encodeURIComponent(orderId)}/documents/upload?fileName=${encodeURIComponent(blob.fileName)}`;
-  return doFetch(url, {
-    method: "POST",
-    headers: { "Content-Type": blob.contentType },
-    body: blob.blob,
-  });
-}
-
-/** Tell the server every file is uploaded — triggers the Telegram notification. */
-async function postCompleteOrder(
-  orderId: string,
-  feedback: string | undefined,
-): Promise<SubmitResult> {
-  return doFetch(`/api/orders/${encodeURIComponent(orderId)}/complete`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(feedback ? { feedback } : {}),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -346,96 +332,51 @@ function delay(ms: number): Promise<void> {
 const processInFlight = new Set<string>();
 
 /**
- * Background worker: takes a spec record that is already known to the server
- * (or needs one more /create-order retry) and walks it through the remaining
- * phases — render exports → upload each → /complete → delete. Idempotent and
- * resumable: every phase is gated by a flag on the record so a tab close
- * mid-flight resumes from the right step on the next visit.
+ * Background worker for spec records that the foreground attempt couldn't
+ * deliver (offline, server 5xx, etc.). Just keeps calling renderAndSubmit
+ * with exponential backoff until it sticks. Idempotent because the orderId
+ * is fixed on the record.
  */
 async function processSpecRecord(record: QueuedOrderSpecRecord): Promise<void> {
   if (processInFlight.has(record.id)) return;
   processInFlight.add(record.id);
   try {
-    // Phase 1: make sure the server has the order (with retry). Idempotent
-    // because we always supply the same client-generated orderId.
-    while (!record.serverAcknowledged) {
-      const result = await postCreateOrder(record);
+    // Reload the latest copy so attempts/lastError stay accurate across runs.
+    const fresh = await getRecord(record.id);
+    const current = fresh && fresh.kind === "spec" ? fresh : record;
+
+    while (true) {
+      const result = await renderAndSubmit(current);
       if (result.ok) {
-        await patchSpecRecord(record.id, { serverAcknowledged: true }).catch(() => {});
-        record.serverAcknowledged = true;
-        break;
+        await removeQueuedOrder(current.id).catch(() => {});
+        return;
       }
-      await bumpAttempt(record.id, result.error ?? "Unknown error").catch(() => {});
+      await bumpAttempt(current.id, result.error ?? "Unknown error").catch(() => {});
+      current.attempts += 1;
       if (!result.retriable) {
-        await removeQueuedOrder(record.id).catch(() => {});
+        // 4xx from the server — payload is structurally bad and retrying
+        // won't help. Drop the record so we don't loop forever.
+        // eslint-disable-next-line no-console
+        console.error(
+          "[order-queue] Order dropped non-retriably:",
+          current.orderId,
+          result.error,
+        );
+        await removeQueuedOrder(current.id).catch(() => {});
         return;
       }
       void registerBackgroundSync();
-      await delay(backoff(record.attempts));
+      await delay(backoff(current.attempts));
     }
-
-    // Phase 2: render and upload the design files (if any). Skip if a
-    // previous run already finished this phase.
-    if (record.designJob && !record.documentsUploaded) {
-      let blobs: DesignExportBlob[] | null = null;
-      while (!blobs) {
-        try {
-          blobs = await generateDesignExportBlobs(record.designJob);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          await bumpAttempt(record.id, `render: ${message}`).catch(() => {});
-          await delay(backoff(record.attempts));
-        }
-      }
-      for (const blob of blobs) {
-        while (true) {
-          const result = await uploadDesignFile(record.orderId, blob);
-          if (result.ok) break;
-          await bumpAttempt(
-            record.id,
-            `upload ${blob.fileName}: ${result.error ?? "Unknown error"}`,
-          ).catch(() => {});
-          if (!result.retriable) {
-            // 4xx for one file shouldn't block the rest of the order; log and skip.
-            // eslint-disable-next-line no-console
-            console.error(
-              "[order-queue] Dropping file after non-retriable error:",
-              record.orderId,
-              blob.fileName,
-              result.error,
-            );
-            break;
-          }
-          void registerBackgroundSync();
-          await delay(backoff(record.attempts));
-        }
-      }
-      await patchSpecRecord(record.id, { documentsUploaded: true }).catch(() => {});
-      record.documentsUploaded = true;
-    }
-
-    // Phase 3: signal completion so the server queues the Telegram notification.
-    while (!record.completed) {
-      const result = await postCompleteOrder(record.orderId, record.feedback);
-      if (result.ok) {
-        record.completed = true;
-        break;
-      }
-      await bumpAttempt(record.id, result.error ?? "Unknown error").catch(() => {});
-      if (!result.retriable) {
-        // The order exists; if /complete is rejected non-retriably we still
-        // drop the record because retries won't help.
-        break;
-      }
-      void registerBackgroundSync();
-      await delay(backoff(record.attempts));
-    }
-
-    // All done — remove the local record.
-    await removeQueuedOrder(record.id).catch(() => {});
   } finally {
     processInFlight.delete(record.id);
   }
+}
+
+async function getRecord(id: string): Promise<QueuedOrderRecord | undefined> {
+  return withStore("readonly", async (store) =>
+    (await reqToPromise(store.get(id))) as QueuedOrderRecord | undefined,
+  );
 }
 
 function backoff(attempt: number): number {
@@ -443,15 +384,14 @@ function backoff(attempt: number): number {
 }
 
 /**
- * Foreground submission. The customer waits ONLY for `/api/create-order` to
- * return 200 — a tiny payload (customer info + payment proof screenshot, no
- * rendered design files). The moment the server confirms, the success screen
- * is shown and this resolves.
+ * Foreground submission. Saves the spec for durability, renders the design
+ * exports, and POSTs the full payload to `/api/create-order`. Resolves only
+ * after the server returns 200, by which point the order is guaranteed
+ * (uploads + Telegram are now the server's responsibility, not the client's).
  *
- * Everything heavy — rendering the high-res design PNGs, uploading them to
- * object storage, and sending the Telegram notification — is then handed off
- * to a background worker. That worker resumes after a tab close / reload
- * because every step is checkpointed in IndexedDB.
+ * On a retriable failure (network down, 5xx) the spec stays in IndexedDB and
+ * the background worker / Service Worker Background Sync keep retrying — the
+ * customer is told their order is saved and will go through automatically.
  */
 export async function submitOrderAndWait(
   args: SaveSpecArgs,
@@ -467,42 +407,36 @@ export async function submitOrderAndWait(
     throw new Error("Order was saved but could not be located for submission");
   }
 
-  // Foreground call — small body, fast.
-  const result = await postCreateOrder(record);
+  const result = await renderAndSubmit(record);
 
-  if (!result.ok) {
-    await bumpAttempt(record.id, result.error ?? "Unknown error").catch(() => {});
-    if (result.retriable) {
-      // Kick off background retries so the order still goes through whenever
-      // the network comes back.
-      void registerBackgroundSync();
-      void processSpecRecord(record);
-      throw new Error(
-        "We couldn't reach the server. Your order is saved on this device and will be sent automatically as soon as you're online — or you can tap Complete Order again now.",
-      );
-    }
-    // Non-retriable (4xx) — payload is structurally bad. Drop the record so
-    // the queue doesn't loop forever.
+  if (result.ok) {
+    // Server has the full payload (customer + payment proof + rendered design
+    // files) in its outbox. We can drop the local record — the order is now
+    // entirely the server's responsibility.
     await removeQueuedOrder(record.id).catch(() => {});
-    throw new Error(result.error ?? "Could not place order");
+    return { orderId };
   }
 
-  // Server has the order. Mark it on the spec record so the background worker
-  // skips the create step, then kick the worker off WITHOUT awaiting it. The
-  // popup closes and the success screen renders immediately.
-  await patchSpecRecord(record.id, { serverAcknowledged: true }).catch(() => {});
-  record.serverAcknowledged = true;
-  void processSpecRecord(record);
+  await bumpAttempt(record.id, result.error ?? "Unknown error").catch(() => {});
 
-  return { orderId };
+  if (result.retriable) {
+    void registerBackgroundSync();
+    void processSpecRecord(record);
+    throw new Error(
+      "We couldn't reach the server. Your order is saved on this device and will be sent automatically as soon as you're online — or you can tap Complete Order again now.",
+    );
+  }
+
+  // Non-retriable (4xx). Drop the record so we don't loop.
+  await removeQueuedOrder(record.id).catch(() => {});
+  throw new Error(result.error ?? "Could not place order");
 }
 
 /**
- * Drain the queue: continue any in-progress order through its remaining
- * phases (create → render → upload → complete → delete). Returns
- * immediately — work continues in the background. Safe to call multiple
- * times concurrently. Called on app boot, on `online`, and from the Service
- * Worker via Background Sync.
+ * Drain the queue: re-attempt every pending order. Returns immediately —
+ * work continues in the background. Safe to call multiple times concurrently.
+ * Called on app boot, on `online`, and from the Service Worker via
+ * Background Sync.
  */
 export async function flushQueuedOrders(): Promise<void> {
   let records: QueuedOrderRecord[];
@@ -515,9 +449,8 @@ export async function flushQueuedOrders(): Promise<void> {
     if (record.kind === "spec") {
       void processSpecRecord(record).catch(() => {});
     } else {
-      // Legacy heavy-payload record from a previous version of the queue.
-      // Drop it — the user has already seen success or will retry, and we no
-      // longer use this code path.
+      // Legacy record from a previous version of the queue. Drop it so the
+      // queue doesn't loop forever on a payload shape we no longer process.
       void removeQueuedOrder(record.id).catch(() => {});
       // eslint-disable-next-line no-console
       console.warn("[order-queue] Dropping legacy submit record:", record.id);

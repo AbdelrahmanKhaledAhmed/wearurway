@@ -550,7 +550,7 @@ export default function Checkout() {
                 Preparing Your Order
               </h3>
               <p className="text-sm text-white/70 leading-relaxed">
-                Please wait a moment while we prepare your order. This will only take a few seconds — please keep this page open until it's done.
+                We're preparing your design files and sending your order to us. Please keep this page open until it's done — it can take up to a minute on slower connections. Once you see the success screen, you can safely close the page.
               </p>
             </motion.div>
           </motion.div>
