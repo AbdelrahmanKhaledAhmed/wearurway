@@ -162,6 +162,7 @@ export interface OrderRecord {
   productPrice?: number;
   shippingPrice?: number;
   total?: number;
+  feedback?: string;
   createdAt: string;
 }
 

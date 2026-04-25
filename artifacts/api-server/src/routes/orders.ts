@@ -42,6 +42,14 @@ interface CreateOrderBody {
   paymentProof?: CreateOrderFile;
   exportFiles?: CreateOrderFile[];
   feedback?: string;
+  /**
+   * When true, the client will upload the design files separately via
+   * /orders/:orderId/documents/upload and then call /orders/:orderId/complete
+   * to trigger the Telegram notification once everything is in. The server
+   * therefore must NOT enqueue the notification here, otherwise the admin
+   * would be pinged about an order whose design files are not yet uploaded.
+   */
+  documentsPending?: boolean;
 }
 
 const CLIENT_ORDER_ID_RE = /^WW-[A-Z0-9-]{4,32}$/;
@@ -183,26 +191,40 @@ router.post("/create-order", (req, res) => {
 
   enqueueUploads(orderId, prepared);
 
-  // Queue the Telegram notification atomically with the uploads. The outbox
-  // will only send it once every pending upload for this order has succeeded.
   const feedback =
     typeof body.feedback === "string" && body.feedback.trim()
       ? body.feedback.trim()
       : undefined;
-  enqueueNotification(orderId, {
-    name: body.name,
-    phone: body.phone,
-    address: body.address,
-    product: body.product,
-    fit: body.fit,
-    color: body.color,
-    size: body.size,
-    paymentMethod: body.paymentMethod,
-    productPrice: body.productPrice,
-    shippingPrice: body.shippingPrice,
-    total: body.total,
-    feedback,
-  });
+
+  // Persist the feedback on the order record so /orders/:orderId/complete
+  // can read it later when the client signals that documents are uploaded.
+  if (feedback) {
+    updateStore((store) => {
+      const order = store.orders[orderId];
+      if (order) order.feedback = feedback;
+    });
+  }
+
+  // If the client is going to upload design files separately and call
+  // /complete afterwards, the notification is queued there — not here.
+  // Otherwise (legacy single-shot submissions), queue the notification now;
+  // the outbox will hold it until pendingUploads drains.
+  if (!body.documentsPending) {
+    enqueueNotification(orderId, {
+      name: body.name,
+      phone: body.phone,
+      address: body.address,
+      product: body.product,
+      fit: body.fit,
+      color: body.color,
+      size: body.size,
+      paymentMethod: body.paymentMethod,
+      productPrice: body.productPrice,
+      shippingPrice: body.shippingPrice,
+      total: body.total,
+      feedback,
+    });
+  }
 
   res.json({ orderId });
 });
@@ -289,7 +311,10 @@ router.post("/orders/:orderId/complete", (req, res) => {
   }
 
   const requestBody = (req.body ?? {}) as { feedback?: unknown };
-  const feedback = typeof requestBody.feedback === "string" ? requestBody.feedback : undefined;
+  const feedback =
+    (typeof requestBody.feedback === "string" && requestBody.feedback.trim()
+      ? requestBody.feedback.trim()
+      : undefined) ?? order?.feedback;
 
   const payload: NotificationPayload = order
     ? {
