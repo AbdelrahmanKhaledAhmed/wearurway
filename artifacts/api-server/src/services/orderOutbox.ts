@@ -1,6 +1,7 @@
 import { getStore, updateStore, type OrderFileRecord } from "../data/store.js";
 import { uploadBuffer } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
+import { renderDesignFiles, type DesignJobInput } from "./designRenderer.js";
 
 export interface PendingUploadEntry {
   id: string;
@@ -99,6 +100,25 @@ export function enqueueNotification(orderId: string, payload: NotificationPayloa
   scheduleProcess(orderId);
 }
 
+/**
+ * Queue a server-side design render. The renderer turns the (small) design
+ * spec into 4 PNGs and enqueues each one as a regular pendingUpload — the
+ * notification is held until that whole chain drains.
+ */
+export function enqueueDesignRender(orderId: string, designJob: DesignJobInput): void {
+  updateStore((store) => {
+    const record = store.orderFiles[orderId];
+    if (!record) return;
+    record.pendingDesignRender = {
+      designJob,
+      attempts: 0,
+      nextAttemptAt: Date.now(),
+    };
+    record.updatedAt = new Date().toISOString();
+  });
+  scheduleProcess(orderId);
+}
+
 function scheduleProcess(orderId: string): void {
   setImmediate(() => {
     void processOrder(orderId);
@@ -111,17 +131,79 @@ async function processOrder(orderId: string): Promise<void> {
   if (!record) return;
   if (
     (!record.pendingUploads || record.pendingUploads.length === 0) &&
-    !record.pendingNotification
+    !record.pendingNotification &&
+    !record.pendingDesignRender
   ) {
     return;
   }
 
   inFlightOrders.add(orderId);
   try {
+    await drainDesignRender(orderId);
     await drainUploads(orderId);
     await drainNotification(orderId);
   } finally {
     inFlightOrders.delete(orderId);
+  }
+}
+
+async function drainDesignRender(orderId: string): Promise<void> {
+  while (true) {
+    const record = readRecord(orderId);
+    if (!record) return;
+    const pending = record.pendingDesignRender;
+    if (!pending) return;
+
+    const now = Date.now();
+    if (pending.nextAttemptAt > now) {
+      await sleep(Math.min(pending.nextAttemptAt - now, MAX_BACKOFF_MS));
+      continue;
+    }
+
+    try {
+      const files = await renderDesignFiles(pending.designJob);
+      // Atomically: enqueue rendered files for upload, clear render queue.
+      updateStore((store) => {
+        const r = store.orderFiles[orderId];
+        if (!r) return;
+        const queue = r.pendingUploads ?? [];
+        for (const file of files) {
+          queue.push({
+            id: makeUploadId(),
+            fileName: file.fileName,
+            contentType: file.contentType,
+            dataBase64: file.buffer.toString("base64"),
+            attempts: 0,
+            nextAttemptAt: Date.now(),
+          });
+        }
+        r.pendingUploads = queue;
+        r.pendingDesignRender = undefined;
+        r.updatedAt = new Date().toISOString();
+      });
+      logger.info(
+        { orderId, fileCount: files.length, attempts: pending.attempts + 1 },
+        "Order design files rendered server-side",
+      );
+      return;
+    } catch (err) {
+      const attempts = pending.attempts + 1;
+      const message = err instanceof Error ? err.message : String(err);
+      updateStore((store) => {
+        const r = store.orderFiles[orderId];
+        if (!r || !r.pendingDesignRender) return;
+        r.pendingDesignRender.attempts = attempts;
+        r.pendingDesignRender.lastError = message;
+        r.pendingDesignRender.nextAttemptAt = nextBackoff(attempts);
+        r.updatedAt = new Date().toISOString();
+      });
+      logger.warn(
+        { orderId, attempts, err: message },
+        "Order design render failed — will retry",
+      );
+      const wait = Math.max(50, nextBackoff(attempts) - Date.now());
+      await sleep(Math.min(wait, MAX_BACKOFF_MS));
+    }
   }
 }
 
@@ -188,6 +270,7 @@ async function drainNotification(orderId: string): Promise<void> {
   while (true) {
     const record = readRecord(orderId);
     if (!record) return;
+    if (record.pendingDesignRender) return;
     if (record.pendingUploads && record.pendingUploads.length > 0) return;
     const pending = record.pendingNotification;
     if (!pending) return;
@@ -317,7 +400,8 @@ function tick(): void {
   for (const [orderId, record] of Object.entries(orderFiles)) {
     const hasUploads = record.pendingUploads && record.pendingUploads.length > 0;
     const hasNotification = !!record.pendingNotification;
-    if (hasUploads || hasNotification) {
+    const hasRender = !!record.pendingDesignRender;
+    if (hasUploads || hasNotification || hasRender) {
       scheduleProcess(orderId);
     }
   }

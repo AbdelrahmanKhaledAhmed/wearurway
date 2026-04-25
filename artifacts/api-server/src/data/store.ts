@@ -136,6 +136,43 @@ export interface PendingNotificationEntry {
   nextAttemptAt: number;
 }
 
+export interface PendingDesignRenderEntry {
+  designJob: {
+    frontLayers: Array<{
+      id: string;
+      name?: string;
+      imageUrl: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      rotation: number;
+      visible: boolean;
+      naturalWidth?: number;
+      naturalHeight?: number;
+    }>;
+    backLayers: Array<{
+      id: string;
+      name?: string;
+      imageUrl: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      rotation: number;
+      visible: boolean;
+      naturalWidth?: number;
+      naturalHeight?: number;
+    }>;
+    mockupSize: number;
+    frontMockupImage?: string;
+    backMockupImage?: string;
+  };
+  attempts: number;
+  lastError?: string;
+  nextAttemptAt: number;
+}
+
 export interface OrderFileRecord {
   orderId: string;
   folderPath: string;
@@ -145,6 +182,7 @@ export interface OrderFileRecord {
   createdAt: string;
   updatedAt: string;
   pendingUploads?: PendingUploadEntry[];
+  pendingDesignRender?: PendingDesignRenderEntry;
   pendingNotification?: PendingNotificationEntry;
   notificationSentAt?: string;
 }

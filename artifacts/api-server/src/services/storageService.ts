@@ -81,6 +81,26 @@ export async function objectExists(objectPath: string): Promise<boolean> {
   }
 }
 
+/** Download an R2 object directly into a Buffer. Returns null if not found. */
+export async function downloadBuffer(objectPath: string): Promise<Buffer | null> {
+  try {
+    const client = getClient();
+    const result = await client.send(
+      new GetObjectCommand({ Bucket: getBucket(), Key: objectPath })
+    );
+    if (!result.Body) return null;
+    const chunks: Buffer[] = [];
+    for await (const chunk of result.Body as Readable) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  } catch (err: unknown) {
+    const code = (err as { Code?: string; name?: string }).Code ?? (err as { name?: string }).name;
+    if (code === "NoSuchKey" || code === "NotFound") return null;
+    throw err;
+  }
+}
+
 /** Stream an R2 file as an HTTP response. Returns false if not found. */
 export async function streamObject(
   objectPath: string,

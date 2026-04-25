@@ -1,31 +1,30 @@
 /**
- * Durable, single-shot client-side order queue.
+ * Durable, server-owned order pipeline (client side).
  *
  * Contract with the server:
  *   When `/api/create-order` returns HTTP 200 with an orderId, the order is
  *   FULLY accepted. The server is from that point solo-responsible for:
- *     - uploading the rendered design files to object storage,
+ *     - rendering the design PNGs from the small spec we sent,
+ *     - uploading them and the payment proof to object storage,
  *     - sending the Telegram notification to the admin.
  *   The client may close, the phone may die, the network may drop — none of
- *   that affects the order anymore. This is the entire point of the server
- *   outbox: every file the client posted lives in `pendingUploads` and gets
- *   drained with retries; the notification is only released once those drain.
+ *   that affects the order anymore.
  *
- * To honour that contract, the client renders the design exports IN the
- * foreground and includes them in the same POST as the customer info and
- * payment proof. The "Preparing Your Order" popup stays up for the duration —
- * once it closes the customer can do whatever they want.
+ * What the client does before posting:
+ *   The design layers live as `blob:` URLs (pure browser memory). Before we
+ *   call /create-order we walk the design spec and upload every blob: layer
+ *   to /api/shared-layers, replacing each URL with its server-hosted twin.
+ *   The POSTed body therefore contains only small JSON: customer info,
+ *   payment proof, and a designJob whose imageUrls are all server-resolvable.
  *
  * Durability before HTTP 200:
- *   We save a `spec` record to IndexedDB BEFORE we start rendering. That way
- *   if the tab dies mid-render or mid-POST we can re-render and re-POST on
- *   the next visit (or via Service Worker Background Sync) without losing
- *   the customer's input. The server treats the client-supplied orderId as
- *   an idempotency key, so re-posting the same order is safe.
+ *   A `spec` record is saved to IndexedDB before any uploading starts so a
+ *   tab kill mid-flight can be retried by Background Sync / next-visit
+ *   flush. The server treats the client-supplied orderId as an idempotency
+ *   key, so re-posting the same order is safe.
  */
 
-import { generateDesignExportBlobs, type DesignExportBlob } from "./design-export";
-import type { CreateOrderDesignJob } from "@workspace/api-client-react";
+import type { CreateOrderDesignJob, CreateOrderDesignLayer } from "@workspace/api-client-react";
 
 const DB_NAME = "wearurway-order-queue";
 const DB_VERSION = 1;
@@ -59,7 +58,7 @@ export interface QueuedOrderCustomer {
 export interface QueuedOrderPayload extends QueuedOrderCustomer {
   orderId: string;
   paymentProof?: QueuedOrderFile;
-  exportFiles?: QueuedOrderFile[];
+  designJob?: CreateOrderDesignJob;
   feedback?: string;
 }
 
@@ -230,67 +229,100 @@ async function bumpAttempt(id: string, error: string): Promise<void> {
   });
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") resolve(reader.result);
-      else reject(new Error("Could not read blob"));
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("Could not read blob"));
-    reader.readAsDataURL(blob);
-  });
-}
-
 interface SubmitResult {
   ok: boolean;
   error?: string;
   retriable: boolean;
 }
 
-/**
- * Render the design exports and POST the entire order — customer info,
- * payment proof, AND the rendered design PNGs — in a single request. Returns
- * only after the server confirms (200) or fails. On 200 the server has the
- * full payload sitting in its outbox and the client has zero further work.
- */
-async function renderAndSubmit(record: QueuedOrderSpecRecord): Promise<SubmitResult> {
-  let blobs: DesignExportBlob[];
-  try {
-    blobs = record.designJob
-      ? await generateDesignExportBlobs(record.designJob)
-      : [];
-  } catch (err) {
-    // Render failures are usually transient (image fetch flaked out, OOM on
-    // a low-end phone) so treat them as retriable.
-    return {
-      ok: false,
-      error: `render failed: ${err instanceof Error ? err.message : String(err)}`,
-      retriable: true,
-    };
-  }
+/** True for any URL the server cannot fetch on its own (browser-only blobs). */
+function needsServerHosting(url: string | undefined): boolean {
+  if (!url) return false;
+  return url.startsWith("blob:");
+}
 
-  let exportFiles: QueuedOrderFile[];
-  try {
-    exportFiles = await Promise.all(
-      blobs.map(async (b) => ({
-        fileName: b.fileName,
-        dataUrl: await blobToDataUrl(b.blob),
-      })),
-    );
-  } catch (err) {
-    return {
-      ok: false,
-      error: `encode failed: ${err instanceof Error ? err.message : String(err)}`,
-      retriable: true,
-    };
+/**
+ * Upload a single browser-only blob URL to /api/shared-layers and return the
+ * server-hosted URL. The endpoint stores the bytes in R2 and returns a path
+ * the server can fetch directly during render.
+ */
+async function uploadLayerBlob(blobUrl: string): Promise<string> {
+  const blobRes = await fetch(blobUrl);
+  if (!blobRes.ok) {
+    throw new Error(`Could not read layer blob (HTTP ${blobRes.status})`);
+  }
+  const blob = await blobRes.blob();
+  const form = new FormData();
+  form.append("file", blob, "layer.png");
+  const res = await fetch("/api/shared-layers", { method: "POST", body: form });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const data = (await res.json()) as { error?: string };
+      if (data?.error) msg = data.error;
+    } catch {
+      // ignore
+    }
+    throw new Error(`Layer upload failed: ${msg}`);
+  }
+  const data = (await res.json()) as { url?: string };
+  if (!data?.url) throw new Error("Layer upload returned no URL");
+  return data.url;
+}
+
+/**
+ * Walk a design job, replacing every blob: layer URL with a server-hosted
+ * one. Same-blob URLs are coalesced so we don't upload the same bytes twice.
+ * Mockup images (front/back) are already server-hosted (/api/uploads/mockups)
+ * so we leave them alone.
+ */
+async function hydrateDesignJob(
+  job: CreateOrderDesignJob,
+): Promise<CreateOrderDesignJob> {
+  const cache = new Map<string, Promise<string>>();
+  const resolve = async (layer: CreateOrderDesignLayer): Promise<CreateOrderDesignLayer> => {
+    if (!needsServerHosting(layer.imageUrl)) return layer;
+    const cached = cache.get(layer.imageUrl);
+    const uploadPromise = cached ?? uploadLayerBlob(layer.imageUrl);
+    if (!cached) cache.set(layer.imageUrl, uploadPromise);
+    const url = await uploadPromise;
+    return { ...layer, imageUrl: url };
+  };
+
+  const [frontLayers, backLayers] = await Promise.all([
+    Promise.all(job.frontLayers.map(resolve)),
+    Promise.all(job.backLayers.map(resolve)),
+  ]);
+
+  return { ...job, frontLayers, backLayers };
+}
+
+/**
+ * Hand the entire order off to the server in a single tiny POST. Once the
+ * server returns 200 it owns the rest: render → upload → notify. The client
+ * has zero further work, so we drop the local spec.
+ */
+async function uploadLayersAndSubmit(record: QueuedOrderSpecRecord): Promise<SubmitResult> {
+  let designJob: CreateOrderDesignJob | undefined;
+  if (record.designJob) {
+    try {
+      designJob = await hydrateDesignJob(record.designJob);
+    } catch (err) {
+      // Layer uploads can fail for transient reasons (network drop, server
+      // hiccup) — keep retrying.
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+        retriable: true,
+      };
+    }
   }
 
   const payload: QueuedOrderPayload = {
     orderId: record.orderId,
     ...record.customer,
     paymentProof: record.paymentProof,
-    exportFiles,
+    designJob,
     feedback: record.feedback,
   };
 
@@ -333,7 +365,7 @@ const processInFlight = new Set<string>();
 
 /**
  * Background worker for spec records that the foreground attempt couldn't
- * deliver (offline, server 5xx, etc.). Just keeps calling renderAndSubmit
+ * deliver (offline, server 5xx, etc.). Just keeps calling uploadLayersAndSubmit
  * with exponential backoff until it sticks. Idempotent because the orderId
  * is fixed on the record.
  */
@@ -346,7 +378,7 @@ async function processSpecRecord(record: QueuedOrderSpecRecord): Promise<void> {
     const current = fresh && fresh.kind === "spec" ? fresh : record;
 
     while (true) {
-      const result = await renderAndSubmit(current);
+      const result = await uploadLayersAndSubmit(current);
       if (result.ok) {
         await removeQueuedOrder(current.id).catch(() => {});
         return;
@@ -407,7 +439,7 @@ export async function submitOrderAndWait(
     throw new Error("Order was saved but could not be located for submission");
   }
 
-  const result = await renderAndSubmit(record);
+  const result = await uploadLayersAndSubmit(record);
 
   if (result.ok) {
     // Server has the full payload (customer + payment proof + rendered design

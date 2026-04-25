@@ -6,8 +6,10 @@ import { isAdminAuthenticated } from "./admin.js";
 import {
   enqueueUploads,
   enqueueNotification,
+  enqueueDesignRender,
   type NotificationPayload,
 } from "../services/orderOutbox.js";
+import type { DesignJobInput } from "../services/designRenderer.js";
 
 const router: IRouter = Router();
 
@@ -43,11 +45,22 @@ interface CreateOrderBody {
   exportFiles?: CreateOrderFile[];
   feedback?: string;
   /**
-   * When true, the client will upload the design files separately via
+   * Server-side render spec. When present, the server queues a render job
+   * that turns the spec into the same 4 PNGs the client used to make and
+   * uploads them to R2. The Telegram notification is held until both render
+   * AND upload have drained — so the admin only ever gets pinged about an
+   * order whose files are physically in storage.
+   *
+   * Every imageUrl in the spec MUST be server-resolvable: an absolute http(s)
+   * URL, a data: URI, or one of the server-hosted upload paths
+   * (/api/uploads/shared-layers/:filename, /api/uploads/mockups/:filename).
+   * Browser blob: URLs cannot be fetched server-side and will be skipped.
+   */
+  designJob?: DesignJobInput;
+  /**
+   * Legacy: when true, the client will upload the design files separately via
    * /orders/:orderId/documents/upload and then call /orders/:orderId/complete
-   * to trigger the Telegram notification once everything is in. The server
-   * therefore must NOT enqueue the notification here, otherwise the admin
-   * would be pinged about an order whose design files are not yet uploaded.
+   * to trigger the Telegram notification once everything is in.
    */
   documentsPending?: boolean;
 }
@@ -191,6 +204,15 @@ router.post("/create-order", (req, res) => {
 
   enqueueUploads(orderId, prepared);
 
+  // If the client sent a server-side render spec, hand it to the renderer.
+  // Once the renderer turns it into PNGs and uploads them, the notification
+  // (queued below) will be released. The customer can close the tab the
+  // instant we return 200 — render + upload + notification are all the
+  // server's responsibility from this point on.
+  if (body.designJob) {
+    enqueueDesignRender(orderId, body.designJob);
+  }
+
   const feedback =
     typeof body.feedback === "string" && body.feedback.trim()
       ? body.feedback.trim()
@@ -207,8 +229,8 @@ router.post("/create-order", (req, res) => {
 
   // If the client is going to upload design files separately and call
   // /complete afterwards, the notification is queued there — not here.
-  // Otherwise (legacy single-shot submissions), queue the notification now;
-  // the outbox will hold it until pendingUploads drains.
+  // Otherwise queue the notification now; the outbox will hold it until both
+  // pendingDesignRender and pendingUploads drain.
   if (!body.documentsPending) {
     enqueueNotification(orderId, {
       name: body.name,
