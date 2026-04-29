@@ -144,15 +144,3 @@ Submitting an order is split into two phases. The customer sees the success scre
 - Validates against `/^01[0125]\d{8}$/` (must be 11 digits, starting with 010/011/012/015)
 - Cleaned phone (digits-only) is sent to the API
 
-### Analytics (Light Funnel Tracking)
-
-- Backend: dedicated `analytics_events(name TEXT PRIMARY KEY, count BIGINT)` table — each event is a single one-row upsert (`INSERT … ON CONFLICT DO UPDATE`), not a rewrite of the main JSONB store row. Legacy counters from the old `store.analyticsEvents` blob are migrated into this table on startup via `services/analyticsStore.ts`.
-- Endpoints:
-  - `POST /api/analytics/event` — public, body `{name}`, increments counter (only allows 8 known event names)
-  - `GET /api/admin/analytics` — admin-only, returns counters
-  - `POST /api/admin/analytics/reset` — admin-only, zeroes all counters
-- Client helper: `artifacts/wearurway/src/lib/analytics.ts` exports `trackEvent(name)`
-  - Uses `sessionStorage` to dedupe per session (refreshes do not double-count)
-  - Uses `navigator.sendBeacon` when available so navigation doesn't block analytics
-- Tracked steps (the funnel): `view_landing`, `view_products`, `view_fits`, `view_colors`, `view_sizes`, `view_designer`, `view_checkout`, `complete_order`
-- Admin "analytics" tab shows the funnel with bars, % of step 1, and per-step drop-off, plus a Reset button
