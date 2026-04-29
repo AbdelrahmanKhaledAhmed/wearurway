@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import FuzzySelectPanel from "./AIAssistPanel";
-import EditorHelpWizard from "./EditorHelpWizard";
+import { useGetOrderSettings } from "@workspace/api-client-react";
 
 type BgPreview = "checker" | "white" | "black";
 type ToolMode  = "select" | null;
@@ -240,6 +240,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const [currentFile, setCurrentFile] = useState<File>(file);
   useEffect(()=>{ setCurrentFile(file); },[file]);
   const [showHelpWizard, setShowHelpWizard] = useState(false);
+  const { data: orderSettings } = useGetOrderSettings();
+  const contactWhatsappHref = `https://wa.me/20${(orderSettings?.contactPhone || orderSettings?.instaPayPhone || "01069383482").replace(/^0/, "")}`;
   const canvasRef        = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef           = useRef<HTMLImageElement>(null);
@@ -887,12 +889,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
 
         {/* ── Tool panel ── */}
         <div className="w-80 border-l flex flex-col shrink-0" style={{borderColor:"rgba(168,85,247,0.2)"}}>
-          {showHelpWizard && (
-            <EditorHelpWizard
-              onClose={()=>setShowHelpWizard(false)}
-              onUploadFile={(f)=>setCurrentFile(f)}
-            />
-          )}
           <FuzzySelectPanel
             toolMode={toolMode}
             hasSelection={!!selectionMask}
@@ -907,6 +903,51 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
           />
         </div>
       </div>
+
+      {showHelpWizard && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
+          onClick={() => setShowHelpWizard(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl p-6 text-center"
+            style={{
+              background: "linear-gradient(135deg,rgba(30,15,50,0.98),rgba(15,5,30,0.98))",
+              border: "1px solid rgba(168,85,247,0.4)",
+              boxShadow: "0 20px 60px rgba(124,58,237,0.4)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-3" style={{ color: "#c48cff" }}>
+              Need Help?
+            </p>
+            <p className="text-[15px] leading-relaxed mb-6" style={{ color: "rgba(255,255,255,0.95)" }}>
+              No stress at all, we can turn your photo into exactly what you imagine. Just contact us, and we'll reply within minutes
+            </p>
+            <a
+              href={contactWhatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setShowHelpWizard(false)}
+              className="inline-block w-full px-6 py-3 rounded-xl font-bold text-sm tracking-[0.15em] uppercase transition-all hover:scale-[1.02] active:scale-[0.99]"
+              style={{
+                background: "linear-gradient(135deg,rgba(168,85,247,1),rgba(124,58,237,1))",
+                color: "#fff",
+                boxShadow: "0 8px 24px rgba(124,58,237,0.5)",
+              }}
+            >
+              Contact Us
+            </a>
+            <button
+              onClick={() => setShowHelpWizard(false)}
+              className="mt-4 text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
