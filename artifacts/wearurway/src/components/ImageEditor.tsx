@@ -151,43 +151,106 @@ function trimTransparency(src: HTMLCanvasElement): {canvas:HTMLCanvasElement;bou
   return {canvas:out,bounds};
 }
 
-function sharpenImageData(id: ImageData) {
-  const src=id.data, dst=new Uint8ClampedArray(src), w=id.width, h=id.height;
-  for (let y=1;y<h-1;y++) for (let x=1;x<w-1;x++) {
-    const i=(y*w+x)*4; if (src[i+3]===0) continue;
-    for (let c=0;c<3;c++) {
-      const v=9*src[i+c]-src[((y-1)*w+(x-1))*4+c]-src[((y-1)*w+x)*4+c]-src[((y-1)*w+(x+1))*4+c]-src[(y*w+(x-1))*4+c]-src[(y*w+(x+1))*4+c]-src[((y+1)*w+(x-1))*4+c]-src[((y+1)*w+x)*4+c]-src[((y+1)*w+(x+1))*4+c];
-      dst[i+c]=Math.max(0,Math.min(255,v));
+// Separable horizontal/vertical Gaussian blur (sigma≈1.0) for unsharp mask.
+// Kernel is small and runs only on RGB so transparent edges stay smooth.
+function gaussianBlurRGB(src: Uint8ClampedArray, w: number, h: number): Uint8ClampedArray {
+  // 5-tap kernel, sigma≈1.0 — matches the radius of a gentle unsharp mask.
+  const K=[0.06136,0.24477,0.38774,0.24477,0.06136];
+  const tmp=new Float32Array(w*h*4);
+  const out=new Uint8ClampedArray(src.length);
+  // Horizontal
+  for (let y=0;y<h;y++) {
+    for (let x=0;x<w;x++) {
+      let r=0,g=0,b=0;
+      for (let k=-2;k<=2;k++) {
+        const sx=Math.min(w-1,Math.max(0,x+k));
+        const i=(y*w+sx)*4, wt=K[k+2];
+        r+=src[i]*wt; g+=src[i+1]*wt; b+=src[i+2]*wt;
+      }
+      const o=(y*w+x)*4;
+      tmp[o]=r; tmp[o+1]=g; tmp[o+2]=b; tmp[o+3]=src[o+3];
     }
   }
-  for (let i=3;i<dst.length;i+=4) dst[i]=Math.max(0,Math.min(255,Math.round(8*(src[i]-128)+128)));
+  // Vertical
+  for (let y=0;y<h;y++) {
+    for (let x=0;x<w;x++) {
+      let r=0,g=0,b=0;
+      for (let k=-2;k<=2;k++) {
+        const sy=Math.min(h-1,Math.max(0,y+k));
+        const i=(sy*w+x)*4, wt=K[k+2];
+        r+=tmp[i]*wt; g+=tmp[i+1]*wt; b+=tmp[i+2]*wt;
+      }
+      const o=(y*w+x)*4;
+      out[o]=r; out[o+1]=g; out[o+2]=b; out[o+3]=src[o+3];
+    }
+  }
+  return out;
+}
+
+// Gentle unsharp mask: out = src + amount * (src - blurred), thresholded.
+// Only RGB is touched — alpha is preserved exactly so anti-aliased edges
+// don't get crushed into hard "map contour" lines.
+function unsharpMask(id: ImageData, amount=0.35, threshold=4): ImageData {
+  const src=id.data, w=id.width, h=id.height;
+  const blurred=gaussianBlurRGB(src,w,h);
+  const dst=new Uint8ClampedArray(src);
+  for (let i=0;i<src.length;i+=4) {
+    if (src[i+3]===0) continue;
+    for (let c=0;c<3;c++) {
+      const diff=src[i+c]-blurred[i+c];
+      if (Math.abs(diff)<threshold) continue;
+      const v=src[i+c]+amount*diff;
+      dst[i+c]=v<0?0:v>255?255:v;
+    }
+    // alpha intentionally left untouched
+  }
   return new ImageData(dst,w,h);
 }
 
-// Stepwise high-quality upscale: doubling each pass with bilinear smoothing
-// preserves edges far better than a single huge drawImage call.
-function upscaleStepwise(src: HTMLCanvasElement, targetW: number, targetH: number): HTMLCanvasElement {
-  let cur=src;
-  while (cur.width*2<=targetW && cur.height*2<=targetH) {
-    const next=document.createElement("canvas");
-    next.width=cur.width*2; next.height=cur.height*2;
-    const nctx=next.getContext("2d"); if (!nctx) return cur;
-    nctx.imageSmoothingEnabled=true; nctx.imageSmoothingQuality="high";
-    nctx.drawImage(cur,0,0,next.width,next.height);
-    cur=next;
+// High-quality upscale using the browser's native resize (Lanczos-class in
+// Chromium) via createImageBitmap. Falls back to a stepwise bilinear scale
+// if createImageBitmap with resize options is unavailable.
+async function highQualityUpscale(
+  src: HTMLCanvasElement, targetW: number, targetH: number
+): Promise<HTMLCanvasElement> {
+  if (src.width===targetW && src.height===targetH) return src;
+  try {
+    const bitmap=await createImageBitmap(src,{
+      resizeWidth:targetW,
+      resizeHeight:targetH,
+      resizeQuality:"high",
+    });
+    const out=document.createElement("canvas");
+    out.width=targetW; out.height=targetH;
+    const ctx=out.getContext("2d");
+    if (!ctx) { bitmap.close(); return src; }
+    ctx.drawImage(bitmap,0,0);
+    bitmap.close();
+    return out;
+  } catch {
+    // Fallback: stepwise doubling with high-quality smoothing.
+    let cur=src;
+    while (cur.width*2<=targetW && cur.height*2<=targetH) {
+      const next=document.createElement("canvas");
+      next.width=cur.width*2; next.height=cur.height*2;
+      const nctx=next.getContext("2d"); if (!nctx) return cur;
+      nctx.imageSmoothingEnabled=true; nctx.imageSmoothingQuality="high";
+      nctx.drawImage(cur,0,0,next.width,next.height);
+      cur=next;
+    }
+    if (cur.width!==targetW||cur.height!==targetH) {
+      const final=document.createElement("canvas");
+      final.width=targetW; final.height=targetH;
+      const fctx=final.getContext("2d"); if (!fctx) return cur;
+      fctx.imageSmoothingEnabled=true; fctx.imageSmoothingQuality="high";
+      fctx.drawImage(cur,0,0,targetW,targetH);
+      cur=final;
+    }
+    return cur;
   }
-  if (cur.width!==targetW||cur.height!==targetH) {
-    const final=document.createElement("canvas");
-    final.width=targetW; final.height=targetH;
-    const fctx=final.getContext("2d"); if (!fctx) return cur;
-    fctx.imageSmoothingEnabled=true; fctx.imageSmoothingQuality="high";
-    fctx.drawImage(cur,0,0,targetW,targetH);
-    cur=final;
-  }
-  return cur;
 }
 
-function enhanceCanvas(src: HTMLCanvasElement, qualityScale=1) {
+async function enhanceCanvas(src: HTMLCanvasElement, qualityScale=1): Promise<HTMLCanvasElement> {
   // Auto-pick the most aggressive sensible scale.
   // Targets ~4096px on the long side (print-grade); never downscales; capped to
   // avoid runaway memory on already-large images.
@@ -202,19 +265,17 @@ function enhanceCanvas(src: HTMLCanvasElement, qualityScale=1) {
   const targetW=Math.max(1,Math.round(src.width*scale));
   const targetH=Math.max(1,Math.round(src.height*scale));
 
-  const upscaled=scale>1?upscaleStepwise(src,targetW,targetH):src;
+  const upscaled=scale>1?await highQualityUpscale(src,targetW,targetH):src;
 
   const out=document.createElement("canvas");
   out.width=upscaled.width; out.height=upscaled.height;
   const ctx=out.getContext("2d"); if (!ctx) return upscaled;
-  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
   ctx.drawImage(upscaled,0,0);
 
-  // Two sharpen passes for crisper edges after the upscale.
-  let id=ctx.getImageData(0,0,out.width,out.height);
-  id=sharpenImageData(id);
-  id=sharpenImageData(id);
-  ctx.putImageData(id,0,0);
+  // Single gentle unsharp mask pass for crispness without ringing or
+  // contour-line artifacts. Alpha is preserved so soft edges stay soft.
+  const id=ctx.getImageData(0,0,out.width,out.height);
+  ctx.putImageData(unsharpMask(id,0.35,4),0,0);
   return out;
 }
 
@@ -702,13 +763,17 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     setProcessing(true);
     // Yield to the browser so the "Applying…" overlay paints before the
     // CPU-heavy upscale + sharpen passes lock the main thread.
-    setTimeout(()=>{
-      const trimmed=trimTransparency(c).canvas;
-      const enhanced=enhanceCanvas(trimmed,qualityScale);
-      enhanced.toBlob(b=>{
+    setTimeout(async ()=>{
+      try {
+        const trimmed=trimTransparency(c).canvas;
+        const enhanced=await enhanceCanvas(trimmed,qualityScale);
+        enhanced.toBlob(b=>{
+          setProcessing(false);
+          if (b) onConfirm(b,trimRef.current!);
+        },"image/png");
+      } catch {
         setProcessing(false);
-        if (b) onConfirm(b,trimRef.current!);
-      },"image/png");
+      }
     },30);
   },[qualityScale,onConfirm]);
 
