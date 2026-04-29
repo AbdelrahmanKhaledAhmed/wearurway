@@ -28,13 +28,13 @@ args = "API server"
 name = "Start application"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm --filter @workspace/wearurway run dev"
-waitForPort = 3000
-
-[workflows.workflow.metadata]
-outputType = "webview"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "API server"
@@ -51,6 +51,7 @@ outputType = "console"
 [agent]
 stack = "BEST_EFFORT_FALLBACK"
 expertMode = true
+integrations = ["javascript_object_storage:2.0.0"]
 
 [postMerge]
 path = "scripts/post-merge.sh"
@@ -71,6 +72,10 @@ externalPort = 8000
 [[ports]]
 localPort = 3003
 externalPort = 8081
+
+[[ports]]
+localPort = 5000
+externalPort = 8099
 
 [[ports]]
 localPort = 5173

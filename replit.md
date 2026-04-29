@@ -54,7 +54,7 @@ A premium streetwear customization website with a multi-step product configurato
 
 - Express 5 API — fully migrated to persistent storage (no more db.json)
 - **Store**: PostgreSQL `store_data` table with a single JSONB row (`key='main'`); in-memory cache with **coalesced** async upsert via `store.ts`. `updateStore` mutates the in-memory copy and marks the row dirty; a single debounced (~250ms) save flushes per window, with at most one follow-up save queued while a write is in flight. `flushPendingSaves()` is called on SIGTERM so the last batch is never lost.
-- **File storage**: Replit Object Storage (GCS-backed) via `lib/objectStorage.ts` (`uploadBuffer`, `deleteObject`, `objectExists`, `streamObject`)
+- **File storage**: Replit Object Storage (GCS-backed) via `services/storageService.ts` re-exported through `lib/objectStorage.ts` (`uploadBuffer`, `deleteObject`, `objectExists`, `streamObject`, `downloadBuffer`, `getPublicUrl`). Bucket id comes from `DEFAULT_OBJECT_STORAGE_BUCKET_ID`; auth uses the local Replit sidecar.
   - Mockup images: `uploads/mockups/`
   - Shared layer uploads: `uploads/shared-layers/`
   - Size chart images: `size-charts/`
