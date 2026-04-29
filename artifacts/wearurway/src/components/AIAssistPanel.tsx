@@ -13,6 +13,7 @@ interface Props {
   onClearSelection: () => void;
   sensitivity: number;
   onSensitivity: (v: number) => void;
+  onReimportFile: (file: File) => void;
 }
 
 const WandIcon = () => (
@@ -26,12 +27,29 @@ const WandIcon = () => (
 export default function FuzzySelectPanel({
   toolMode, hasSelection,
   onSetToolMode, onDelete, onChangeColor, onPreviewColor, onCancelColorPreview, onClearSelection,
-  sensitivity, onSensitivity,
+  sensitivity, onSensitivity, onReimportFile,
 }: Props) {
   const [pickedColor, setPickedColor] = useState("#ff0000");
   const [hexInput, setHexInput]       = useState("#ff0000");
   const [showPicker,  setShowPicker]  = useState(false);
+  const [bgRemoverOpened, setBgRemoverOpened] = useState(false);
   const colorInputRef = useRef<HTMLInputElement>(null);
+  const reimportInputRef = useRef<HTMLInputElement>(null);
+
+  const handleOpenBgRemover = () => {
+    window.open("https://www.photoroom.com/tools/background-remover", "_blank", "noopener,noreferrer");
+    setBgRemoverOpened(true);
+  };
+
+  const handleReimportClick = () => {
+    reimportInputRef.current?.click();
+  };
+
+  const handleReimportChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) onReimportFile(file);
+    e.target.value = "";
+  };
 
   const updateColor = (color: string) => {
     setPickedColor(color);
@@ -114,6 +132,77 @@ export default function FuzzySelectPanel({
               style={{ left: selectActive ? "calc(100% - 1.125rem)" : "0.125rem" }} />
           </div>
         </button>
+
+        {/* Background Remover (external tool) */}
+        <button
+          onClick={handleOpenBgRemover}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99]"
+          style={{
+            background: "linear-gradient(135deg,rgba(168,85,247,0.18),rgba(124,58,237,0.18))",
+            border: "1px solid rgba(168,85,247,0.4)",
+            color: "#e2c9ff",
+          }}
+          data-testid="button-background-remover"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: "rgba(168,85,247,0.3)" }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}>
+                <path d="M21 15a2 2 0 0 1-2 2H5l-4 4V5a2 2 0 0 1 2-2h11" />
+                <path d="M16 3h5v5" />
+                <path d="m21 3-9 9" />
+              </svg>
+            </div>
+            <div className="text-left">
+              <p className="text-[11px] font-bold text-white">Background Remover</p>
+              <p className="text-[9px] mt-0.5" style={{ color: "rgba(196,140,255,0.65)" }}>
+                Opens in new tab
+              </p>
+            </div>
+          </div>
+        </button>
+
+        {/* Re-import edited image (after using BG remover) */}
+        {bgRemoverOpened && (
+          <>
+            <input
+              ref={reimportInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleReimportChange}
+              style={{ display: "none" }}
+              data-testid="input-reimport-file"
+            />
+            <button
+              onClick={handleReimportClick}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99]"
+              style={{
+                background: "linear-gradient(135deg,rgba(34,197,94,0.18),rgba(16,185,129,0.18))",
+                border: "1px solid rgba(34,197,94,0.45)",
+                color: "#bbf7d0",
+              }}
+              data-testid="button-reimport-image"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: "rgba(34,197,94,0.3)" }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}>
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <p className="text-[11px] font-bold text-white">Re-import Edited Image</p>
+                  <p className="text-[9px] mt-0.5" style={{ color: "rgba(187,247,208,0.7)" }}>
+                    Upload the file you downloaded
+                  </p>
+                </div>
+              </div>
+            </button>
+          </>
+        )}
+
         {/* Sensitivity slider — shown whenever Magic Select is active */}
         {selectActive && (
           <div className="px-3 py-3 rounded-xl"

@@ -903,6 +903,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             onClearSelection={handleClearSelection}
             sensitivity={sensitivity}
             onSensitivity={setSensitivity}
+            onReimportFile={(f)=>setCurrentFile(f)}
           />
         </div>
       </div>
