@@ -92,7 +92,7 @@ export default function AdminDashboard() {
 
         <Tabs defaultValue="products" className="w-full">
           <TabsList className="mb-12 rounded-none border-b border-border bg-transparent h-auto p-0 flex space-x-8 overflow-x-auto justify-start w-full">
-            {["products", "fits", "colors", "sizes", "mockups", "order files", "settings", "fonts", "analytics", "system"].map(tab => (
+            {["products", "fits", "colors", "sizes", "mockups", "order files", "settings", "fonts", "system"].map(tab => (
               <TabsTrigger
                 key={tab}
                 value={tab}
@@ -110,7 +110,6 @@ export default function AdminDashboard() {
           <TabsContent value="order files"><OrderFilesManager /></TabsContent>
           <TabsContent value="settings"><OrderSettingsManager /></TabsContent>
           <TabsContent value="fonts"><FontsManager /></TabsContent>
-          <TabsContent value="analytics"><AnalyticsManager /></TabsContent>
           <TabsContent value="system"><SystemManager /></TabsContent>
         </Tabs>
       </motion.div>
