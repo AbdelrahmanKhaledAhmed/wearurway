@@ -62,9 +62,6 @@ function MobileBlocker() {
           If you don’t have a laptop or desktop and you want to create a specific design, you can message us. And if you don’t have anything in mind, you can check out the designs on Pinterest.
         </p>
         <div className="pt-4">
-          <p className="text-sm text-muted-foreground mb-3">
-            Follow us on social for updates
-          </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <a
               href="https://www.instagram.com/wearurway.store/"
