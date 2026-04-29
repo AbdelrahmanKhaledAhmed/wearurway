@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 type ToolMode = "select" | null;
 
@@ -33,6 +33,7 @@ export default function FuzzySelectPanel({
   const [hexInput, setHexInput]       = useState("#ff0000");
   const [showPicker,  setShowPicker]  = useState(false);
   const [bgRemoverOpened, setBgRemoverOpened] = useState(false);
+  const [showReimportPopup, setShowReimportPopup] = useState(false);
   const colorInputRef = useRef<HTMLInputElement>(null);
   const reimportInputRef = useRef<HTMLInputElement>(null);
 
@@ -41,13 +42,33 @@ export default function FuzzySelectPanel({
     setBgRemoverOpened(true);
   };
 
+  // When user returns to the tab after using the background remover,
+  // show a popup prompting them to re-import the edited photo.
+  useEffect(() => {
+    if (!bgRemoverOpened) return;
+    const onFocus = () => setShowReimportPopup(true);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setShowReimportPopup(true);
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [bgRemoverOpened]);
+
   const handleReimportClick = () => {
     reimportInputRef.current?.click();
   };
 
   const handleReimportChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) onReimportFile(file);
+    if (file) {
+      onReimportFile(file);
+      setShowReimportPopup(false);
+      setBgRemoverOpened(false);
+    }
     e.target.value = "";
   };
 
@@ -162,46 +183,16 @@ export default function FuzzySelectPanel({
           </div>
         </button>
 
-        {/* Re-import edited image (after using BG remover) */}
-        {bgRemoverOpened && (
-          <>
-            <input
-              ref={reimportInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleReimportChange}
-              style={{ display: "none" }}
-              data-testid="input-reimport-file"
-            />
-            <button
-              onClick={handleReimportClick}
-              className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99]"
-              style={{
-                background: "linear-gradient(135deg,rgba(34,197,94,0.18),rgba(16,185,129,0.18))",
-                border: "1px solid rgba(34,197,94,0.45)",
-                color: "#bbf7d0",
-              }}
-              data-testid="button-reimport-image"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-6 h-6 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: "rgba(34,197,94,0.3)" }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}>
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                </div>
-                <div className="text-left">
-                  <p className="text-[11px] font-bold text-white">Re-import Edited Image</p>
-                  <p className="text-[9px] mt-0.5" style={{ color: "rgba(187,247,208,0.7)" }}>
-                    Upload the file you downloaded
-                  </p>
-                </div>
-              </div>
-            </button>
-          </>
-        )}
+        {/* Hidden file input used by the re-import popup */}
+        <input
+          ref={reimportInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleReimportChange}
+          style={{ display: "none" }}
+          data-testid="input-reimport-file"
+        />
+
 
         {/* Sensitivity slider — shown whenever Magic Select is active */}
         {selectActive && (
@@ -433,6 +424,52 @@ export default function FuzzySelectPanel({
           </ul>
         </div>
       </div>
+
+      {/* Re-import popup — appears when user returns after using BG remover */}
+      {showReimportPopup && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
+          onClick={() => setShowReimportPopup(false)}
+          data-testid="popup-reimport"
+        >
+          <div
+            className="w-full max-w-md rounded-2xl p-6 text-center"
+            style={{
+              background: "linear-gradient(135deg,rgba(30,15,50,0.98),rgba(15,5,30,0.98))",
+              border: "1px solid rgba(168,85,247,0.4)",
+              boxShadow: "0 20px 60px rgba(124,58,237,0.4)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-3" style={{ color: "#c48cff" }}>
+              Welcome Back
+            </p>
+            <p className="text-[15px] leading-relaxed mb-6" style={{ color: "rgba(255,255,255,0.95)" }}>
+              All set? Click below to bring your edited photo back into the editor.
+            </p>
+            <button
+              onClick={handleReimportClick}
+              className="inline-block w-full px-6 py-3 rounded-xl font-bold text-sm tracking-[0.15em] uppercase transition-all hover:scale-[1.02] active:scale-[0.99]"
+              style={{
+                background: "linear-gradient(135deg,rgba(168,85,247,1),rgba(124,58,237,1))",
+                color: "#fff",
+                boxShadow: "0 8px 24px rgba(124,58,237,0.5)",
+              }}
+              data-testid="button-popup-reimport"
+            >
+              Re-import
+            </button>
+            <button
+              onClick={() => setShowReimportPopup(false)}
+              className="mt-4 text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
+              data-testid="button-popup-cancel"
+            >
+              Not yet
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
