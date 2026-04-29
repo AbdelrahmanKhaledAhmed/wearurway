@@ -19,7 +19,7 @@ import Checkout from "@/pages/checkout";
 import { Navbar } from "@/components/layout/navbar";
 import { CustomizerProvider } from "@/hooks/use-customizer";
 import { getAdminToken } from "@/lib/admin-token";
-import { FaInstagram, FaTiktok } from "react-icons/fa";
+import { FaInstagram, FaTiktok, FaPinterest } from "react-icons/fa";
 
 const queryClient = new QueryClient();
 
@@ -56,16 +56,16 @@ function MobileBlocker() {
           This website is designed for desktop and laptop use only.
         </p>
         <p className="text-base text-muted-foreground">
-          To create your T-shirt design with full precision and a professional experience, please open it on a computer.
+          Mobile access is not supported to ensure the best quality and usability of the design tools.
         </p>
         <p className="text-base text-muted-foreground">
-          Mobile access is not supported to ensure the best quality and usability of the design tools.
+          If you don’t have a laptop or desktop and you want to create a specific design, or even customize a T-shirt, you can message us. And if you don’t have anything in mind, you can check out the designs on Pinterest.
         </p>
         <div className="pt-4">
           <p className="text-sm text-muted-foreground mb-3">
             Follow us on social for updates
           </p>
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex items-center justify-center gap-3 flex-wrap">
             <a
               href="https://www.instagram.com/wearurway.store/"
               target="_blank"
@@ -87,6 +87,17 @@ function MobileBlocker() {
             >
               <FaTiktok className="w-5 h-5" />
               <span>TikTok</span>
+            </a>
+            <a
+              href="https://www.pinterest.com/WEARURWAY/t-shirt-designs/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Pinterest"
+              data-testid="link-pinterest-mobile"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              <FaPinterest className="w-5 h-5" />
+              <span>Pinterest</span>
             </a>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { FaInstagram, FaTiktok } from "react-icons/fa";
+import { FaInstagram, FaTiktok, FaPinterest } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
 
@@ -52,6 +52,16 @@ export default function Landing() {
             data-testid="link-tiktok"
           >
             <FaTiktok className="w-7 h-7" />
+          </a>
+          <a
+            href="https://www.pinterest.com/WEARURWAY/t-shirt-designs/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Pinterest"
+            className="text-muted-foreground hover:text-foreground transition-colors duration-300"
+            data-testid="link-pinterest"
+          >
+            <FaPinterest className="w-7 h-7" />
           </a>
         </div>
       </motion.div>
