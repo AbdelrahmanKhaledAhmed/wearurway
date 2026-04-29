@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useCustomizer } from "@/hooks/use-customizer";
 import { useGetOrderSettings } from "@workspace/api-client-react";
 import type { CreateOrderDesignJob } from "@workspace/api-client-react";
-import { trackEvent } from "@/lib/analytics";
 import {
   submitOrderAndWait,
   type QueuedOrderCustomer,
@@ -56,7 +55,6 @@ export default function Checkout() {
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
-  useEffect(() => { trackEvent("view_checkout"); }, []);
   const [shipping, setShipping] = useState<ShippingOption>("wasslaha");
   const [payment, setPayment] = useState<PaymentMethod>("cod");
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -185,7 +183,6 @@ export default function Checkout() {
       setOrderId(newOrderId);
       setSubmitting(false);
       setSubmitted(true);
-      trackEvent("complete_order");
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Could not submit order. Please try again.",

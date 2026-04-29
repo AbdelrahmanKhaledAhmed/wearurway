@@ -5,7 +5,6 @@ import { useGetSizes, getGetSizesQueryKey } from "@workspace/api-client-react";
 import { useCustomizer } from "@/hooks/use-customizer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { trackEvent } from "@/lib/analytics";
 
 export default function Sizes() {
   const [, setLocation] = useLocation();
@@ -24,8 +23,6 @@ export default function Sizes() {
   useEffect(() => {
     if (!fitId || !colorId) {
       setLocation("/colors");
-    } else {
-      trackEvent("view_sizes");
     }
   }, [fitId, colorId, setLocation]);
 

@@ -1,12 +1,9 @@
-import { useEffect } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { FaInstagram, FaTiktok, FaPinterest } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
-import { trackEvent } from "@/lib/analytics";
 
 export default function Landing() {
-  useEffect(() => { trackEvent("view_landing"); }, []);
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center relative overflow-hidden">
       <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-accent/20 via-background to-background pointer-events-none" />

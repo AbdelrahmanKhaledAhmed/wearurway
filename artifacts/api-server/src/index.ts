@@ -1,7 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { initStore, flushPendingSaves } from "./data/store.js";
-import { initAnalytics } from "./services/analyticsStore.js";
 import { cleanupExpiredDesigns } from "./routes/shared-designs.js";
 import { startOrderOutbox } from "./services/orderOutbox.js";
 import http from "node:http";
@@ -25,7 +24,6 @@ process.on("unhandledRejection", (reason) => {
 
 async function main() {
   await initStore();
-  await initAnalytics();
 
   const server = http.createServer(app);
 

@@ -215,7 +215,6 @@ export interface Store {
   orders: Record<string, OrderRecord>;
   orderSettings: OrderSettings;
   adminSessions?: string[];
-  analyticsEvents?: Record<string, number>;
 }
 
 const DEFAULT_STORE: Store = {
@@ -223,7 +222,6 @@ const DEFAULT_STORE: Store = {
   sharedDesigns: {},
   orderFiles: {},
   orders: {},
-  analyticsEvents: {},
   orderSettings: {
     shippingCompanyName: "Wasslaha Standard",
     shippingDescription: "Delivered in 2–3 working days",
@@ -285,7 +283,6 @@ async function loadFromDB(): Promise<Store> {
         sharedDesigns: parsed.sharedDesigns ?? {},
         orderFiles: parsed.orderFiles ?? {},
         orders: parsed.orders ?? {},
-        analyticsEvents: parsed.analyticsEvents ?? {},
         orderSettings: {
           ...DEFAULT_STORE.orderSettings,
           ...(parsed.orderSettings ?? {}),
