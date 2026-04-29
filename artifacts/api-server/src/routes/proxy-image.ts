@@ -196,13 +196,31 @@ async function scrapePinPage(pinUrl: string): Promise<string | null> {
 
 // ── Short URL resolution ──────────────────────────────────────────────────────
 
+// Reduce a resolved Pinterest URL to its canonical `/pin/<id>/` form.
+// pin.it redirects often land on `/pin/<id>/sent/?invite_code=…&sender_id=…`,
+// which can confuse Pinterest's oEmbed and the HTML scraper. Stripping the
+// trailing path segments and query string lets the rest of the pipeline
+// behave the same as if the user had pasted the canonical pin URL.
+function canonicalizePinUrl(resolved: string): string {
+  try {
+    const u = new URL(resolved);
+    const m = u.pathname.match(/\/pin\/(\d+)/);
+    if (!m) return resolved;
+    return `${u.protocol}//${u.host}/pin/${m[1]}/`;
+  } catch { return resolved; }
+}
+
 async function resolveShortUrl(url: string): Promise<string> {
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), 10000);
+  const t = setTimeout(() => controller.abort(), 20000);
   try {
     const res = await fetch(url, {
       redirect: "follow", signal: controller.signal,
-      headers: { "User-Agent": BROWSER_UA },
+      headers: {
+        "User-Agent": BROWSER_UA,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
     });
     clearTimeout(t);
     return res.url;
@@ -222,9 +240,14 @@ async function convertToPng(buffer: Buffer): Promise<Buffer> {
 async function resolveAndFetch(rawUrl: string): Promise<Buffer> {
   let targetUrl = rawUrl;
 
-  // 1. Resolve pin.it short links
-  if (isShortUrl(targetUrl)) {
+  // 1. Resolve pin.it short links (re-resolve a couple of times in case the
+  // first hop lands on another shortener) and canonicalize to the clean
+  // /pin/<id>/ form so oEmbed and scraping work reliably.
+  for (let i = 0; i < 3 && isShortUrl(targetUrl); i++) {
     targetUrl = await resolveShortUrl(targetUrl);
+  }
+  if (getPinId(targetUrl) !== null) {
+    targetUrl = canonicalizePinUrl(targetUrl);
   }
 
   // 2. Direct i.pinimg.com CDN URL → upgrade to originals, fetch via wsrv.nl
