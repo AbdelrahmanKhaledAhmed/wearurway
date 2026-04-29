@@ -59,7 +59,7 @@ function MobileBlocker() {
           Mobile access is not supported to ensure the best quality and usability of the design tools.
         </p>
         <p className="text-base text-muted-foreground">
-          If you don’t have a laptop or desktop and you want to create a specific design, or even customize a T-shirt, you can message us. And if you don’t have anything in mind, you can check out the designs on Pinterest.
+          If you don’t have a laptop or desktop and you want to create a specific design, you can message us. And if you don’t have anything in mind, you can check out the designs on Pinterest.
         </p>
         <div className="pt-4">
           <p className="text-sm text-muted-foreground mb-3">
