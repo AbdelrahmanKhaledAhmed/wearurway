@@ -856,8 +856,11 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
 
           {loaded && !processing && (
             <button
-              onClick={()=>setShowHelpWizard(true)}
-              className="absolute bottom-5 left-5 max-w-[260px] text-left px-4 py-3 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.99]"
+              onClick={(e)=>{ e.stopPropagation(); setShowHelpWizard(true); }}
+              onMouseDown={(e)=>e.stopPropagation()}
+              onMouseUp={(e)=>e.stopPropagation()}
+              onMouseMove={(e)=>e.stopPropagation()}
+              className="absolute bottom-5 left-5 z-20 max-w-[260px] text-left px-4 py-3 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.99]"
               style={{
                 background:"linear-gradient(135deg,rgba(168,85,247,0.85),rgba(124,58,237,0.85))",
                 border:"1px solid rgba(196,140,255,0.6)",
