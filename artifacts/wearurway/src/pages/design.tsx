@@ -141,12 +141,33 @@ export default function Design() {
   // Per-user visual zoom for the mockup. Purely a CSS scale on the mockup
   // viewer — does NOT change mockupSize (the canonical coordinate space),
   // so it never affects layer positions, the export, or other users' views.
+  // Persisted in localStorage so the user's preferred size survives refreshes.
   const VIEW_ZOOM_MIN = 0.6;
   const VIEW_ZOOM_MAX = 2.5;
   const VIEW_ZOOM_STEP = 0.15;
-  const [viewZoom, setViewZoom] = useState(1);
+  const VIEW_ZOOM_STORAGE_KEY = "wearurway:viewZoom";
+  const [viewZoom, setViewZoom] = useState<number>(() => {
+    if (typeof window === "undefined") return 1;
+    try {
+      const raw = window.localStorage.getItem(VIEW_ZOOM_STORAGE_KEY);
+      if (!raw) return 1;
+      const n = Number(raw);
+      if (!Number.isFinite(n)) return 1;
+      return Math.min(VIEW_ZOOM_MAX, Math.max(VIEW_ZOOM_MIN, n));
+    } catch {
+      return 1;
+    }
+  });
   const viewZoomRef = useRef(viewZoom);
   useEffect(() => { viewZoomRef.current = viewZoom; }, [viewZoom]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(VIEW_ZOOM_STORAGE_KEY, String(viewZoom));
+    } catch {
+      // ignore (private mode / quota)
+    }
+  }, [viewZoom]);
   const [snapActive, setSnapActive] = useState(false);
   const holdActionRef = useRef<(() => void) | null>(null);
   const holdTimerRef = useRef<{ timeout: ReturnType<typeof setTimeout> | null; interval: ReturnType<typeof setInterval> | null }>({ timeout: null, interval: null });
