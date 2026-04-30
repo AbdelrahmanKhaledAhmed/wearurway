@@ -35,7 +35,26 @@ const MIN_LAYER_SIZE = 10;
 const CHECKOUT_EXPORT_DB = "wearurway-checkout-exports";
 const CHECKOUT_EXPORT_STORE = "exports";
 const CHECKOUT_EXPORT_KEY = "latest";
-const EXPORT_SCALE = 8;
+// Floor for export scale: even with no layers (e.g. shirt-mockup only), we
+// still upscale this much so the result is print-quality.
+const EXPORT_SCALE_MIN = 8;
+// Hard cap on export scale to stay well under browser canvas-size limits
+// (most browsers are safe up to ~16384px per dimension).
+const EXPORT_SCALE_MAX = 16;
+
+function computeExportScale(
+  loaded: { l: DesignLayerForExport; img: HTMLImageElement }[],
+): number {
+  let scale = EXPORT_SCALE_MIN;
+  for (const { l: layer, img } of loaded) {
+    const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
+    const natW = layer.naturalWidth ?? img.naturalWidth ?? 0;
+    const natH = layer.naturalHeight ?? img.naturalHeight ?? 0;
+    if (natW > 0 && displayW > 0) scale = Math.max(scale, natW / displayW);
+    if (natH > 0 && displayH > 0) scale = Math.max(scale, natH / displayH);
+  }
+  return Math.min(EXPORT_SCALE_MAX, Math.ceil(scale));
+}
 
 async function loadImg(src: string): Promise<HTMLImageElement | null> {
   try {
@@ -179,11 +198,13 @@ export async function generateDesignExportFiles({
     // still matching the on-screen layout exactly. All layout math stays in
     // the canonical mockup-space; we expand the physical canvas and use
     // ctx.scale() so source images (e.g. 1200x1200 photos) are drawn at full
-    // detail instead of being downscaled to the preview size.
+    // native resolution. The scale is chosen adaptively from the largest
+    // uploaded image so we never waste detail and never blow up memory.
+    const scale = computeExportScale(loaded);
     const baseW = Math.round(mockupSize);
     const baseH = Math.round(mockupSize * (4 / 3));
-    const exportW = baseW * EXPORT_SCALE;
-    const exportH = baseH * EXPORT_SCALE;
+    const exportW = baseW * scale;
+    const exportH = baseH * scale;
     const makeCanvas = () => {
       const c = document.createElement("canvas");
       c.width = exportW;
@@ -194,7 +215,7 @@ export async function generateDesignExportFiles({
       const ctx = c.getContext("2d")!;
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
-      ctx.scale(EXPORT_SCALE, EXPORT_SCALE);
+      ctx.scale(scale, scale);
       return ctx;
     };
 
@@ -270,12 +291,13 @@ export async function generateDesignExportBlobs({
     // Render at a high-resolution scale so the file is print-quality while
     // still matching the on-screen layout exactly. All layout math stays in
     // the canonical mockup-space; we expand the physical canvas and use
-    // ctx.scale() so source images (e.g. 1200x1200 photos) are drawn at full
-    // detail instead of being downscaled to the preview size.
+    // ctx.scale() so source images are drawn at full native resolution. The
+    // scale is chosen adaptively from the largest uploaded image.
+    const scale = computeExportScale(loaded);
     const baseW = Math.round(mockupSize);
     const baseH = Math.round(mockupSize * (4 / 3));
-    const exportW = baseW * EXPORT_SCALE;
-    const exportH = baseH * EXPORT_SCALE;
+    const exportW = baseW * scale;
+    const exportH = baseH * scale;
     const makeCanvas = () => {
       const c = document.createElement("canvas");
       c.width = exportW;
@@ -286,7 +308,7 @@ export async function generateDesignExportBlobs({
       const ctx = c.getContext("2d")!;
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
-      ctx.scale(EXPORT_SCALE, EXPORT_SCALE);
+      ctx.scale(scale, scale);
       return ctx;
     };
 
