@@ -733,7 +733,7 @@ function SummaryRow({ label, value }: { label: string; value: React.ReactNode })
   );
 }
 
-function CompleteOrderButton({ total, submitting, onSubmit }: { total: number; submitting: boolean; onSubmit: () => void }) {
+function CompleteOrderButton({ submitting, onSubmit }: { total: number; submitting: boolean; onSubmit: () => void }) {
   return (
     <button
       onClick={onSubmit}
@@ -741,7 +741,7 @@ function CompleteOrderButton({ total, submitting, onSubmit }: { total: number; s
       className="w-full py-4 font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-[0.98] disabled:opacity-60"
       style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
     >
-      {`Complete Order — ${total} EGP`}
+      Complete Order
     </button>
   );
 }
