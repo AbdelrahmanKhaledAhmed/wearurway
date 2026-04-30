@@ -197,7 +197,7 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
                 {step === "intro" && (
                   <div className="px-6 py-6">
                     <p className="text-sm text-white/70 leading-relaxed mb-6">
-                      Open our curated Pinterest board, pick a design you love, then come back and paste the link — it'll download instantly as a PNG ready to use.
+                      Open our curated Pinterest board, pick a design you love, then come back and paste the link.
                     </p>
                     <div className="flex flex-col gap-3">
                       <motion.button
