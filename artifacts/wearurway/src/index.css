@@ -67,37 +67,34 @@
 }
 
 :root {
-  /* Base graphite, very slightly cool — feels darker than 5% thanks to
-     the layered body gradient applied below. */
-  --background: 240 10% 6%;
+  --background: 240 10% 4%;
   --foreground: 0 0% 98%;
 
-  /* Cards & popovers sit a touch above the body so layers feel separated. */
-  --card: 240 9% 9%;
+  --card: 240 10% 4%;
   --card-foreground: 0 0% 98%;
-  --card-border: 240 6% 18%;
+  --card-border: 240 4% 16%;
 
-  --popover: 240 9% 9%;
+  --popover: 240 10% 4%;
   --popover-foreground: 0 0% 98%;
-  --popover-border: 240 6% 18%;
+  --popover-border: 240 4% 16%;
 
   --primary: 0 0% 98%;
   --primary-foreground: 240 5.9% 10%;
 
-  --secondary: 240 6% 18%;
+  --secondary: 240 4% 16%;
   --secondary-foreground: 0 0% 98%;
 
-  --muted: 240 6% 18%;
+  --muted: 240 4% 16%;
   --muted-foreground: 240 5% 65%;
 
-  --accent: 240 6% 18%;
+  --accent: 240 4% 16%;
   --accent-foreground: 0 0% 98%;
 
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
 
-  --border: 240 6% 18%;
-  --input: 240 6% 18%;
+  --border: 240 4% 16%;
+  --input: 240 4% 16%;
   --ring: 240 5% 65%;
 
   --sidebar: 240 10% 4%;
@@ -141,39 +138,39 @@
 }
 
 .dark {
-  --background: 240 10% 6%;
+  --background: 240 10% 4%;
   --foreground: 0 0% 98%;
 
-  --card: 240 9% 9%;
+  --card: 240 10% 4%;
   --card-foreground: 0 0% 98%;
-  --card-border: 240 6% 18%;
+  --card-border: 240 4% 16%;
 
-  --popover: 240 9% 9%;
+  --popover: 240 10% 4%;
   --popover-foreground: 0 0% 98%;
-  --popover-border: 240 6% 18%;
+  --popover-border: 240 4% 16%;
 
   --primary: 0 0% 98%;
   --primary-foreground: 240 5.9% 10%;
 
-  --secondary: 240 6% 18%;
+  --secondary: 240 4% 16%;
   --secondary-foreground: 0 0% 98%;
 
-  --muted: 240 6% 18%;
+  --muted: 240 4% 16%;
   --muted-foreground: 240 5% 65%;
 
-  --accent: 240 6% 18%;
+  --accent: 240 4% 16%;
   --accent-foreground: 0 0% 98%;
 
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
 
-  --border: 240 6% 18%;
-  --input: 240 6% 18%;
+  --border: 240 4% 16%;
+  --input: 240 4% 16%;
   --ring: 240 5% 65%;
   
   --chart-1: 0 0% 98%;
   --chart-2: 240 5% 65%;
-  --chart-3: 240 6% 18%;
+  --chart-3: 240 4% 16%;
   --chart-4: 0 0% 98%;
   --chart-5: 240 5% 65%;
 }
@@ -186,33 +183,13 @@
     zoom: 0.9;
     overflow-x: hidden;
   }
-  /* Subtle layered backdrop — reads as a deep dark surface with a hint of
-     warmth from the top and a cool drop toward the bottom, instead of a
-     flat solid black. The base bg-background acts as a fallback. */
   body {
     @apply font-sans antialiased bg-background text-foreground;
     overflow-x: hidden;
-    background-image:
-      radial-gradient(120% 80% at 50% -10%, hsl(245 18% 11% / 0.85) 0%, hsl(240 12% 7% / 0.0) 55%),
-      radial-gradient(90% 60% at 100% 110%, hsl(260 20% 10% / 0.55) 0%, hsl(240 12% 6% / 0.0) 60%),
-      linear-gradient(180deg, hsl(240 10% 7%) 0%, hsl(240 10% 5%) 100%);
-    background-attachment: fixed;
   }
 }
 
 @layer utilities {
-  /* Layered panel surface for sidebars & modals — replaces flat #0d0d0d
-     so panels feel sculpted instead of pasted on. Includes a subtle inner
-     highlight along the top edge. */
-  .panel-dark {
-    background-color: hsl(240 10% 7%);
-    background-image:
-      linear-gradient(180deg, hsl(240 12% 10%) 0%, hsl(240 10% 6%) 100%),
-      radial-gradient(140% 70% at 50% -20%, hsl(248 22% 14% / 0.55) 0%, hsl(240 10% 6% / 0.0) 60%);
-    background-blend-mode: normal, screen;
-    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.04);
-  }
-
   .no-scrollbar {
     scrollbar-width: none;
     -ms-overflow-style: none;

@@ -176,7 +176,7 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
               className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
             >
               <div
-                className="pointer-events-auto w-full max-w-md panel-dark border border-white/10 overflow-hidden"
+                className="pointer-events-auto w-full max-w-md bg-[#0d0d0d] border border-white/10 overflow-hidden"
                 onClick={e => e.stopPropagation()}
               >
                 {/* Header */}

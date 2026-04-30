@@ -252,7 +252,7 @@ export default function OrderReviewModal({
             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
           >
             <div
-              className="pointer-events-auto w-full max-w-2xl max-h-[90vh] overflow-y-auto panel-dark border border-white/10 flex flex-col"
+              className="pointer-events-auto w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[#0d0d0d] border border-white/10 flex flex-col"
               style={{ scrollbarWidth: "none" }}
               onClick={e => e.stopPropagation()}
             >
