@@ -42,13 +42,19 @@ export default function FuzzySelectPanel({
     setBgRemoverOpened(true);
   };
 
-  // When user returns to the tab after using the background remover,
-  // show a popup prompting them to re-import the edited photo.
+  // When the user returns to this tab after clicking "Background Remover",
+  // show the re-import popup ONCE. We immediately clear bgRemoverOpened so
+  // future tab switches (unrelated to the BG remover) don't keep re-opening
+  // the popup. The popup only comes back if they click the button again.
   useEffect(() => {
     if (!bgRemoverOpened) return;
-    const onFocus = () => setShowReimportPopup(true);
+    const trigger = () => {
+      setShowReimportPopup(true);
+      setBgRemoverOpened(false);
+    };
+    const onFocus = () => trigger();
     const onVisible = () => {
-      if (document.visibilityState === "visible") setShowReimportPopup(true);
+      if (document.visibilityState === "visible") trigger();
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisible);
