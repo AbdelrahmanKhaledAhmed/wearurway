@@ -305,14 +305,21 @@ export default function Design() {
     // Transfer layer to the other side if dropped on the opposite button
     if (drag && overSide && overSide !== sideRef.current) {
       const layerId = drag.layerId;
-      const layer = layersRef.current.find(l => l.id === layerId);
+      const layer = layersRef.current.find((l) => l.id === layerId);
       if (layer) {
+        // Restore the layer to the spot it occupied BEFORE the drag began,
+        // so it doesn't land where the cursor was over the side button.
+        const restoredLayer = {
+          ...layer,
+          x: drag.startLayerX,
+          y: drag.startLayerY,
+        };
         if (sideRef.current === "front") {
-          setFrontLayers(prev => prev.filter(l => l.id !== layerId));
-          setBackLayers(prev => [...prev, layer]);
+          setFrontLayers((prev) => prev.filter((l) => l.id !== layerId));
+          setBackLayers((prev) => [...prev, restoredLayer]);
         } else {
-          setBackLayers(prev => prev.filter(l => l.id !== layerId));
-          setFrontLayers(prev => [...prev, layer]);
+          setBackLayers((prev) => prev.filter((l) => l.id !== layerId));
+          setFrontLayers((prev) => [...prev, restoredLayer]);
         }
         setSide(overSide);
         setSelectedLayerId(layerId);
