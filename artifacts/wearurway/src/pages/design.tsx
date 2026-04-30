@@ -1427,13 +1427,13 @@ export default function Design() {
                 <p className="text-xs text-muted-foreground uppercase tracking-widest">Size</p>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setMockupSize(prev => Math.max(160, prev - 40))}
+                    onClick={() => setMockupSize(prev => Math.max(160, prev - 10))}
                     className="flex-1 py-2.5 text-sm font-bold uppercase tracking-widest border border-border bg-background hover:border-foreground hover:bg-muted/20 transition-colors"
                   >
                     − Smaller
                   </button>
                   <button
-                    onClick={() => setMockupSize(prev => Math.min(1400, prev + 40))}
+                    onClick={() => setMockupSize(prev => Math.min(1400, prev + 10))}
                     className="flex-1 py-2.5 text-sm font-bold uppercase tracking-widest border border-border bg-background hover:border-foreground hover:bg-muted/20 transition-colors"
                   >
                     + Bigger
