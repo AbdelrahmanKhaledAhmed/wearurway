@@ -209,8 +209,26 @@ router.post("/create-order", (req, res) => {
   // (queued below) will be released. The customer can close the tab the
   // instant we return 200 — render + upload + notification are all the
   // server's responsibility from this point on.
-  if (body.designJob) {
+  //
+  // BUT: if the client already shipped the rendered design PNGs as
+  // exportFiles (the same high-res output the on-screen Export button
+  // produces), we skip the server-side sharp render entirely so we don't
+  // overwrite the better client-rendered files with a lower-res copy.
+  const clientRenderedDesignFilenames = new Set([
+    "design-front.png",
+    "mockup-front.png",
+    "design-back.png",
+    "mockup-back.png",
+  ]);
+  const clientShippedDesignFiles = Array.isArray(body.exportFiles)
+    && body.exportFiles.some((f) => !!f.fileName && clientRenderedDesignFilenames.has(f.fileName));
+  if (body.designJob && !clientShippedDesignFiles) {
     enqueueDesignRender(orderId, body.designJob);
+  } else if (body.designJob && clientShippedDesignFiles) {
+    logger.info(
+      { orderId, fileCount: body.exportFiles?.length },
+      "Skipping server-side design render — client supplied high-res files",
+    );
   }
 
   const feedback =

@@ -59,6 +59,14 @@ export interface QueuedOrderPayload extends QueuedOrderCustomer {
   orderId: string;
   paymentProof?: QueuedOrderFile;
   designJob?: CreateOrderDesignJob;
+  /**
+   * Pre-rendered, high-resolution design files produced in the browser using
+   * the same renderer as the on-screen Export button. Sending these means the
+   * server skips its lower-res sharp render and stores these bytes in R2
+   * verbatim. Filenames are: design-front.png, mockup-front.png,
+   * design-back.png, mockup-back.png (only the sides that have content).
+   */
+  exportFiles?: QueuedOrderFile[];
   feedback?: string;
 }
 
@@ -74,6 +82,7 @@ export interface QueuedOrderSpecRecord {
   customer: QueuedOrderCustomer;
   paymentProof?: QueuedOrderFile;
   designJob?: CreateOrderDesignJob;
+  exportFiles?: QueuedOrderFile[];
   feedback?: string;
   attempts: number;
   lastError?: string;
@@ -174,6 +183,7 @@ export interface SaveSpecArgs {
   customer: QueuedOrderCustomer;
   paymentProof?: QueuedOrderFile;
   designJob?: CreateOrderDesignJob;
+  exportFiles?: QueuedOrderFile[];
   feedback?: string;
 }
 
@@ -194,6 +204,7 @@ export async function saveSpecQueuedOrder(
     customer: args.customer,
     paymentProof: args.paymentProof,
     designJob: args.designJob,
+    exportFiles: args.exportFiles,
     feedback: args.feedback,
     attempts: 0,
     createdAt: now,
@@ -323,6 +334,7 @@ async function uploadLayersAndSubmit(record: QueuedOrderSpecRecord): Promise<Sub
     ...record.customer,
     paymentProof: record.paymentProof,
     designJob,
+    exportFiles: record.exportFiles,
     feedback: record.feedback,
   };
 

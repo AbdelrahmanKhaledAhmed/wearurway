@@ -3,6 +3,11 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGetOrderSettings, useGetSizes, getGetSizesQueryKey } from "@workspace/api-client-react";
 import { useCustomizer } from "@/hooks/use-customizer";
+import {
+  generateDesignExportFiles,
+  saveCheckoutExportFiles,
+  type DesignExportFile,
+} from "@/lib/design-export";
 
 interface BBox { x: number; y: number; width: number; height: number }
 
@@ -167,7 +172,13 @@ export default function OrderReviewModal({
   const [backPreview, setBackPreview] = useState<string | null>(null);
   const [generatingPreviews, setGeneratingPreviews] = useState(false);
   const [prepareError, setPrepareError] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const generatedRef = useRef(false);
+  // High-res export files (same ones the Export button on /design produces).
+  // We start rendering as soon as the user reaches the review step so the
+  // bytes are ready (or near-ready) by the time they click Confirm — they
+  // get persisted to IndexedDB and uploaded to R2 from /checkout.
+  const exportFilesPromiseRef = useRef<Promise<DesignExportFile[]> | null>(null);
 
   const hasFront = frontLayers.some(l => l.visible);
   const hasBack = backLayers.some(l => l.visible);
@@ -177,6 +188,17 @@ export default function OrderReviewModal({
     if (generatedRef.current) return;
     generatedRef.current = true;
     setGeneratingPreviews(true);
+    // Kick off the high-res export in parallel — don't block previews on it.
+    exportFilesPromiseRef.current = generateDesignExportFiles({
+      frontLayers,
+      backLayers,
+      mockupSize,
+      frontMockupImage: mockup?.front?.image,
+      backMockupImage: mockup?.back?.image,
+    }).catch((err) => {
+      console.warn("[order-review] high-res export render failed", err);
+      return [];
+    });
     try {
       const [fp, bp] = await Promise.all([
         generatePreview("FRONT", mockup?.front?.image, localFrontBbox, frontLayers, mockupSize),
@@ -196,6 +218,8 @@ export default function OrderReviewModal({
       setFrontPreview(null);
       setBackPreview(null);
       setPrepareError("");
+      setConfirming(false);
+      exportFilesPromiseRef.current = null;
     }
   }, [isOpen]);
 
@@ -211,8 +235,9 @@ export default function OrderReviewModal({
     setStep("review");
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setPrepareError("");
+    setConfirming(true);
     const designJob = {
       frontLayers,
       backLayers,
@@ -222,6 +247,20 @@ export default function OrderReviewModal({
     };
 
     try {
+      // Wait for the high-res export render that started when we entered the
+      // review step, then persist the bytes to IndexedDB. /checkout reads
+      // them and ships them to the server as the order's R2 design files.
+      const exportFiles = exportFilesPromiseRef.current
+        ? await exportFilesPromiseRef.current
+        : [];
+      if (exportFiles.length > 0) {
+        try {
+          await saveCheckoutExportFiles(exportFiles);
+        } catch (err) {
+          console.warn("[order-review] could not persist export files", err);
+        }
+      }
+
       sessionStorage.setItem("ww_checkout_design_job", JSON.stringify(designJob));
       sessionStorage.setItem("ww_checkout_front", frontPreview ?? "");
       sessionStorage.setItem("ww_checkout_back", backPreview ?? "");
@@ -230,6 +269,8 @@ export default function OrderReviewModal({
       onClose();
     } catch {
       setPrepareError("Could not open checkout. Please try again.");
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -404,14 +445,15 @@ export default function OrderReviewModal({
                   <div className="px-8 pt-6 pb-8">
                     <button
                       onClick={handleConfirm}
-                      className="w-full py-4 font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-[0.98]"
+                      disabled={confirming}
+                      className="w-full py-4 font-black uppercase tracking-[0.2em] text-sm transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                       style={{
                         backgroundColor: "#f5c842",
                         color: "#0d0d0d",
                         letterSpacing: "0.25em",
                       }}
                     >
-                      Confirm Order
+                      {confirming ? "Preparing…" : "Confirm Order"}
                     </button>
                     {prepareError && <p className="text-xs text-red-400 mt-3">{prepareError}</p>}
                   </div>

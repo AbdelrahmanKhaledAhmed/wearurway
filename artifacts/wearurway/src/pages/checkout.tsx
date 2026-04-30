@@ -8,6 +8,10 @@ import {
   submitOrderAndWait,
   type QueuedOrderCustomer,
 } from "@/lib/order-queue";
+import {
+  loadCheckoutExportFiles,
+  clearCheckoutExportFiles,
+} from "@/lib/design-export";
 
 const FREE_SHIPPING_AREAS = ["6th of October", "Sheikh Zayed"];
 
@@ -134,6 +138,25 @@ export default function Checkout() {
           ? { fileName: proofFile.name, dataUrl: await fileToDataUrl(proofFile) }
           : undefined;
 
+      // 1b. Pull the high-resolution design PNGs that the OrderReviewModal
+      //     rendered (same renderer as the on-screen Export button). When
+      //     present these go straight to R2 verbatim — the server skips its
+      //     lower-res sharp render. If they're missing for any reason
+      //     (older client, render failure) we still send the designJob so
+      //     the server can render server-side as a fallback.
+      let exportFiles: { fileName: string; dataUrl: string }[] | undefined;
+      try {
+        const stored = await loadCheckoutExportFiles();
+        if (stored.length > 0) {
+          exportFiles = stored.map((f) => ({
+            fileName: f.fileName,
+            dataUrl: f.dataUrl,
+          }));
+        }
+      } catch (err) {
+        console.warn("[checkout] could not load export files", err);
+      }
+
       const customer: QueuedOrderCustomer = {
         name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
         phone: form.phone.replace(/\D/g, ""),
@@ -165,6 +188,7 @@ export default function Checkout() {
         customer,
         paymentProof,
         designJob,
+        exportFiles,
         feedback: feedback.trim() || undefined,
       });
 
@@ -174,6 +198,8 @@ export default function Checkout() {
       sessionStorage.removeItem("ww_checkout_back");
       sessionStorage.removeItem("ww_checkout_price");
       sessionStorage.removeItem("ww_checkout_design_job");
+      // High-res export files are durably saved on the server now too.
+      void clearCheckoutExportFiles().catch(() => {});
 
       // 4. The server has confirmed the order. Show the success screen with
       //    the confirmed orderId. The server-side outbox continues to
