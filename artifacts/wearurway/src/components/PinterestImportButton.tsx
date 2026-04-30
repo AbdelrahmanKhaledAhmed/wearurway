@@ -197,9 +197,6 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
                 {step === "intro" && (
                   <div className="px-6 py-6">
                     <p className="text-sm text-white/70 leading-relaxed mb-6">
-                      Not sure how to choose a good image or design that fits your idea?{" "}
-                      <span className="text-white font-semibold">I'll help you find or pick the perfect design.</span>
-                      <br /><br />
                       Open our curated Pinterest board, pick a design you love, then come back and paste the link — it'll download instantly as a PNG ready to use.
                     </p>
                     <div className="flex flex-col gap-3">
