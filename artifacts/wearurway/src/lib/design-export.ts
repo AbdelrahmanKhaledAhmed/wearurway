@@ -174,20 +174,11 @@ export async function generateDesignExportFiles({
       );
     }
 
-    const MAX_CANVAS_PX = 16384;
-    const scaleForMinimum = 4000 / mockupSize;
-    const scaleForShirt = shirtImg ? shirtImg.naturalWidth / mockupSize : 0;
-    let SCALE = Math.max(scaleForShirt, scaleForMinimum);
-    for (const { l, img } of loaded) {
-      const { width: dw } = getRatioLockedSize(l, l.width);
-      SCALE = Math.max(SCALE, img.naturalWidth / dw);
-    }
-    if (mockupSize * SCALE > MAX_CANVAS_PX || mockupSize * (4 / 3) * SCALE > MAX_CANVAS_PX) {
-      SCALE = Math.min(MAX_CANVAS_PX / mockupSize, MAX_CANVAS_PX / (mockupSize * (4 / 3)));
-    }
-
-    const exportW = Math.round(mockupSize * SCALE);
-    const exportH = Math.round(mockupSize * (4 / 3) * SCALE);
+    // Render at exactly the mockup display size so the file matches what the
+    // user sees on screen — no extra upscaling. The high-quality smoothing on
+    // the canvas context handles any per-layer downscaling cleanly.
+    const exportW = Math.round(mockupSize);
+    const exportH = Math.round(mockupSize * (4 / 3));
     const makeCanvas = () => {
       const c = document.createElement("canvas");
       c.width = exportW;
@@ -205,15 +196,13 @@ export async function generateDesignExportFiles({
     const layerCtx = setupCtx(layerCanvas);
     for (const { l: layer, img } of loaded) {
       const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
-      const exportLayerW = displayW * SCALE;
-      const exportLayerH = displayH * SCALE;
-      const cx = (layer.x + displayW / 2) * SCALE;
-      const cy = (layer.y + displayH / 2) * SCALE;
+      const cx = layer.x + displayW / 2;
+      const cy = layer.y + displayH / 2;
       const angle = (layer.rotation * Math.PI) / 180;
       layerCtx.save();
       layerCtx.translate(cx, cy);
       layerCtx.rotate(angle);
-      layerCtx.drawImage(img, -exportLayerW / 2, -exportLayerH / 2, exportLayerW, exportLayerH);
+      layerCtx.drawImage(img, -displayW / 2, -displayH / 2, displayW, displayH);
       layerCtx.restore();
     }
 
@@ -272,20 +261,10 @@ export async function generateDesignExportBlobs({
       );
     }
 
-    const MAX_CANVAS_PX = 16384;
-    const scaleForMinimum = 4000 / mockupSize;
-    const scaleForShirt = shirtImg ? shirtImg.naturalWidth / mockupSize : 0;
-    let SCALE = Math.max(scaleForShirt, scaleForMinimum);
-    for (const { l, img } of loaded) {
-      const { width: dw } = getRatioLockedSize(l, l.width);
-      SCALE = Math.max(SCALE, img.naturalWidth / dw);
-    }
-    if (mockupSize * SCALE > MAX_CANVAS_PX || mockupSize * (4 / 3) * SCALE > MAX_CANVAS_PX) {
-      SCALE = Math.min(MAX_CANVAS_PX / mockupSize, MAX_CANVAS_PX / (mockupSize * (4 / 3)));
-    }
-
-    const exportW = Math.round(mockupSize * SCALE);
-    const exportH = Math.round(mockupSize * (4 / 3) * SCALE);
+    // Render at exactly the mockup display size so the file matches what the
+    // user sees on screen — no extra upscaling.
+    const exportW = Math.round(mockupSize);
+    const exportH = Math.round(mockupSize * (4 / 3));
     const makeCanvas = () => {
       const c = document.createElement("canvas");
       c.width = exportW;
@@ -303,15 +282,13 @@ export async function generateDesignExportBlobs({
     const layerCtx = setupCtx(layerCanvas);
     for (const { l: layer, img } of loaded) {
       const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
-      const exportLayerW = displayW * SCALE;
-      const exportLayerH = displayH * SCALE;
-      const cx = (layer.x + displayW / 2) * SCALE;
-      const cy = (layer.y + displayH / 2) * SCALE;
+      const cx = layer.x + displayW / 2;
+      const cy = layer.y + displayH / 2;
       const angle = (layer.rotation * Math.PI) / 180;
       layerCtx.save();
       layerCtx.translate(cx, cy);
       layerCtx.rotate(angle);
-      layerCtx.drawImage(img, -exportLayerW / 2, -exportLayerH / 2, exportLayerW, exportLayerH);
+      layerCtx.drawImage(img, -displayW / 2, -displayH / 2, displayW, displayH);
       layerCtx.restore();
     }
 

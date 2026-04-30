@@ -31,7 +31,6 @@ export interface RenderedDesignFile {
 }
 
 const MIN_LAYER_SIZE = 10;
-const MAX_CANVAS_PX = 16384;
 
 interface LoadedImage {
   buffer: Buffer;
@@ -170,30 +169,18 @@ async function renderSide(
     );
   }
 
-  const scaleForMinimum = 4000 / mockupSize;
-  const scaleForShirt = shirt ? shirt.width / mockupSize : 0;
-  let SCALE = Math.max(scaleForShirt, scaleForMinimum);
-  for (const { l, img } of loaded) {
-    const { width: dw } = getRatioLockedSize(l, img, l.width);
-    SCALE = Math.max(SCALE, img.width / dw);
-  }
-  if (
-    mockupSize * SCALE > MAX_CANVAS_PX ||
-    mockupSize * (4 / 3) * SCALE > MAX_CANVAS_PX
-  ) {
-    SCALE = Math.min(MAX_CANVAS_PX / mockupSize, MAX_CANVAS_PX / (mockupSize * (4 / 3)));
-  }
-
-  const exportW = Math.max(1, Math.round(mockupSize * SCALE));
-  const exportH = Math.max(1, Math.round(mockupSize * (4 / 3) * SCALE));
+  // Render at exactly the mockup display size so the cloud-stored files
+  // match what the customer sees on screen — no extra upscaling.
+  const exportW = Math.max(1, Math.round(mockupSize));
+  const exportH = Math.max(1, Math.round(mockupSize * (4 / 3)));
 
   const layerComposites: sharp.OverlayOptions[] = [];
   for (const { l, img } of loaded) {
     const { width: displayW, height: displayH } = getRatioLockedSize(l, img, l.width);
-    const exportLayerW = Math.max(1, Math.round(displayW * SCALE));
-    const exportLayerH = Math.max(1, Math.round(displayH * SCALE));
-    const cx = (l.x + displayW / 2) * SCALE;
-    const cy = (l.y + displayH / 2) * SCALE;
+    const exportLayerW = Math.max(1, Math.round(displayW));
+    const exportLayerH = Math.max(1, Math.round(displayH));
+    const cx = l.x + displayW / 2;
+    const cy = l.y + displayH / 2;
 
     const resized = sharp(img.buffer).resize(exportLayerW, exportLayerH, { fit: "fill" });
     const angle = Number.isFinite(l.rotation) ? l.rotation : 0;
