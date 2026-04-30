@@ -144,7 +144,7 @@ export default function Design() {
   // Persisted in localStorage so the user's preferred size survives refreshes.
   const VIEW_ZOOM_MIN = 0.6;
   const VIEW_ZOOM_MAX = 2.5;
-  const VIEW_ZOOM_STEP = 0.15;
+  const VIEW_ZOOM_STEP = 0.05;
   const VIEW_ZOOM_STORAGE_KEY = "wearurway:viewZoom";
   const [viewZoom, setViewZoom] = useState<number>(() => {
     if (typeof window === "undefined") return 1;
