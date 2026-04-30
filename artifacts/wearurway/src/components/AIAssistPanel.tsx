@@ -111,7 +111,7 @@ export default function FuzzySelectPanel({
   const selectActive = toolMode === "select";
 
   return (
-    <div className="flex flex-col h-full" style={{ backgroundColor: "#0d0d0d" }}>
+    <div className="flex flex-col h-full panel-dark">
 
       {/* ── Header ── */}
       <div className="px-5 pt-5 pb-4 border-b shrink-0" style={{ borderColor: "rgba(168,85,247,0.15)" }}>
