@@ -35,6 +35,7 @@ const MIN_LAYER_SIZE = 10;
 const CHECKOUT_EXPORT_DB = "wearurway-checkout-exports";
 const CHECKOUT_EXPORT_STORE = "exports";
 const CHECKOUT_EXPORT_KEY = "latest";
+const EXPORT_SCALE = 8;
 
 async function loadImg(src: string): Promise<HTMLImageElement | null> {
   try {
@@ -174,11 +175,15 @@ export async function generateDesignExportFiles({
       );
     }
 
-    // Render at exactly the mockup display size so the file matches what the
-    // user sees on screen — no extra upscaling. The high-quality smoothing on
-    // the canvas context handles any per-layer downscaling cleanly.
-    const exportW = Math.round(mockupSize);
-    const exportH = Math.round(mockupSize * (4 / 3));
+    // Render at a high-resolution scale so the file is print-quality while
+    // still matching the on-screen layout exactly. All layout math stays in
+    // the canonical mockup-space; we expand the physical canvas and use
+    // ctx.scale() so source images (e.g. 1200x1200 photos) are drawn at full
+    // detail instead of being downscaled to the preview size.
+    const baseW = Math.round(mockupSize);
+    const baseH = Math.round(mockupSize * (4 / 3));
+    const exportW = baseW * EXPORT_SCALE;
+    const exportH = baseH * EXPORT_SCALE;
     const makeCanvas = () => {
       const c = document.createElement("canvas");
       c.width = exportW;
@@ -189,6 +194,7 @@ export async function generateDesignExportFiles({
       const ctx = c.getContext("2d")!;
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
+      ctx.scale(EXPORT_SCALE, EXPORT_SCALE);
       return ctx;
     };
 
@@ -208,7 +214,7 @@ export async function generateDesignExportFiles({
 
     if (shirtImg) {
       layerCtx.globalCompositeOperation = "destination-in";
-      drawContain(layerCtx, shirtImg, exportW, exportH);
+      drawContain(layerCtx, shirtImg, baseW, baseH);
       layerCtx.globalCompositeOperation = "source-over";
     }
 
@@ -220,8 +226,8 @@ export async function generateDesignExportFiles({
     if (shirtImg) {
       const finalCanvas = makeCanvas();
       const finalCtx = setupCtx(finalCanvas);
-      drawContain(finalCtx, shirtImg, exportW, exportH);
-      finalCtx.drawImage(layerCanvas, 0, 0);
+      drawContain(finalCtx, shirtImg, baseW, baseH);
+      finalCtx.drawImage(layerCanvas, 0, 0, baseW, baseH);
       const mockupDataUrl = await canvasToDataUrl(trimCanvas(finalCanvas));
       if (mockupDataUrl) files.push({ fileName: mockupFileName, dataUrl: mockupDataUrl });
     }
@@ -261,10 +267,15 @@ export async function generateDesignExportBlobs({
       );
     }
 
-    // Render at exactly the mockup display size so the file matches what the
-    // user sees on screen — no extra upscaling.
-    const exportW = Math.round(mockupSize);
-    const exportH = Math.round(mockupSize * (4 / 3));
+    // Render at a high-resolution scale so the file is print-quality while
+    // still matching the on-screen layout exactly. All layout math stays in
+    // the canonical mockup-space; we expand the physical canvas and use
+    // ctx.scale() so source images (e.g. 1200x1200 photos) are drawn at full
+    // detail instead of being downscaled to the preview size.
+    const baseW = Math.round(mockupSize);
+    const baseH = Math.round(mockupSize * (4 / 3));
+    const exportW = baseW * EXPORT_SCALE;
+    const exportH = baseH * EXPORT_SCALE;
     const makeCanvas = () => {
       const c = document.createElement("canvas");
       c.width = exportW;
@@ -275,6 +286,7 @@ export async function generateDesignExportBlobs({
       const ctx = c.getContext("2d")!;
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
+      ctx.scale(EXPORT_SCALE, EXPORT_SCALE);
       return ctx;
     };
 
@@ -294,7 +306,7 @@ export async function generateDesignExportBlobs({
 
     if (shirtImg) {
       layerCtx.globalCompositeOperation = "destination-in";
-      drawContain(layerCtx, shirtImg, exportW, exportH);
+      drawContain(layerCtx, shirtImg, baseW, baseH);
       layerCtx.globalCompositeOperation = "source-over";
     }
 
@@ -306,8 +318,8 @@ export async function generateDesignExportBlobs({
     if (shirtImg) {
       const finalCanvas = makeCanvas();
       const finalCtx = setupCtx(finalCanvas);
-      drawContain(finalCtx, shirtImg, exportW, exportH);
-      finalCtx.drawImage(layerCanvas, 0, 0);
+      drawContain(finalCtx, shirtImg, baseW, baseH);
+      finalCtx.drawImage(layerCanvas, 0, 0, baseW, baseH);
       const mockupBlob = await canvasToBlob(trimCanvas(finalCanvas));
       if (mockupBlob) files.push({ fileName: mockupFileName, blob: mockupBlob, contentType: "image/png" });
     }
