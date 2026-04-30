@@ -1,75 +1,102 @@
-import { Storage } from "@google-cloud/storage";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import type { Response as ExpressResponse } from "express";
 import { Readable } from "stream";
+import config from "../config.js";
 
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+const PROVIDER = "Cloudflare R2";
 
-function getBucketId(): string {
-  const id = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
-  if (!id) {
+function requireR2Config(): {
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucketName: string;
+  publicUrl: string;
+} {
+  const { accountId, accessKeyId, secretAccessKey, bucketName, publicUrl } =
+    config.r2;
+  const missing: string[] = [];
+  if (!accountId) missing.push("R2_ACCOUNT_ID");
+  if (!accessKeyId) missing.push("R2_ACCESS_KEY_ID");
+  if (!secretAccessKey) missing.push("R2_SECRET_ACCESS_KEY");
+  if (!bucketName) missing.push("R2_BUCKET_NAME");
+  if (missing.length > 0) {
     throw new Error(
-      "Missing DEFAULT_OBJECT_STORAGE_BUCKET_ID. Provision an Object Storage bucket via the Replit App Storage tool.",
+      `Missing Cloudflare R2 configuration: ${missing.join(", ")}. ` +
+        `Set these variables in your hosting provider before starting the server.`,
     );
   }
-  return id;
+  return { accountId, accessKeyId, secretAccessKey, bucketName, publicUrl };
 }
 
-let cachedClient: Storage | null = null;
+let cachedClient: S3Client | null = null;
 
-function getClient(): Storage {
+function getClient(): S3Client {
   if (cachedClient) return cachedClient;
-  cachedClient = new Storage({
-    credentials: {
-      audience: "replit",
-      subject_token_type: "access_token",
-      token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
-      type: "external_account",
-      credential_source: {
-        url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
-        format: {
-          type: "json",
-          subject_token_field_name: "access_token",
-        },
-      },
-      universe_domain: "googleapis.com",
-    },
-    projectId: "",
+  const { accountId, accessKeyId, secretAccessKey } = requireR2Config();
+  cachedClient = new S3Client({
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId, secretAccessKey },
   });
   return cachedClient;
 }
 
-function getFile(objectPath: string) {
-  return getClient().bucket(getBucketId()).file(objectPath);
+function getBucket(): string {
+  return requireR2Config().bucketName;
 }
 
-/** Upload a Buffer to Object Storage at the given object path. */
+function isNotFoundError(err: unknown): boolean {
+  const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+  return (
+    e?.name === "NotFound" ||
+    e?.name === "NoSuchKey" ||
+    e?.$metadata?.httpStatusCode === 404
+  );
+}
+
+/** Upload a Buffer to R2 at the given object path. */
 export async function uploadBuffer(
   objectPath: string,
   buffer: Buffer,
   contentType = "image/png",
 ): Promise<void> {
-  const file = getFile(objectPath);
-  await file.save(buffer, {
-    contentType,
-    resumable: false,
-  });
+  await getClient().send(
+    new PutObjectCommand({
+      Bucket: getBucket(),
+      Key: objectPath,
+      Body: buffer,
+      ContentType: contentType,
+    }),
+  );
 }
 
-/** Delete a file from Object Storage (ignores "not found" errors). */
+/** Delete a file from R2 (ignores "not found" errors). */
 export async function deleteObject(objectPath: string): Promise<void> {
   try {
-    await getFile(objectPath).delete({ ignoreNotFound: true });
-  } catch {
-    // ignore
+    await getClient().send(
+      new DeleteObjectCommand({ Bucket: getBucket(), Key: objectPath }),
+    );
+  } catch (err) {
+    if (isNotFoundError(err)) return;
+    // swallow other errors to match previous behavior
   }
 }
 
-/** Check whether a file exists in Object Storage. */
+/** Check whether a file exists in R2. */
 export async function objectExists(objectPath: string): Promise<boolean> {
   try {
-    const [exists] = await getFile(objectPath).exists();
-    return exists;
-  } catch {
+    await getClient().send(
+      new HeadObjectCommand({ Bucket: getBucket(), Key: objectPath }),
+    );
+    return true;
+  } catch (err) {
+    if (isNotFoundError(err)) return false;
     return false;
   }
 }
@@ -79,13 +106,18 @@ export async function downloadBuffer(
   objectPath: string,
 ): Promise<Buffer | null> {
   try {
-    const [exists] = await getFile(objectPath).exists();
-    if (!exists) return null;
-    const [buf] = await getFile(objectPath).download();
-    return buf;
-  } catch (err: unknown) {
-    const code = (err as { code?: number }).code;
-    if (code === 404) return null;
+    const result = await getClient().send(
+      new GetObjectCommand({ Bucket: getBucket(), Key: objectPath }),
+    );
+    if (!result.Body) return null;
+    const stream = result.Body as Readable;
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  } catch (err) {
+    if (isNotFoundError(err)) return null;
     throw err;
   }
 }
@@ -95,24 +127,22 @@ export async function streamObject(
   objectPath: string,
   res: ExpressResponse,
 ): Promise<boolean> {
-  const file = getFile(objectPath);
   try {
-    const [exists] = await file.exists();
-    if (!exists) return false;
+    const result = await getClient().send(
+      new GetObjectCommand({ Bucket: getBucket(), Key: objectPath }),
+    );
+    if (!result.Body) return false;
 
-    const [metadata] = await file.getMetadata();
-    const contentType =
-      (metadata.contentType as string | undefined) ?? "application/octet-stream";
-
+    const contentType = result.ContentType ?? "application/octet-stream";
     res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-    if (metadata.size !== undefined && metadata.size !== null) {
-      res.setHeader("Content-Length", String(metadata.size));
+    if (typeof result.ContentLength === "number") {
+      res.setHeader("Content-Length", String(result.ContentLength));
     }
 
-    const stream = file.createReadStream();
+    const stream = result.Body as Readable;
     await new Promise<void>((resolve, reject) => {
-      (stream as Readable)
+      stream
         .on("error", reject)
         .pipe(res)
         .on("finish", resolve)
@@ -120,25 +150,30 @@ export async function streamObject(
     });
 
     return true;
-  } catch (err: unknown) {
-    const code = (err as { code?: number }).code;
-    if (code === 404) return false;
+  } catch (err) {
+    if (isNotFoundError(err)) return false;
     throw err;
   }
 }
 
 /**
  * Return a URL the browser can load to fetch a stored object.
- * Always proxies through the API so we don't need a public bucket URL.
+ * If R2_PUBLIC_URL is configured (e.g. a custom domain or r2.dev URL),
+ * use it directly. Otherwise proxy through the API.
  */
 export function getPublicUrl(objectPath: string): string {
-  return `/api/storage/${objectPath
+  const publicBase = config.r2.publicUrl;
+  const encodedPath = objectPath
     .split("/")
     .map(encodeURIComponent)
-    .join("/")}`;
+    .join("/");
+  if (publicBase) {
+    return `${publicBase.replace(/\/+$/, "")}/${encodedPath}`;
+  }
+  return `/api/storage/${encodedPath}`;
 }
 
-/** Health-check: verify Object Storage is reachable. */
+/** Health-check: verify R2 is reachable. */
 export async function checkStorageHealth(): Promise<{
   ok: boolean;
   provider: string;
@@ -147,13 +182,13 @@ export async function checkStorageHealth(): Promise<{
 }> {
   let bucket = "(not configured)";
   try {
-    bucket = getBucketId();
+    bucket = getBucket();
     await objectExists("__health_check__");
-    return { ok: true, provider: "Replit Object Storage", bucket };
+    return { ok: true, provider: PROVIDER, bucket };
   } catch (err) {
     return {
       ok: false,
-      provider: "Replit Object Storage",
+      provider: PROVIDER,
       bucket,
       error: String(err),
     };
