@@ -137,6 +137,16 @@ export default function Design() {
   const pinchRef = useRef<{ dist: number } | null>(null);
   const mockupSizeRef = useRef(mockupSize);
   useEffect(() => { mockupSizeRef.current = mockupSize; }, [mockupSize]);
+
+  // Per-user visual zoom for the mockup. Purely a CSS scale on the mockup
+  // viewer — does NOT change mockupSize (the canonical coordinate space),
+  // so it never affects layer positions, the export, or other users' views.
+  const VIEW_ZOOM_MIN = 0.6;
+  const VIEW_ZOOM_MAX = 2.5;
+  const VIEW_ZOOM_STEP = 0.15;
+  const [viewZoom, setViewZoom] = useState(1);
+  const viewZoomRef = useRef(viewZoom);
+  useEffect(() => { viewZoomRef.current = viewZoom; }, [viewZoom]);
   const [snapActive, setSnapActive] = useState(false);
   const holdActionRef = useRef<(() => void) | null>(null);
   const holdTimerRef = useRef<{ timeout: ReturnType<typeof setTimeout> | null; interval: ReturnType<typeof setInterval> | null }>({ timeout: null, interval: null });
@@ -231,8 +241,11 @@ export default function Design() {
   const onMouseMove = useCallback((e: MouseEvent) => {
     const drag = dragRef.current;
     if (!drag) return;
-    const dx = e.clientX - drag.startMouseX;
-    const dy = e.clientY - drag.startMouseY;
+    // Convert screen-pixel drag delta into canvas-pixel delta. The mockup
+    // viewer is CSS-scaled by viewZoom, so screen px = canvas px * viewZoom.
+    const z = viewZoomRef.current || 1;
+    const dx = (e.clientX - drag.startMouseX) / z;
+    const dy = (e.clientY - drag.startMouseY) / z;
     const canvasCenterX = mockupSizeRef.current / 2;
     const rawX = drag.startLayerX + dx;
     const rawY = drag.startLayerY + dy;
@@ -383,8 +396,11 @@ export default function Design() {
     e.preventDefault();
     const clipRect = clipAreaRef.current?.getBoundingClientRect();
     if (!clipRect) return;
-    const anchorX = e.clientX - clipRect.left;
-    const anchorY = e.clientY - clipRect.top;
+    // clipRect reflects the CSS-scaled bounds, so divide by viewZoom to get
+    // the anchor in canvas (unscaled) coordinates.
+    const z = viewZoomRef.current || 1;
+    const anchorX = (e.clientX - clipRect.left) / z;
+    const anchorY = (e.clientY - clipRect.top) / z;
     setSelectedLayerId(prev => {
       if (!prev) return prev;
       setLayers(layers =>
@@ -1258,7 +1274,15 @@ export default function Design() {
           <div className="absolute inset-0 flex items-center justify-center">
           <div
             className="relative"
-            style={{ width: `${mockupSize}px`, aspectRatio: "3/4", transform: `translateY(${mockupOffsetY}px)` }}
+            style={{
+              width: `${mockupSize}px`,
+              aspectRatio: "3/4",
+              // Apply the user's view zoom on top of the admin offset.
+              // transform-origin defaults to center, so it scales around
+              // the mockup's center, keeping it visually anchored.
+              transform: `translateY(${mockupOffsetY}px) scale(${viewZoom})`,
+              transformOrigin: "center center",
+            }}
           >
             <AnimatePresence mode="wait">
               <motion.div
@@ -1491,6 +1515,31 @@ export default function Design() {
                 <p className="text-xs font-bold uppercase tracking-widest">Add Text</p>
               </div>
             </button>
+
+            {/* Mockup view zoom — purely visual, doesn't affect order/export */}
+            <div className="space-y-1.5 pt-1">
+              <p className="text-xs text-muted-foreground uppercase tracking-widest">Size</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setViewZoom(z => Math.max(VIEW_ZOOM_MIN, +(z - VIEW_ZOOM_STEP).toFixed(2)))}
+                  disabled={viewZoom <= VIEW_ZOOM_MIN + 1e-3}
+                  className="flex-1 py-2.5 text-xs font-bold uppercase tracking-widest border border-border hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  data-testid="button-view-zoom-out"
+                  title="Make the mockup smaller (only on your screen)"
+                >
+                  − Smaller
+                </button>
+                <button
+                  onClick={() => setViewZoom(z => Math.min(VIEW_ZOOM_MAX, +(z + VIEW_ZOOM_STEP).toFixed(2)))}
+                  disabled={viewZoom >= VIEW_ZOOM_MAX - 1e-3}
+                  className="flex-1 py-2.5 text-xs font-bold uppercase tracking-widest border border-border hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  data-testid="button-view-zoom-in"
+                  title="Make the mockup bigger (only on your screen)"
+                >
+                  + Bigger
+                </button>
+              </div>
+            </div>
 
           </div>
 
