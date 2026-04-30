@@ -315,9 +315,6 @@ export default function Checkout() {
                         <p className="text-[11px] text-white/40 mt-0.5">Send to <span className="text-white/70 font-bold">{orderSettings?.instaPayPhone ?? "01069383482"}</span></p>
                       </div>
                     </div>
-                    <div className="w-8 h-8 rounded flex items-center justify-center" style={{ backgroundColor: "#f5c842" }}>
-                      <span className="text-[10px] font-black text-black">₣</span>
-                    </div>
                   </div>
 
                   <AnimatePresence>
