@@ -1539,7 +1539,7 @@ export default function Design() {
 
             {/* Mockup view zoom — purely visual, doesn't affect order/export */}
             <div className="space-y-1.5 pt-1">
-              <p className="text-xs text-muted-foreground uppercase tracking-widest">Size</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-widest">Size of Mockup</p>
               <div className="flex gap-2">
                 <button
                   onClick={() => setViewZoom(z => Math.max(VIEW_ZOOM_MIN, +(z - VIEW_ZOOM_STEP).toFixed(2)))}
