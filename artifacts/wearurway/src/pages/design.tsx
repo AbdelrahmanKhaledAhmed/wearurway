@@ -1178,30 +1178,6 @@ export default function Design() {
                             </button>
                             <div className="flex gap-1.5">
                               <button
-                                onMouseDown={() => startHold(() => zoomSelected("out"))}
-                                onMouseUp={stopHold}
-                                onMouseLeave={stopHold}
-                                onTouchStart={e => { e.preventDefault(); startHold(() => zoomSelected("out")); }}
-                                onTouchEnd={stopHold}
-                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
-                                title="Zoom Out"
-                              >
-                                − Zoom
-                              </button>
-                              <button
-                                onMouseDown={() => startHold(() => zoomSelected("in"))}
-                                onMouseUp={stopHold}
-                                onMouseLeave={stopHold}
-                                onTouchStart={e => { e.preventDefault(); startHold(() => zoomSelected("in")); }}
-                                onTouchEnd={stopHold}
-                                className="flex-1 text-xs py-1 border border-border hover:border-foreground transition-colors uppercase tracking-widest font-bold select-none"
-                                title="Zoom In"
-                              >
-                                + Zoom
-                              </button>
-                            </div>
-                            <div className="flex gap-1.5">
-                              <button
                                 onMouseDown={() => startHold(() => rotateSelected("ccw"))}
                                 onMouseUp={stopHold}
                                 onMouseLeave={stopHold}
