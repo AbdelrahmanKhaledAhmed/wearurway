@@ -266,6 +266,8 @@ async function drainUploads(orderId: string): Promise<void> {
   }
 }
 
+
+
 async function drainNotification(orderId: string): Promise<void> {
   while (true) {
     const record = readRecord(orderId);
@@ -326,6 +328,10 @@ async function sendTelegramMessage(orderId: string, payload: NotificationPayload
       "Telegram bot token or chat ID is not configured — set them in admin → order settings",
     );
   }
+  
+function padLabel(label: string, width: number): string {
+  return label.padEnd(width, " ");
+}  
 
   const paymentMethod =
     payload.paymentMethod === "instapay" ? "InstaPay 💳" : "Cash on Delivery 💵";
@@ -335,41 +341,36 @@ async function sendTelegramMessage(orderId: string, payload: NotificationPayload
   const shippingPrice =
     payload.shippingPrice ?? Math.max(0, (payload.total ?? 0) - productPrice);
   const sizeDetails = `${payload.size?.name ?? "-"} (${payload.size?.realWidth ?? "-"} × ${payload.size?.realHeight ?? "-"} cm)`;
-  const line = "━━━━━━━━━━━━━━━━━━━━";
+  const line = "━━━━━━━━━━━━━━━";
   const trimmedFeedback = payload.feedback?.trim();
   const message = [
-    line,
-    "🛍  NEW ORDER",
-    line,
-    "",
-    `🆔  Order ID: ${orderId}`,
-    "",
-    "👤  CUSTOMER INFO",
-    `   Name:     ${payload.name ?? "-"}`,
-    `   Phone:    ${payload.phone ?? "-"}`,
-    `   Address:  ${payload.address ?? "-"}`,
-    "",
-    "👕  PRODUCT DETAILS",
-    `   Product:  ${payload.product ?? "-"}`,
-    `   Fit:      ${payload.fit ?? "-"}`,
-    `   Color:    ${payload.color ?? "-"}`,
-    `   Size:     ${sizeDetails}`,
-    "",
-    "💰  PRICING",
-    `   T-shirt:  ${formatMoney(productPrice)}`,
-    `   Shipping: ${formatMoney(shippingPrice)}`,
-    `   Total:    ${formatMoney(payload.total)}`,
-    "",
-    `💳  Payment:  ${paymentMethod}`,
-    "",
-    "📁  DOCUMENTS",
-    "   Stored on Cloudflare R2 ☁️",
-    `   Folder: orders/${orderId}/`,
-    "   Admin Panel → Order Files",
-    "",
-    ...(trimmedFeedback ? ["💬  CUSTOMER FEEDBACK", trimmedFeedback, ""] : []),
-    line,
-  ].join("\n");
+  line,
+  "NEW ORDER",
+  line,
+  "",
+  `Order ID: ${orderId}`,
+  "",
+  "CUSTOMER INFO",
+  `${padLabel("Name:", 12)} ${payload.name ?? "-"}`,
+  `${padLabel("Phone:", 12)} ${payload.phone ?? "-"}`,
+  `${padLabel("Address:", 12)} ${payload.address ?? "-"}`,
+  "",
+  "PRODUCT DETAILS",
+  `${padLabel("Product:", 12)} ${payload.product ?? "-"}`,
+  `${padLabel("Fit:", 12)} ${payload.fit ?? "-"}`,
+  `${padLabel("Color:", 12)} ${payload.color ?? "-"}`,
+  `${padLabel("Size:", 12)} ${sizeDetails}`,
+  "",
+  "PRICING",
+  `${padLabel("T-shirt:", 12)} ${formatMoney(productPrice)}`,
+  `${padLabel("Shipping:", 12)} ${formatMoney(shippingPrice)}`,
+  `${padLabel("Total:", 12)} ${formatMoney(payload.total)}`,
+  "",
+  `${padLabel("Payment:", 12)} ${paymentMethod}`,
+  "",
+  ...(trimmedFeedback ? ["CUSTOMER FEEDBACK", trimmedFeedback, ""] : []),
+  line,
+].join("\n");
 
   const response = await fetch(
     `https://api.telegram.org/bot${botToken}/sendMessage`,
