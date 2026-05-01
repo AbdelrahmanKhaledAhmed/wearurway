@@ -408,7 +408,7 @@ export default function Checkout() {
                     <p className="text-xs font-black uppercase tracking-widest">Cash on Delivery</p>
                     <p className="text-[11px] text-white/40 mt-0.5">Pay when your order arrives</p>
                     <p className="text-[11px] text-white/50 mt-1.5 leading-relaxed">
-                      There will be a 200 EGP deposit, which will be deducted from the total price when you pay. This is because the T-shirt is made specifically for you.
+                      There will be a 50% deposit of the total price will be required, and it will be deducted from the final payment. This is because the T-shirt is made specifically for you.
                     </p>
                   </div>
                 </div>
