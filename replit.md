@@ -1,61 +1,64 @@
-# WearUrWay
+# WEARURWAY
 
-Premium streetwear customization platform — multi-step product configurator (Landing → Products → Fits → Colors → Sizes), interactive design editor, and protected admin panel.
+A custom apparel design-and-order platform — customers pick a product, customize it with layered designs, and submit orders. Admins manage products, mockups, pricing, and view orders.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — API server (port 8080)
-- `pnpm --filter @workspace/wearurway run dev` — Vite frontend (port 5000)
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks & Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+| Command | Description |
+|---|---|
+| `pnpm --filter @workspace/wearurway run dev` | Frontend dev server (port 5000) |
+| `PORT=8080 pnpm --filter @workspace/api-server run dev` | API server (port 8080) |
+| `pnpm --filter @workspace/api-server run build` | Build API server (esbuild → dist/) |
 
-Required env secrets:
-- `DATABASE_URL` — Replit-managed PostgreSQL (auto-provisioned)
-- `ADMIN_PASSWORD` — admin panel password (default: `admin123`)
-
-Optional env secrets:
-- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` — Cloudflare R2 for file storage
-- `AI_INTEGRATIONS_OPENAI_API_KEY`, `AI_INTEGRATIONS_OPENAI_BASE_URL` — OpenAI for AI image assist (returns 503 if unset)
+Required env vars:
+- `DATABASE_URL` — Replit-managed PostgreSQL (set automatically)
+- `AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY` — Replit AI integrations (optional; enables AI background removal)
+- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` — Cloudflare R2 storage (optional; falls back to local disk)
+- `ADMIN_PASSWORD` — defaults to `admin123` if not set
+- `UPLOADS_DIR`, `SIZE_CHARTS_DIR`, `FRONTEND_DIR` — optional path overrides
 
 ## Stack
 
-- **Frontend**: React 19, Vite 7, Tailwind CSS v4, Wouter, Framer Motion, Radix UI, TanStack Query
-- **Backend**: Node.js 20, Express 5, Pino logging, Sharp (image processing), Multer (file uploads)
-- **Database**: PostgreSQL via `pg` — single `store_data` table with a JSONB column (`key='main'`); in-memory cache with debounced async upsert
-- **File Storage**: Cloudflare R2 (S3-compatible) via AWS SDK — optional, returns 503 if not configured
-- **Build**: esbuild (ESM bundle) for API, Vite for frontend
-- **Codegen**: Orval from OpenAPI spec → Zod schemas + React Query hooks
+- **Frontend:** React + Vite + Tailwind CSS + Radix UI, port 5000
+- **Backend:** Express 5 (ESM) + pino logging, port 8080 in dev
+- **Database:** PostgreSQL via raw `pg` pool (not Drizzle ORM for app data); schema auto-created via `ensureSchema()`
+- **Storage:** AWS S3-compatible (Cloudflare R2) or local disk fallback
+- **Build:** esbuild bundles API server to `artifacts/api-server/dist/`
+- **Monorepo:** pnpm workspaces (`artifacts/*`, `lib/*`)
+- **Node:** ≥20
 
 ## Where things live
 
 ```
-artifacts/wearurway/     — React frontend
-artifacts/api-server/    — Express API backend
-lib/api-spec/            — OpenAPI spec (source of truth for API contract)
-lib/api-zod/             — generated Zod schemas
-lib/api-client-react/    — generated React Query hooks
-lib/integrations-openai-ai-server/  — OpenAI client (lazy-loaded)
-artifacts/api-server/src/data/store.ts  — in-memory store + DB persistence
-artifacts/api-server/src/services/storageService.ts  — R2 storage service
-artifacts/wearurway/src/config/fonts.ts  — custom font config
+artifacts/api-server/    Express API server
+artifacts/wearurway/     Main customer/admin frontend
+artifacts/mockup-sandbox/ Mockup preview tool
+lib/api-spec/            OpenAPI spec (openapi.yaml)
+lib/api-zod/             Zod types generated from spec
+lib/api-client-react/    React API client (generated)
+lib/db/                  Drizzle config + placeholder schema
+lib/integrations-openai-ai-server/  OpenAI client wrapper
 ```
+
+Key files: `artifacts/api-server/src/config.ts` (env), `artifacts/api-server/src/data/store.ts` (in-memory+DB store), `artifacts/api-server/src/services/databaseService.ts` (pg pool + schema), `artifacts/api-server/src/lib/paths.ts` (file paths).
 
 ## Architecture decisions
 
-- Single JSONB row in PostgreSQL (`key='main'`) for all app state — simple, no migrations, coalesced debounced writes (250ms) to reduce write amplification
-- Cloudflare R2 for persistent file storage (mockups, order exports, shared layers); all optional — app degrades gracefully without it
-- Admin auth is custom Bearer token (crypto.randomBytes) stored in process memory + DB; no external auth service
-- OpenAI integration loaded lazily per-request so server starts without AI credentials
-- Client-side order durability via IndexedDB + service worker — success shown immediately, uploads/Telegram happen in background with exponential backoff
+- **Single JSONB row store:** All app state (products, orders, mockups, etc.) lives in one `store_data` table row. Writes are debounced/coalesced to avoid write amplification.
+- **In-memory cache:** The JSONB store is loaded into memory on startup; all reads are in-process, writes go async to DB.
+- **SSL handling:** DB pool skips SSL for local/Replit connections (detects `helium`/`localhost` hostnames), uses `rejectUnauthorized: false` for external DBs.
+- **Frontend static serving:** In production, the API server serves the built wearurway frontend from `FRONTEND_DIR`. In dev, Vite proxies `/api` to port 8080.
+- **OpenAI integration:** Uses Replit AI integrations (`AI_INTEGRATIONS_OPENAI_BASE_URL` / `AI_INTEGRATIONS_OPENAI_API_KEY`); AI features gracefully degrade (503) when not configured.
 
 ## Product
 
-- Multi-step customization flow: product → fit → color → size → design editor → checkout
-- Interactive design editor: layer drag/resize, text tool with custom fonts, image editor with AI-assisted selection
-- Export Design generates high-res PNG; Share Design creates side-by-side front/back mockup
-- Mobile responsive with soft-suggestion popup for desktop-recommended features
-- Admin panel at `/admin`: manage products, fits, colors, sizes, mockups, settings, orders
+- Product customization: pick product → fit → color → size
+- Design editor: add/position/resize graphic layers on front/back of garment
+- AI-assisted background removal on uploaded images
+- Order submission with InstaPay / cash-on-delivery
+- Admin panel: manage products, mockups, pricing, view/export orders
+- Shared design links (expire after 24h)
+- Order notifications via Telegram bot (optional)
 
 ## User preferences
 
@@ -63,12 +66,13 @@ _Populate as you build_
 
 ## Gotchas
 
-- Vite dev proxy forwards `/api` → `http://localhost:8080` — API must be on port 8080
-- `pnpm install` must be run before any build steps (node_modules were absent on first import)
-- `SUPABASE_URL` takes priority over `DATABASE_URL` if it's a postgres:// URI — on Replit, `DATABASE_URL` is used
-- Order outbox retries uploads + Telegram forever with exponential backoff; state persists in the JSONB store row
-- Sharp and esbuild are in `onlyBuiltDependencies` — must be built from source on install
+- The API server must be built before starting (`run dev` does build + start automatically)
+- `pnpm install` must be run before first use (packages not pre-installed)
+- R2 storage is optional; if not configured, files are stored locally in `uploads/`
+- Admin password defaults to `admin123` — set `ADMIN_PASSWORD` env var before going to production
 
 ## Pointers
 
-- Skills: `react-vite`, `database`, `environment-secrets`, `workflows`, `package-management`
+- Workflows skill: `.local/skills/workflows/SKILL.md`
+- Database skill: `.local/skills/database/SKILL.md`
+- Environment secrets: `.local/skills/environment-secrets/SKILL.md`

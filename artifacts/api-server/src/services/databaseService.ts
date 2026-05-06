@@ -17,11 +17,12 @@ function getPool(): InstanceType<typeof Pool> {
     }
 
     const isSupabase = connectionString.includes("supabase");
+    const isLocal = connectionString.includes("localhost") || connectionString.includes("127.0.0.1") || connectionString.includes("helium");
     activeProvider = isSupabase ? "Supabase (PostgreSQL)" : "PostgreSQL";
 
     pool = new Pool({
       connectionString,
-      ssl: { rejectUnauthorized: false },
+      ssl: isLocal ? false : { rejectUnauthorized: false },
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 8000,
