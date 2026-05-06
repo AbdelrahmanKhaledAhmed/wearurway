@@ -1066,7 +1066,21 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             onClearSelection={handleClearSelection}
             sensitivity={sensitivity}
             onSensitivity={setSensitivity}
-            onReimportFile={(f)=>setCurrentFile(f)}
+            onDownloadImage={() => {
+              const c = canvasRef.current;
+              if (!c) return;
+              c.toBlob(blob => {
+                if (!blob) return;
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "design.png";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 500);
+              }, "image/png");
+            }}
           />
         </div>
       </div>

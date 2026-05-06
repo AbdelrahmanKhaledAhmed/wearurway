@@ -7,7 +7,7 @@ interface Props {
   inline?: boolean;
 }
 
-type Step = "intro" | "import" | "loading" | "upload";
+type Step = "intro" | "import" | "loading";
 
 const PINTEREST_URL = "https://www.pinterest.com/WEARURWAY/t-shirt-designs/";
 
@@ -43,52 +43,24 @@ async function convertToPng(blob: Blob): Promise<Blob> {
   });
 }
 
-function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 500);
-}
-
 export default function PinterestImportButton({ onImageReady, disabled, inline }: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("intro");
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState("");
   const [loadingMsg, setLoadingMsg] = useState("");
-  const [downloadedFile, setDownloadedFile] = useState<File | null>(null);
-  const [uploadError, setUploadError] = useState("");
 
   const reset = () => {
     setStep("intro");
     setUrlInput("");
     setUrlError("");
     setLoadingMsg("");
-    setDownloadedFile(null);
-    setUploadError("");
-  };
-
-  const acceptFile = (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      setUploadError("Please choose an image file.");
-      return;
-    }
-    setUploadError("");
-    onImageReady(file);
-    setOpen(false);
-    setTimeout(reset, 300);
   };
 
   const handleOpen = () => { reset(); setOpen(true); };
   const handleClose = () => { setOpen(false); setTimeout(reset, 300); };
 
   const handleOpenPinterest = () => {
-    // Use a real anchor click so iOS Safari handles the navigation gracefully
-    // and is less likely to discard the original tab (which causes white screen on return).
     const a = document.createElement("a");
     a.href = PINTEREST_URL;
     a.target = "_blank";
@@ -108,7 +80,6 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
     setStep("loading");
     setLoadingMsg("Finding your image…");
 
-    // Cycle through friendly loading messages while waiting
     const msgs = ["Finding your image…", "Downloading from Pinterest…", "Almost there…"];
     let mi = 0;
     const ticker = setInterval(() => { mi = (mi + 1) % msgs.length; setLoadingMsg(msgs[mi]); }, 2500);
@@ -128,12 +99,14 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
       }
 
       const blob = await res.blob();
-      setLoadingMsg("Converting to PNG…");
+      setLoadingMsg("Opening in editor…");
       const png = await convertToPng(blob);
-      triggerDownload(png, "pinterest-design.png");
       const file = new File([png], "pinterest-design.png", { type: "image/png" });
-      setDownloadedFile(file);
-      setStep("upload");
+
+      // Go straight to image editor — no intermediate step, no device download
+      setOpen(false);
+      setTimeout(reset, 300);
+      onImageReady(file);
     } catch {
       clearInterval(ticker);
       setStep("import");
@@ -249,7 +222,7 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
                 {step === "import" && (
                   <div className="px-6 py-6 space-y-5">
                     <p className="text-[11px] text-white/50 leading-relaxed">
-                      Paste a Pinterest pin or direct image URL below. The image will be automatically converted to PNG and downloaded to your device.
+                      Paste a Pinterest pin or direct image URL below, then press <strong className="text-white/70">Start Design</strong> to open it in the editor.
                     </p>
 
                     {/* URL input */}
@@ -271,7 +244,7 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
                           className="px-4 py-2.5 font-black uppercase text-xs tracking-widest transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed"
                           style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
                         >
-                          Download
+                          Start Design
                         </button>
                       </div>
                       {urlError && <p className="text-[11px] text-red-400 mt-2">{urlError}</p>}
@@ -288,38 +261,6 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
                   <div className="px-6 py-10 flex flex-col items-center gap-4">
                     <div className="w-8 h-8 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
                     <p className="text-xs text-white/50 uppercase tracking-widest">{loadingMsg || "Processing…"}</p>
-                  </div>
-                )}
-
-                {/* Upload step */}
-                {step === "upload" && (
-                  <div className="px-6 py-6 space-y-5">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E60023" }}>
-                        <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm font-black uppercase tracking-widest text-white mb-1">Downloaded!</p>
-                        <p className="text-[11px] text-white/50 leading-relaxed">
-                          Your image was saved as a PNG. Now upload it to your design below.
-                        </p>
-                      </div>
-                    </div>
-
-                    {downloadedFile && (
-                      <motion.button
-                        whileTap={{ scale: 0.97 }}
-                        onClick={() => acceptFile(downloadedFile)}
-                        className="w-full py-3.5 font-black uppercase text-xs tracking-[0.2em] transition-opacity hover:opacity-80"
-                        style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
-                      >
-                        Start Design
-                      </motion.button>
-                    )}
-
-                    {uploadError && <p className="text-[11px] text-red-400">{uploadError}</p>}
                   </div>
                 )}
               </div>

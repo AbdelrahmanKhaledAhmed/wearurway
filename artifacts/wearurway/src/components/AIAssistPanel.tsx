@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 
 type ToolMode = "select" | null;
 
@@ -13,7 +13,7 @@ interface Props {
   onClearSelection: () => void;
   sensitivity: number;
   onSensitivity: (v: number) => void;
-  onReimportFile: (file: File) => void;
+  onDownloadImage: () => void;
 }
 
 const WandIcon = () => (
@@ -27,55 +27,15 @@ const WandIcon = () => (
 export default function FuzzySelectPanel({
   toolMode, hasSelection,
   onSetToolMode, onDelete, onChangeColor, onPreviewColor, onCancelColorPreview, onClearSelection,
-  sensitivity, onSensitivity, onReimportFile,
+  sensitivity, onSensitivity, onDownloadImage,
 }: Props) {
   const [pickedColor, setPickedColor] = useState("#ff0000");
   const [hexInput, setHexInput]       = useState("#ff0000");
   const [showPicker,  setShowPicker]  = useState(false);
-  const [bgRemoverOpened, setBgRemoverOpened] = useState(false);
-  const [showReimportPopup, setShowReimportPopup] = useState(false);
   const colorInputRef = useRef<HTMLInputElement>(null);
-  const reimportInputRef = useRef<HTMLInputElement>(null);
 
   const handleOpenBgRemover = () => {
-    window.open("https://www.photoroom.com/tools/background-remover", "_blank", "noopener,noreferrer");
-    setBgRemoverOpened(true);
-  };
-
-  // When the user returns to this tab after clicking "Background Remover",
-  // show the re-import popup ONCE. We immediately clear bgRemoverOpened so
-  // future tab switches (unrelated to the BG remover) don't keep re-opening
-  // the popup. The popup only comes back if they click the button again.
-  useEffect(() => {
-    if (!bgRemoverOpened) return;
-    const trigger = () => {
-      setShowReimportPopup(true);
-      setBgRemoverOpened(false);
-    };
-    const onFocus = () => trigger();
-    const onVisible = () => {
-      if (document.visibilityState === "visible") trigger();
-    };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [bgRemoverOpened]);
-
-  const handleReimportClick = () => {
-    reimportInputRef.current?.click();
-  };
-
-  const handleReimportChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      onReimportFile(file);
-      setShowReimportPopup(false);
-      setBgRemoverOpened(false);
-    }
-    e.target.value = "";
+    onDownloadImage();
   };
 
   const updateColor = (color: string) => {
@@ -183,21 +143,12 @@ export default function FuzzySelectPanel({
             <div className="text-left">
               <p className="text-[11px] font-bold text-white">Background Remover</p>
               <p className="text-[9px] mt-0.5" style={{ color: "rgba(196,140,255,0.65)" }}>
-                Opens in new tab
+                Downloads to device
               </p>
             </div>
           </div>
         </button>
 
-        {/* Hidden file input used by the re-import popup */}
-        <input
-          ref={reimportInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleReimportChange}
-          style={{ display: "none" }}
-          data-testid="input-reimport-file"
-        />
 
 
         {/* Sensitivity slider — shown whenever Magic Select is active */}
@@ -431,51 +382,6 @@ export default function FuzzySelectPanel({
         </div>
       </div>
 
-      {/* Re-import popup — appears when user returns after using BG remover */}
-      {showReimportPopup && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
-          onClick={() => setShowReimportPopup(false)}
-          data-testid="popup-reimport"
-        >
-          <div
-            className="w-full max-w-md rounded-2xl p-6 text-center"
-            style={{
-              background: "linear-gradient(135deg,rgba(30,15,50,0.98),rgba(15,5,30,0.98))",
-              border: "1px solid rgba(168,85,247,0.4)",
-              boxShadow: "0 20px 60px rgba(124,58,237,0.4)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-3" style={{ color: "#c48cff" }}>
-              Welcome Back
-            </p>
-            <p className="text-[15px] leading-relaxed mb-6" style={{ color: "rgba(255,255,255,0.95)" }}>
-              All set? Click below to bring your edited photo back into the editor.
-            </p>
-            <button
-              onClick={handleReimportClick}
-              className="inline-block w-full px-6 py-3 rounded-xl font-bold text-sm tracking-[0.15em] uppercase transition-all hover:scale-[1.02] active:scale-[0.99]"
-              style={{
-                background: "linear-gradient(135deg,rgba(168,85,247,1),rgba(124,58,237,1))",
-                color: "#fff",
-                boxShadow: "0 8px 24px rgba(124,58,237,0.5)",
-              }}
-              data-testid="button-popup-reimport"
-            >
-              Re-import
-            </button>
-            <button
-              onClick={() => setShowReimportPopup(false)}
-              className="mt-4 text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
-              data-testid="button-popup-cancel"
-            >
-              Not yet
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
