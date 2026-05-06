@@ -21,7 +21,7 @@ function getPool(): InstanceType<typeof Pool> {
 
     pool = new Pool({
       connectionString,
-      ssl: isSupabase ? { rejectUnauthorized: false } : undefined,
+      ssl: { rejectUnauthorized: false },
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 8000,
