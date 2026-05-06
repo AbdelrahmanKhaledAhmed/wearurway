@@ -1644,7 +1644,7 @@ export default function Design() {
       <div
         className="relative w-full overflow-hidden shrink-0"
         style={{
-          height: `${Math.round((mockupSize * (4 / 3) + 16) * viewZoom)}px`,
+          height: `${Math.round((mockupSize * (4 / 3) + 60) * viewZoom)}px`,
           backgroundImage:
             "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
           backgroundSize: "24px 24px",
@@ -1859,7 +1859,7 @@ export default function Design() {
       </div>
 
       {/* ── ORDER NOW ── */}
-      <div className="px-4 py-5 pb-5">
+      <div className="px-4 py-5 pb-28">
         <button
           onClick={() => setShowOrderModal(true)}
           className="w-full py-4 font-black uppercase text-sm tracking-[0.2em] transition-all active:scale-[0.98] hover:opacity-90"
