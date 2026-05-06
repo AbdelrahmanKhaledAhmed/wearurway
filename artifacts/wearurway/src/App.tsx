@@ -19,7 +19,6 @@ import Checkout from "@/pages/checkout";
 import { Navbar } from "@/components/layout/navbar";
 import { CustomizerProvider } from "@/hooks/use-customizer";
 import { getAdminToken } from "@/lib/admin-token";
-import { FaInstagram, FaTiktok, FaPinterest } from "react-icons/fa";
 
 const queryClient = new QueryClient();
 
@@ -67,44 +66,15 @@ function MobileDesktopSuggestion() {
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-end justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-background border border-border p-6 space-y-4 shadow-2xl mb-2">
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-md bg-background border border-border p-8 space-y-5 shadow-2xl text-center">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground mb-1">Heads Up</p>
-          <h2 className="text-lg font-black uppercase tracking-wide">Better on Desktop</h2>
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground mb-2">Heads Up</p>
+          <h2 className="text-xl font-black uppercase tracking-wide">Better on Desktop</h2>
         </div>
         <p className="text-sm text-muted-foreground leading-relaxed">
           For the best design experience, we recommend using a laptop or desktop. You can still use all features on mobile though!
         </p>
-        <div className="flex gap-3">
-          <a
-            href="https://www.instagram.com/wearurway.store/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-2 border border-border text-xs font-medium transition-colors hover:bg-muted/10"
-          >
-            <FaInstagram className="w-4 h-4" />
-            Instagram
-          </a>
-          <a
-            href="https://www.pinterest.com/WEARURWAY/t-shirt-designs/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-2 border border-border text-xs font-medium transition-colors hover:bg-muted/10"
-          >
-            <FaPinterest className="w-4 h-4" />
-            Pinterest
-          </a>
-          <a
-            href="https://www.tiktok.com/@wearurway"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-2 border border-border text-xs font-medium transition-colors hover:bg-muted/10"
-          >
-            <FaTiktok className="w-4 h-4" />
-            TikTok
-          </a>
-        </div>
         <button
           onClick={dismiss}
           className="w-full py-3.5 font-black uppercase text-sm tracking-[0.2em] transition-all active:scale-[0.98]"
