@@ -3,8 +3,8 @@ import { Router } from "express";
 const router = Router();
 
 async function getOpenAI() {
-  if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || !process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
-    throw new Error("OpenAI AI integration is not configured");
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OpenAI is not configured");
   }
 
   const { openai } = await import("@workspace/integrations-openai-ai-server");
