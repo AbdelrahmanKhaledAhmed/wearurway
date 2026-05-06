@@ -858,25 +858,25 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     <div className="fixed inset-0 z-[100] flex flex-col" style={{backgroundColor:"#141414"}}>
 
       {/* ── Top bar ── */}
-      <div className="flex items-center justify-between px-5 h-14 border-b shrink-0" style={{borderColor:"rgba(255,255,255,0.08)"}}>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between px-3 md:px-5 h-14 border-b shrink-0" style={{borderColor:"rgba(255,255,255,0.08)"}}>
+        <div className="flex items-center gap-2 md:gap-4">
+          <div className="hidden md:flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor:"#a855f7"}}/>
             <span className="text-[11px] font-black uppercase tracking-[0.25em] text-white">Image Editor</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 md:gap-1">
             <button onClick={doUndo} disabled={!canUndo} title="Undo (Ctrl+Z)"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-white/50 hover:text-white hover:bg-white/8 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest">
-              <UndoIcon/> Undo
+              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 rounded text-white/50 hover:text-white hover:bg-white/8 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest">
+              <UndoIcon/> <span className="hidden md:inline">Undo</span>
             </button>
             <button onClick={doRedo} disabled={!canRedo} title="Redo (Ctrl+Y)"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-white/50 hover:text-white hover:bg-white/8 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest">
-              Redo <RedoIcon/>
+              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 rounded text-white/50 hover:text-white hover:bg-white/8 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest">
+              <span className="hidden md:inline">Redo</span> <RedoIcon/>
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 mr-2">
+        <div className="flex items-center gap-1.5 md:gap-2">
+          <div className="hidden md:flex items-center gap-1 mr-2">
             {(["checker","white","black"] as BgPreview[]).map(b=>(
               <button key={b} onClick={()=>setBgPreview(b)} title={`${b} background`}
                 className={`w-6 h-6 rounded border transition-all ${bgPreview===b?"border-[#f5c842] scale-110":"border-white/20 hover:border-white/50"}`}
@@ -888,11 +888,11 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             <span className="text-[10px] text-white/30 ml-1 uppercase tracking-widest">BG</span>
           </div>
           <button onClick={onCancel}
-            className="px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest text-white/40 hover:text-white/70 hover:bg-white/8 transition-all">
+            className="px-3 md:px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest text-white/40 hover:text-white/70 hover:bg-white/8 transition-all">
             Cancel
           </button>
           <button onClick={handleConfirm}
-            className="px-5 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
+            className="px-4 md:px-5 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
             style={{background:"linear-gradient(135deg,#a855f7,#7c3aed)",color:"#fff"}}>
             Apply →
           </button>
@@ -1006,6 +1006,36 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
                 style={{backgroundColor:"rgba(0,0,0,0.7)",border:"1px solid rgba(168,85,247,0.4)",color:"rgba(196,140,255,0.9)",backdropFilter:"blur(8px)"}}>
                 <span style={{color:"#a855f7"}}>✦</span> Click anywhere on your image to select
               </div>
+            </div>
+          )}
+
+          {/* ── Mobile selection actions (top-left overlay, visible when area is selected) ── */}
+          {selectionMask && loaded && !processing && (
+            <div className="md:hidden absolute top-3 left-3 z-20 flex flex-col gap-2">
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl"
+                style={{backgroundColor:"rgba(168,85,247,0.18)",border:"1px solid rgba(168,85,247,0.4)",backdropFilter:"blur(8px)"}}>
+                <div className="relative">
+                  <div className="w-2 h-2 rounded-full" style={{backgroundColor:"#a855f7"}}/>
+                  <div className="absolute inset-0 rounded-full animate-ping" style={{backgroundColor:"rgba(168,85,247,0.5)"}}/>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-widest" style={{color:"#e2c9ff"}}>Selected</span>
+              </div>
+              <button
+                onClick={handleDelete}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all active:scale-95"
+                style={{background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff",boxShadow:"0 4px 14px rgba(239,68,68,0.35)"}}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{width:13,height:13}}>
+                  <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                </svg>
+                Remove Selected
+              </button>
+              <button
+                onClick={handleClearSelection}
+                className="px-3 py-1.5 rounded-xl text-[10px] uppercase tracking-widest transition-all active:scale-95"
+                style={{backgroundColor:"rgba(0,0,0,0.55)",border:"1px solid rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.5)",backdropFilter:"blur(8px)"}}>
+                Clear Selection
+              </button>
             </div>
           )}
 
