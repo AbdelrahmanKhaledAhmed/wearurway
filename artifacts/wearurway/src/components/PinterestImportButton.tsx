@@ -87,7 +87,15 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
   const handleClose = () => { setOpen(false); setTimeout(reset, 300); };
 
   const handleOpenPinterest = () => {
-    window.open(PINTEREST_URL, "_blank", "noopener,noreferrer");
+    // Use a real anchor click so iOS Safari handles the navigation gracefully
+    // and is less likely to discard the original tab (which causes white screen on return).
+    const a = document.createElement("a");
+    a.href = PINTEREST_URL;
+    a.target = "_blank";
+    a.rel = "noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     setStep("import");
   };
 
