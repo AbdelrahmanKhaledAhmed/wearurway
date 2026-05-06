@@ -589,16 +589,6 @@ export default function Design() {
     };
   }, [onTouchStart, onTouchMove, onTouchEnd]);
 
-  // Prevent the browser's native pinch-zoom on the design page.
-  // We intercept any 2-finger touchmove at the document level so the OS
-  // never gets a chance to zoom the viewport.
-  useEffect(() => {
-    const prevent = (e: TouchEvent) => {
-      if (e.touches.length >= 2) e.preventDefault();
-    };
-    document.addEventListener("touchmove", prevent, { passive: false });
-    return () => document.removeEventListener("touchmove", prevent);
-  }, []);
 
   const selectedLayer = layers.find(l => l.id === selectedLayerId) ?? null;
 
