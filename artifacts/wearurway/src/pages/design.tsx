@@ -1409,6 +1409,7 @@ export default function Design() {
                 height: `${effectiveBbox.height}%`,
                 overflow: "hidden",
                 zIndex: 5,
+                touchAction: "none",
                 ...(currentSide?.image ? {
                   WebkitMaskImage: `url("${currentSide.image}")`,
                   maskImage: `url("${currentSide.image}")`,

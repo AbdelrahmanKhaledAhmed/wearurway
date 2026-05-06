@@ -254,7 +254,8 @@ async function enhanceCanvas(src: HTMLCanvasElement, qualityScale=1): Promise<HT
   // Auto-pick the most aggressive sensible scale.
   // Targets ~4096px on the long side (print-grade); never downscales; capped to
   // avoid runaway memory on already-large images.
-  const TARGET_LONG=4096, MAX_SIDE=8192, MAX_AUTO_SCALE=8;
+  // MAX_SIDE is capped to 4096 for mobile canvas limits (many devices reject larger).
+  const TARGET_LONG=4096, MAX_SIDE=4096, MAX_AUTO_SCALE=8;
   const longSide=Math.max(src.width,src.height);
   const autoScale=Math.min(MAX_AUTO_SCALE,Math.max(1,TARGET_LONG/longSide));
   const scale=Math.min(
@@ -822,11 +823,23 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
         const trimmed=trimTransparency(c).canvas;
         const enhanced=await enhanceCanvas(trimmed,qualityScale);
         enhanced.toBlob(b=>{
-          setProcessing(false);
-          if (b) onConfirm(b,trimRef.current!);
+          if (b) {
+            setProcessing(false);
+            onConfirm(b,trimRef.current!);
+          } else {
+            // Fallback: toBlob failed (canvas too large on mobile) — retry at original size
+            trimmed.toBlob(b2=>{
+              setProcessing(false);
+              if (b2) onConfirm(b2,trimRef.current!);
+            },"image/png");
+          }
         },"image/png");
       } catch {
         setProcessing(false);
+        // Final fallback: use raw canvas directly
+        c.toBlob(b=>{
+          if (b) onConfirm(b,trimRef.current!);
+        },"image/png");
       }
     },30);
   },[qualityScale,onConfirm]);
@@ -887,6 +900,27 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             ))}
             <span className="text-[10px] text-white/30 ml-1 uppercase tracking-widest">BG</span>
           </div>
+          {/* Mobile: Remove Selected + Clear — shown in top bar when selection exists */}
+          {selectionMask && (
+            <div className="md:hidden flex items-center gap-1">
+              <button
+                onClick={handleDelete}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide active:scale-95 transition-all"
+                style={{background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff"}}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{width:11,height:11}}>
+                  <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                </svg>
+                Remove
+              </button>
+              <button
+                onClick={handleClearSelection}
+                className="px-2 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide active:scale-95 transition-all"
+                style={{backgroundColor:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.55)"}}>
+                ×&nbsp;Clear
+              </button>
+            </div>
+          )}
           <button onClick={onCancel}
             className="px-3 md:px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest text-white/40 hover:text-white/70 hover:bg-white/8 transition-all">
             Cancel
@@ -906,7 +940,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
         <div
           ref={areaRef}
           className="flex-1 flex items-center justify-center relative overflow-hidden select-none min-h-0"
-          style={{...bgStyle,cursor:canvasCursor}}
+          style={{...bgStyle,cursor:canvasCursor,touchAction:"none"}}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
@@ -1009,35 +1043,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             </div>
           )}
 
-          {/* ── Mobile selection actions (top-left overlay, visible when area is selected) ── */}
-          {selectionMask && loaded && !processing && (
-            <div className="md:hidden absolute top-3 left-3 z-20 flex flex-col gap-2">
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl"
-                style={{backgroundColor:"rgba(168,85,247,0.18)",border:"1px solid rgba(168,85,247,0.4)",backdropFilter:"blur(8px)"}}>
-                <div className="relative">
-                  <div className="w-2 h-2 rounded-full" style={{backgroundColor:"#a855f7"}}/>
-                  <div className="absolute inset-0 rounded-full animate-ping" style={{backgroundColor:"rgba(168,85,247,0.5)"}}/>
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-widest" style={{color:"#e2c9ff"}}>Selected</span>
-              </div>
-              <button
-                onClick={handleDelete}
-                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all active:scale-95"
-                style={{background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff",boxShadow:"0 4px 14px rgba(239,68,68,0.35)"}}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{width:13,height:13}}>
-                  <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-                </svg>
-                Remove Selected
-              </button>
-              <button
-                onClick={handleClearSelection}
-                className="px-3 py-1.5 rounded-xl text-[10px] uppercase tracking-widest transition-all active:scale-95"
-                style={{backgroundColor:"rgba(0,0,0,0.55)",border:"1px solid rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.5)",backdropFilter:"blur(8px)"}}>
-                Clear Selection
-              </button>
-            </div>
-          )}
 
           <canvas ref={canvasRef} style={{display:"none"}}/>
         </div>
