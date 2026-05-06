@@ -311,6 +311,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   // ── Pan state ───────────────────────────────────────────────────────────────
   const isMoving         = useRef(false);
   const moveStartRef     = useRef<{pointerX:number;pointerY:number;panX:number;panY:number}|null>(null);
+  const pinchEditorRef   = useRef<number|null>(null);
+  const [showToolPanel,  setShowToolPanel]  = useState(false);
 
   // ── History ─────────────────────────────────────────────────────────────────
   const undoRef          = useRef<CanvasSnapshot[]>([]);
@@ -752,6 +754,58 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
     e.preventDefault();
   },[]);
 
+  // ── Touch events (pan + pinch-zoom) ─────────────────────────────────────────
+
+  const onTouchStartEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
+    if (!loaded||!nativeSize) return;
+    if (e.touches.length===1) {
+      const touch=e.touches[0];
+      if (toolMode==="select") {
+        const pt=getImageCoords(touch.clientX,touch.clientY);
+        if (pt) handleFuzzySelect(pt.imgX,pt.imgY);
+        return;
+      }
+      isMoving.current=true;
+      moveStartRef.current={pointerX:touch.clientX,pointerY:touch.clientY,panX:panRef.current.x,panY:panRef.current.y};
+    } else if (e.touches.length===2) {
+      isMoving.current=false;
+      moveStartRef.current=null;
+      const dx=e.touches[0].clientX-e.touches[1].clientX;
+      const dy=e.touches[0].clientY-e.touches[1].clientY;
+      pinchEditorRef.current=Math.sqrt(dx*dx+dy*dy);
+    }
+  },[loaded,nativeSize,toolMode,getImageCoords,handleFuzzySelect]);
+
+  const onTouchMoveEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
+    e.preventDefault();
+    if (e.touches.length===1 && isMoving.current && moveStartRef.current) {
+      const touch=e.touches[0];
+      const s=moveStartRef.current;
+      setPan({x:s.panX+touch.clientX-s.pointerX,y:s.panY+touch.clientY-s.pointerY});
+    } else if (e.touches.length===2 && pinchEditorRef.current!==null) {
+      const dx=e.touches[0].clientX-e.touches[1].clientX;
+      const dy=e.touches[0].clientY-e.touches[1].clientY;
+      const newDist=Math.sqrt(dx*dx+dy*dy);
+      const scale=newDist/pinchEditorRef.current;
+      pinchEditorRef.current=newDist;
+      const el=areaRef.current;
+      if (el) {
+        const rect=el.getBoundingClientRect();
+        const cx=(e.touches[0].clientX+e.touches[1].clientX)/2;
+        const cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
+        applyZoom(zoomRef.current*scale,(cx-rect.left)/rect.width,(cy-rect.top)/rect.height);
+      } else {
+        applyZoom(zoomRef.current*scale);
+      }
+    }
+  },[applyZoom]);
+
+  const onTouchEndEditor = useCallback(()=>{
+    isMoving.current=false;
+    moveStartRef.current=null;
+    pinchEditorRef.current=null;
+  },[]);
+
   // ── Confirm ─────────────────────────────────────────────────────────────────
 
   const handleConfirm = useCallback(()=>{
@@ -846,12 +900,12 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       </div>
 
       {/* ── Body ── */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 flex-col md:flex-row">
 
         {/* ── Canvas area ── */}
         <div
           ref={areaRef}
-          className="flex-1 flex items-center justify-center relative overflow-hidden select-none"
+          className="flex-1 flex items-center justify-center relative overflow-hidden select-none min-h-0"
           style={{...bgStyle,cursor:canvasCursor}}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
@@ -859,6 +913,9 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
           onMouseLeave={onMouseLeave}
           onContextMenu={onContextMenu}
           onWheel={onWheel}
+          onTouchStart={onTouchStartEditor}
+          onTouchMove={onTouchMoveEditor}
+          onTouchEnd={onTouchEndEditor}
         >
           {displaySrc && displayDims && (
             <div
@@ -956,7 +1013,18 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
         </div>
 
         {/* ── Tool panel ── */}
-        <div className="w-80 border-l flex flex-col shrink-0" style={{borderColor:"rgba(168,85,247,0.2)"}}>
+        {/* On mobile: collapsible bottom sheet toggle */}
+        <div className="md:hidden flex items-center justify-between px-4 py-2 border-t shrink-0" style={{borderColor:"rgba(168,85,247,0.2)",backgroundColor:"#0d0d0d"}}>
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">Tools</span>
+          <button
+            onClick={()=>setShowToolPanel(p=>!p)}
+            className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded border transition-all"
+            style={{borderColor:"rgba(168,85,247,0.4)",color:"rgba(196,140,255,0.85)",backgroundColor:showToolPanel?"rgba(168,85,247,0.12)":"transparent"}}
+          >
+            {showToolPanel?"Hide":"Show"}
+          </button>
+        </div>
+        <div className={`${showToolPanel?"flex":"hidden"} md:flex w-full md:w-80 border-t md:border-t-0 md:border-l flex-col shrink-0 max-h-64 md:max-h-none overflow-y-auto`} style={{borderColor:"rgba(168,85,247,0.2)"}}>
           <FuzzySelectPanel
             toolMode={toolMode}
             hasSelection={!!selectionMask}

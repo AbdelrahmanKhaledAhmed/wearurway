@@ -132,6 +132,12 @@ export default function Design() {
   const { data: orderSettings } = useGetOrderSettings();
   const showExportButton = orderSettings?.showExportButton === true;
 
+  const [isMobileLayout, setIsMobileLayout] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < 768
+  );
+  const [showLayersSheet, setShowLayersSheet] = useState(false);
+  const touchDragRef = useRef<DragState | null>(null);
+
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const pinchRef = useRef<{ dist: number } | null>(null);
@@ -177,6 +183,12 @@ export default function Design() {
       setLocation("/products");
     }
   }, [selectedProduct, selectedFit, selectedColor, setLocation, isAdminPreview]);
+
+  useEffect(() => {
+    const handler = () => setIsMobileLayout(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
   const savedDesignLoaded = useRef(false);
 
@@ -327,14 +339,42 @@ export default function Design() {
     }
   }, []);
 
+  const onTouchMoveGlobal = useCallback((e: TouchEvent) => {
+    const drag = touchDragRef.current;
+    if (!drag || e.touches.length !== 1) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const z = viewZoomRef.current || 1;
+    const dx = (touch.clientX - drag.startMouseX) / z;
+    const dy = (touch.clientY - drag.startMouseY) / z;
+    const canvasCenterX = mockupSizeRef.current / 2;
+    const rawX = drag.startLayerX + dx;
+    const rawY = drag.startLayerY + dy;
+    const layer = layersRef.current.find(l => l.id === drag.layerId);
+    const layerW = layer ? Math.max(MIN_LAYER_SIZE, layer.width) : 0;
+    const snapping = layerW > 0 && Math.abs((rawX + layerW / 2) - canvasCenterX) < SNAP_THRESHOLD;
+    const finalX = snapping ? canvasCenterX - layerW / 2 : rawX;
+    setLayers(prev => prev.map(l => l.id === drag.layerId ? { ...l, x: finalX, y: rawY } : l));
+    setSnapActive(snapping);
+  }, [setLayers]);
+
+  const onTouchEndGlobal = useCallback(() => {
+    touchDragRef.current = null;
+    setSnapActive(false);
+  }, []);
+
   useEffect(() => {
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("touchmove", onTouchMoveGlobal, { passive: false });
+    window.addEventListener("touchend", onTouchEndGlobal);
     return () => {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("touchmove", onTouchMoveGlobal);
+      window.removeEventListener("touchend", onTouchEndGlobal);
     };
-  }, [onMouseMove, onMouseUp]);
+  }, [onMouseMove, onMouseUp, onTouchMoveGlobal, onTouchEndGlobal]);
 
   // Delete selected layer with Delete or Backspace key
   useEffect(() => {
@@ -366,6 +406,25 @@ export default function Design() {
       startLayerY: layer.y,
     };
   };
+
+  const startTouchDrag = useCallback((e: React.TouchEvent, layer: DesignLayer) => {
+    if (e.touches.length !== 1) return;
+    if (layer.id !== selectedLayerId) {
+      e.preventDefault();
+      setSelectedLayerId(layer.id);
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    const touch = e.touches[0];
+    touchDragRef.current = {
+      layerId: layer.id,
+      startMouseX: touch.clientX,
+      startMouseY: touch.clientY,
+      startLayerX: layer.x,
+      startLayerY: layer.y,
+    };
+  }, [selectedLayerId]);
 
   const getLayerAspectRatio = (layer: DesignLayer) => {
     const naturalRatio =
@@ -1113,7 +1172,10 @@ export default function Design() {
         onCancel={() => setShowAddImageModal(false)}
       />
     )}
-    <div className="h-screen overflow-hidden pt-20 flex flex-col bg-background">
+    {/* ════════════════════════════════════════════
+        DESKTOP LAYOUT  (md and wider)
+        ════════════════════════════════════════════ */}
+    <div className="hidden md:flex h-screen overflow-hidden pt-20 flex-col bg-background">
 
       <div className="flex flex-1 overflow-hidden">
 
@@ -1369,6 +1431,7 @@ export default function Design() {
                     alt={layer.name}
                     draggable={false}
                     onMouseDown={e => startDrag(e, layer)}
+                    onTouchStart={e => startTouchDrag(e, layer)}
                     style={{
                       position: "absolute",
                       left: layer.x,
@@ -1563,9 +1626,369 @@ export default function Design() {
           {/* ── (layers moved to left sidebar) ── */}
           <div className="flex-1" /></div>
       </div>
+    </div>{/* end desktop layout */}
+
+    {/* Desktop-only Pinterest import button */}
+    <div className="hidden md:block">
+      <PinterestImportButton onImageReady={handleImportFile} disabled={uploading} />
     </div>
 
-    <PinterestImportButton onImageReady={handleImportFile} disabled={uploading} />
+    {/* ════════════════════════════════════════════
+        MOBILE LAYOUT  (smaller than md)
+        ════════════════════════════════════════════ */}
+    <div className="flex flex-col md:hidden min-h-screen bg-background">
+      {/* top padding for navbar */}
+      <div className="h-16 shrink-0" />
+
+      {/* ── Mockup section ── */}
+      <div
+        className="relative w-full overflow-hidden shrink-0"
+        style={{
+          height: `${Math.round((mockupSize * (4 / 3) + 60) * viewZoom)}px`,
+          backgroundImage:
+            "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
+          backgroundSize: "24px 24px",
+          backgroundPosition: "0 0, 0 12px, 12px -12px, -12px 0px",
+          backgroundColor: "#1a1a1a",
+        }}
+      >
+        {/* Front / Back toggle — pinned at top center */}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex gap-0 border border-border/60">
+          {(["front", "back"] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => { setSide(s); setSelectedLayerId(null); }}
+              className={`px-5 py-1.5 text-xs uppercase tracking-widest font-medium transition-colors ${
+                side === s
+                  ? "bg-foreground text-background"
+                  : "bg-background/20 text-foreground"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+
+        {/* Mockup + layers */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div
+            className="relative"
+            style={{
+              width: `${mockupSize}px`,
+              aspectRatio: "3/4",
+              transform: `translateY(${mockupOffsetY}px) scale(${viewZoom})`,
+              transformOrigin: "center center",
+            }}
+          >
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={side}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="absolute inset-0"
+              >
+                {currentSide?.image ? (
+                  <img
+                    src={currentSide.image}
+                    alt={`${side} mockup`}
+                    className="w-full h-full object-contain pointer-events-none"
+                    style={{ position: "relative", zIndex: 1 }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-3 border border-dashed border-border">
+                    <span className="text-5xl text-muted-foreground/20 font-black uppercase">{side[0]}</span>
+                    <p className="text-xs uppercase tracking-widest text-muted-foreground/50">
+                      No mockup for {side} view
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Center snap guide */}
+            {snapActive && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0, bottom: 0,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: "1px",
+                  backgroundColor: "#f5c842",
+                  zIndex: 20,
+                  pointerEvents: "none",
+                  opacity: 0.75,
+                }}
+              />
+            )}
+
+            {/* Design clip area (touch-draggable layers) */}
+            <div
+              style={{
+                position: "absolute",
+                left: `${effectiveBbox.x}%`,
+                top: `${effectiveBbox.y}%`,
+                width: `${effectiveBbox.width}%`,
+                height: `${effectiveBbox.height}%`,
+                overflow: "hidden",
+                zIndex: 5,
+                ...(currentSide?.image ? {
+                  WebkitMaskImage: `url("${currentSide.image}")`,
+                  maskImage: `url("${currentSide.image}")`,
+                  WebkitMaskSize: "contain",
+                  maskSize: "contain",
+                  WebkitMaskPosition: "center",
+                  maskPosition: "center",
+                  WebkitMaskRepeat: "no-repeat",
+                  maskRepeat: "no-repeat",
+                } : {}),
+              }}
+            >
+              {layers.map((layer) =>
+                layer.visible ? (() => {
+                  const { width, height } = getRatioLockedSize(layer, layer.width);
+                  return (
+                    <img
+                      key={layer.id}
+                      src={layer.imageUrl}
+                      alt={layer.name}
+                      draggable={false}
+                      onMouseDown={e => startDrag(e, layer)}
+                      onTouchStart={e => startTouchDrag(e, layer)}
+                      style={{
+                        position: "absolute",
+                        left: layer.x,
+                        top: layer.y,
+                        width,
+                        height,
+                        minWidth: width,
+                        minHeight: height,
+                        maxWidth: "none",
+                        maxHeight: "none",
+                        transform: `rotate(${layer.rotation}deg)`,
+                        transformOrigin: "center center",
+                        cursor: touchDragRef.current?.layerId === layer.id ? "grabbing" : "grab",
+                        userSelect: "none",
+                        background: "none",
+                        flexShrink: 0,
+                        imageRendering: "high-quality" as React.CSSProperties["imageRendering"],
+                      }}
+                    />
+                  );
+                })() : null
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Pinch-zoom hint ── */}
+      {layers.length > 0 && (
+        <p className="text-center text-[10px] uppercase tracking-widest text-muted-foreground/40 py-1.5">
+          Tap layer to select · Drag to move · Pinch to zoom
+        </p>
+      )}
+
+      {/* ── Pinterest inline button ── */}
+      <div className="px-4 py-3 border-b border-border">
+        <PinterestImportButton onImageReady={handleImportFile} disabled={uploading} inline />
+      </div>
+
+      {/* ── Tools: Add Image + Add Text ── */}
+      <div className="px-4 py-4 border-b border-border grid grid-cols-2 gap-3">
+        <button
+          onClick={handleAddImage}
+          disabled={uploading}
+          className="flex items-center justify-center border border-border px-4 py-3.5 hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <p className="text-xs font-bold uppercase tracking-widest">
+            {uploading ? "Uploading…" : "Add Image"}
+          </p>
+        </button>
+        <button
+          onClick={() => setShowTextModal(true)}
+          className="flex items-center justify-center border border-border px-4 py-3.5 hover:border-foreground hover:bg-muted/10 transition-colors"
+        >
+          <p className="text-xs font-bold uppercase tracking-widest">Add Text</p>
+        </button>
+      </div>
+
+      {/* ── Configuration summary ── */}
+      <div className="px-4 py-4 border-b border-border">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Configuration</p>
+        <div className="space-y-1.5 text-xs">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground uppercase tracking-widest">Product</span>
+            <span className="font-bold uppercase">{selectedProduct.name}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground uppercase tracking-widest">Fit</span>
+            <span className="font-bold uppercase">{selectedFit.name}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground uppercase tracking-widest">Color</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 border border-border" style={{ backgroundColor: selectedColor.hex }} />
+              <span className="font-bold uppercase">{selectedColor.name}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Mockup view size ── */}
+      <div className="px-4 py-4 border-b border-border">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Mockup Size</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewZoom(z => Math.max(VIEW_ZOOM_MIN, +(z - VIEW_ZOOM_STEP).toFixed(2)))}
+            disabled={viewZoom <= VIEW_ZOOM_MIN + 1e-3}
+            className="flex-1 py-2.5 text-xs font-bold uppercase tracking-widest border border-border hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            − Smaller
+          </button>
+          <button
+            onClick={() => setViewZoom(z => Math.min(VIEW_ZOOM_MAX, +(z + VIEW_ZOOM_STEP).toFixed(2)))}
+            disabled={viewZoom >= VIEW_ZOOM_MAX - 1e-3}
+            className="flex-1 py-2.5 text-xs font-bold uppercase tracking-widest border border-border hover:border-foreground hover:bg-muted/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            + Bigger
+          </button>
+        </div>
+      </div>
+
+      {/* ── ORDER NOW ── */}
+      <div className="px-4 py-5 pb-28">
+        <button
+          onClick={() => setShowOrderModal(true)}
+          className="w-full py-4 font-black uppercase text-sm tracking-[0.2em] transition-all active:scale-[0.98] hover:opacity-90"
+          style={{ backgroundColor: "#f5c842", color: "#0d0d0d", letterSpacing: "0.25em" }}
+        >
+          Order Now
+        </button>
+      </div>
+
+      {/* ── Floating Layers button ── */}
+      <button
+        onClick={() => setShowLayersSheet(true)}
+        className="fixed bottom-5 right-4 z-40 flex items-center gap-2 px-4 py-3 border border-border bg-background shadow-lg text-xs font-bold uppercase tracking-widest hover:border-foreground transition-colors"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+          <rect x="2" y="3" width="20" height="4" rx="1" />
+          <rect x="2" y="10" width="20" height="4" rx="1" />
+          <rect x="2" y="17" width="20" height="4" rx="1" />
+        </svg>
+        Layers{layers.length > 0 ? ` (${layers.length})` : ""}
+      </button>
+
+      {/* ── Layers bottom sheet ── */}
+      {showLayersSheet && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end"
+          style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+          onClick={() => setShowLayersSheet(false)}
+        >
+          <div
+            className="bg-background border-t border-border max-h-[70vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* drag handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-border rounded-full" />
+            </div>
+
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  {side === "front" ? "Front" : "Back"} Layers {layers.length > 0 && `(${layers.length})`}
+                </p>
+                <button
+                  onClick={() => setShowLayersSheet(false)}
+                  className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+                >
+                  Close
+                </button>
+              </div>
+
+              {layers.length === 0 ? (
+                <p className="text-xs text-muted-foreground uppercase tracking-widest leading-relaxed">
+                  No layers yet. Add an image to the {side} to start designing.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {[...layers].reverse().map((layer, reversedIdx) => {
+                    const trueIdx = layers.length - 1 - reversedIdx;
+                    const isSelected = selectedLayerId === layer.id;
+                    return (
+                      <motion.div
+                        key={layer.id}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className={`border transition-colors ${isSelected ? "border-foreground bg-muted/10" : "border-border"}`}
+                      >
+                        <div
+                          className="flex items-center gap-2 px-3 py-2 cursor-pointer"
+                          onClick={() => setSelectedLayerId(isSelected ? null : layer.id)}
+                        >
+                          <div className="w-8 h-8 border border-border overflow-hidden shrink-0"
+                            style={{
+                              backgroundImage: "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
+                              backgroundSize: "6px 6px",
+                              backgroundPosition: "0 0, 0 3px, 3px -3px, -3px 0px",
+                              backgroundColor: "#1a1a1a",
+                            }}
+                          >
+                            <img src={layer.imageUrl} alt={layer.name} className="w-full h-full object-contain" />
+                          </div>
+                          <span className="text-xs font-medium truncate flex-1 uppercase tracking-wide">{layer.name}</span>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setLayers(prev => prev.map(l => l.id === layer.id ? { ...l, visible: !l.visible } : l));
+                            }}
+                            className={`text-xs px-2 py-1 border transition-colors ${layer.visible ? "border-border" : "border-border/30 text-muted-foreground/30"}`}
+                          >
+                            {layer.visible ? "👁" : "👁"}
+                          </button>
+                        </div>
+
+                        {isSelected && (
+                          <div className="px-3 pb-2">
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => moveLayerUp(layer.id)}
+                                disabled={trueIdx === layers.length - 1}
+                                className="flex-1 text-xs py-1.5 border border-border hover:border-foreground transition-colors disabled:opacity-30 uppercase tracking-widest"
+                              >
+                                ↑ Up
+                              </button>
+                              <button
+                                onClick={() => moveLayerDown(layer.id)}
+                                disabled={trueIdx === 0}
+                                className="flex-1 text-xs py-1.5 border border-border hover:border-foreground transition-colors disabled:opacity-30 uppercase tracking-widest"
+                              >
+                                ↓ Down
+                              </button>
+                              <button
+                                onClick={() => removeLayer(layer.id)}
+                                className="text-xs py-1.5 px-3 border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors uppercase tracking-widest"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>{/* end mobile layout */}
 
     <OrderReviewModal
       isOpen={showOrderModal}

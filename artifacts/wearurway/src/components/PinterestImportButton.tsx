@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 interface Props {
   onImageReady: (file: File) => void;
   disabled?: boolean;
+  inline?: boolean;
 }
 
 type Step = "intro" | "import" | "loading" | "upload";
@@ -53,7 +54,7 @@ function triggerDownload(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
-export default function PinterestImportButton({ onImageReady, disabled }: Props) {
+export default function PinterestImportButton({ onImageReady, disabled, inline }: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("intro");
   const [urlInput, setUrlInput] = useState("");
@@ -138,22 +139,36 @@ export default function PinterestImportButton({ onImageReady, disabled }: Props)
 
   return (
     <>
-      {/* Trigger button */}
-      <motion.button
-        onClick={handleOpen}
-        disabled={disabled}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.97 }}
-        className="fixed bottom-6 left-5 z-40 flex items-start gap-3 px-4 py-4 rounded-2xl shadow-2xl disabled:opacity-40 disabled:cursor-not-allowed transition-opacity max-w-[190px] text-left"
-        style={{ backgroundColor: "#E60023", color: "#fff" }}
-        title="I'll help you find or pick the perfect design"
-      >
-        <PinterestIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
-        <span className="text-[11px] font-semibold leading-snug">
-          Not sure which design fits your idea?{" "}
-          <span className="font-black">I'll help you pick the perfect one.</span>
-        </span>
-      </motion.button>
+      {/* Trigger button — fixed on desktop, inline on mobile */}
+      {inline ? (
+        <button
+          onClick={handleOpen}
+          disabled={disabled}
+          className="w-full flex items-center gap-3 px-4 py-3 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity text-left"
+          style={{ backgroundColor: "#E60023", color: "#fff" }}
+        >
+          <PinterestIcon className="w-4 h-4 flex-shrink-0" />
+          <span className="text-[11px] font-semibold leading-snug">
+            Not sure? <span className="font-black">Find your design on Pinterest.</span>
+          </span>
+        </button>
+      ) : (
+        <motion.button
+          onClick={handleOpen}
+          disabled={disabled}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          className="fixed bottom-6 left-5 z-40 flex items-start gap-3 px-4 py-4 rounded-2xl shadow-2xl disabled:opacity-40 disabled:cursor-not-allowed transition-opacity max-w-[190px] text-left"
+          style={{ backgroundColor: "#E60023", color: "#fff" }}
+          title="I'll help you find or pick the perfect design"
+        >
+          <PinterestIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span className="text-[11px] font-semibold leading-snug">
+            Not sure which design fits your idea?{" "}
+            <span className="font-black">I'll help you pick the perfect one.</span>
+          </span>
+        </motion.button>
+      )}
 
       {/* Modal */}
       <AnimatePresence>

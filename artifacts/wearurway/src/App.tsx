@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -47,57 +47,71 @@ function Router() {
   );
 }
 
-function MobileBlocker() {
+function MobileDesktopSuggestion() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.innerWidth >= 768) return;
+    try {
+      if (localStorage.getItem("ww_mobile_suggestion_seen") === "1") return;
+    } catch {}
+    setVisible(true);
+  }, []);
+
+  const dismiss = () => {
+    setVisible(false);
+    try { localStorage.setItem("ww_mobile_suggestion_seen", "1"); } catch {}
+  };
+
+  if (!visible) return null;
+
   return (
-    <div className="md:hidden fixed inset-0 z-[9999] flex items-center justify-center bg-background p-6 text-center">
-      <div className="max-w-md space-y-4">
-        <h1 className="text-2xl font-bold">Desktop Only</h1>
-        <p className="text-base text-muted-foreground">
-          This website is designed for desktop and laptop use only.
-        </p>
-        <p className="text-base text-muted-foreground">
-          Mobile access is not supported to ensure the best quality and usability of the design tools.
-        </p>
-        <p className="text-base text-muted-foreground">
-          If you don’t have a laptop or desktop and you want to create a specific design, you can message us. And if you don’t have anything in mind, you can check out the designs on Pinterest.
-        </p>
-        <div className="pt-4">
-          <div className="flex items-center justify-center gap-3 flex-wrap">
-            <a
-              href="https://www.instagram.com/wearurway.store/"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Instagram"
-              data-testid="link-instagram-mobile"
-              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            >
-              <FaInstagram className="w-5 h-5" />
-              <span>Instagram</span>
-            </a>
-            <a
-              href="https://www.tiktok.com/@wearurway"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="TikTok"
-              data-testid="link-tiktok-mobile"
-              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            >
-              <FaTiktok className="w-5 h-5" />
-              <span>TikTok</span>
-            </a>
-            <a
-              href="https://www.pinterest.com/WEARURWAY/t-shirt-designs/"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Pinterest"
-              data-testid="link-pinterest-mobile"
-              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            >
-              <FaPinterest className="w-5 h-5" />
-              <span>Pinterest</span>
-            </a>
-          </div>
+    <div className="fixed inset-0 z-[9998] flex items-end justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-md bg-background border border-border p-6 space-y-4 shadow-2xl mb-2">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground mb-1">Heads Up</p>
+          <h2 className="text-lg font-black uppercase tracking-wide">Better on Desktop</h2>
         </div>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          For the best design experience, we recommend using a laptop or desktop. You can still use all features on mobile though!
+        </p>
+        <div className="flex gap-3">
+          <a
+            href="https://www.instagram.com/wearurway.store/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-2 border border-border text-xs font-medium transition-colors hover:bg-muted/10"
+          >
+            <FaInstagram className="w-4 h-4" />
+            Instagram
+          </a>
+          <a
+            href="https://www.pinterest.com/WEARURWAY/t-shirt-designs/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-2 border border-border text-xs font-medium transition-colors hover:bg-muted/10"
+          >
+            <FaPinterest className="w-4 h-4" />
+            Pinterest
+          </a>
+          <a
+            href="https://www.tiktok.com/@wearurway"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-2 border border-border text-xs font-medium transition-colors hover:bg-muted/10"
+          >
+            <FaTiktok className="w-4 h-4" />
+            TikTok
+          </a>
+        </div>
+        <button
+          onClick={dismiss}
+          className="w-full py-3.5 font-black uppercase text-sm tracking-[0.2em] transition-all active:scale-[0.98]"
+          style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
+        >
+          Continue on Mobile
+        </button>
       </div>
     </div>
   );
@@ -112,7 +126,7 @@ function App() {
             <Router />
           </WouterRouter>
           <Toaster />
-          <MobileBlocker />
+          <MobileDesktopSuggestion />
         </TooltipProvider>
       </CustomizerProvider>
     </QueryClientProvider>

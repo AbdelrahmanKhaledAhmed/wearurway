@@ -49,6 +49,7 @@ A premium streetwear customization website with a multi-step product configurato
 - Export Design composites the already-processed layer images with uniform X/Y scaling so exported PNGs preserve the same aspect ratio shown on the mockup.
 - Export Design outputs high-resolution PNG files using print-DPI canvas scaling while keeping filename dimensions aligned with the live selected-layer size shown on the mockup.
 - Tools includes Share Design, which generates a ready-to-share PNG combining the full front and back mockups side-by-side with all visible design layers applied.
+- Mobile support: The "Desktop Only" hard-block is replaced with a one-time soft-suggestion popup (`MobileDesktopSuggestion` in `App.tsx`, stored in `localStorage` key `ww_mobile_suggestion_seen`). Design page has a fully responsive layout: on `< md` a scrollable vertical stack (mockup → Pinterest inline → tools → config → Order Now) with a floating "Layers" button that opens a bottom-sheet drawer; single-finger touch drag moves selected layers (touchstart → `startTouchDrag`, global touchmove → `onTouchMoveGlobal`), second tap selects. ImageEditor is responsive (`flex-col md:flex-row`): canvas fills top, tool panel is collapsible at bottom on mobile; touch pan (1 finger) and pinch-zoom (2 fingers) added (`onTouchStartEditor` / `onTouchMoveEditor`).
 
 ### Backend (artifacts/api-server)
 
