@@ -1,148 +1,74 @@
-# Workspace
+# WearUrWay
 
-## Overview
+Premium streetwear customization platform — multi-step product configurator (Landing → Products → Fits → Colors → Sizes), interactive design editor, and protected admin panel.
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+## Run & Operate
+
+- `pnpm --filter @workspace/api-server run dev` — API server (port 8080)
+- `pnpm --filter @workspace/wearurway run dev` — Vite frontend (port 5000)
+- `pnpm run build` — typecheck + build all packages
+- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks & Zod schemas from OpenAPI spec
+- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+
+Required env secrets:
+- `DATABASE_URL` — Replit-managed PostgreSQL (auto-provisioned)
+- `ADMIN_PASSWORD` — admin panel password (default: `admin123`)
+
+Optional env secrets:
+- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` — Cloudflare R2 for file storage
+- `AI_INTEGRATIONS_OPENAI_API_KEY`, `AI_INTEGRATIONS_OPENAI_BASE_URL` — OpenAI for AI image assist (returns 503 if unset)
 
 ## Stack
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: Supabase PostgreSQL (`store_data` JSONB table; `pg` directly without Drizzle). Connection string read from `SUPABASE_URL` (must be a `postgresql://` URI); falls back to `DATABASE_URL` if not set.
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (ESM bundle via build.mjs)
+- **Frontend**: React 19, Vite 7, Tailwind CSS v4, Wouter, Framer Motion, Radix UI, TanStack Query
+- **Backend**: Node.js 20, Express 5, Pino logging, Sharp (image processing), Multer (file uploads)
+- **Database**: PostgreSQL via `pg` — single `store_data` table with a JSONB column (`key='main'`); in-memory cache with debounced async upsert
+- **File Storage**: Cloudflare R2 (S3-compatible) via AWS SDK — optional, returns 503 if not configured
+- **Build**: esbuild (ESM bundle) for API, Vite for frontend
+- **Codegen**: Orval from OpenAPI spec → Zod schemas + React Query hooks
 
-## Key Commands
+## Where things live
 
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
-- Replit artifact workflows run the API on port 8080 and Vite frontend on port 3000
+```
+artifacts/wearurway/     — React frontend
+artifacts/api-server/    — Express API backend
+lib/api-spec/            — OpenAPI spec (source of truth for API contract)
+lib/api-zod/             — generated Zod schemas
+lib/api-client-react/    — generated React Query hooks
+lib/integrations-openai-ai-server/  — OpenAI client (lazy-loaded)
+artifacts/api-server/src/data/store.ts  — in-memory store + DB persistence
+artifacts/api-server/src/services/storageService.ts  — R2 storage service
+artifacts/wearurway/src/config/fonts.ts  — custom font config
+```
 
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+## Architecture decisions
 
-## wearurway Project
+- Single JSONB row in PostgreSQL (`key='main'`) for all app state — simple, no migrations, coalesced debounced writes (250ms) to reduce write amplification
+- Cloudflare R2 for persistent file storage (mockups, order exports, shared layers); all optional — app degrades gracefully without it
+- Admin auth is custom Bearer token (crypto.randomBytes) stored in process memory + DB; no external auth service
+- OpenAI integration loaded lazily per-request so server starts without AI credentials
+- Client-side order durability via IndexedDB + service worker — success shown immediately, uploads/Telegram happen in background with exponential backoff
 
-### Overview
+## Product
 
-A premium streetwear customization website with a multi-step product configurator and a protected admin panel.
+- Multi-step customization flow: product → fit → color → size → design editor → checkout
+- Interactive design editor: layer drag/resize, text tool with custom fonts, image editor with AI-assisted selection
+- Export Design generates high-res PNG; Share Design creates side-by-side front/back mockup
+- Mobile responsive with soft-suggestion popup for desktop-recommended features
+- Admin panel at `/admin`: manage products, fits, colors, sizes, mockups, settings, orders
 
-### Frontend (artifacts/wearurway)
+## User preferences
 
-- React + Vite + Tailwind CSS
-- Dark streetwear aesthetic (near-black background, off-white text)
-- `framer-motion` for transitions
-- Wouter for routing
-- Customization flow: Landing → Products → Fits → Colors → Sizes
-- Admin flow: /admin (login) → /admin/dashboard
-- Mockups admin includes a per-mockup Designer Display setting to show or hide the Save Design button on the designer page.
-- Design editor supports cursor-centered mouse-wheel zoom on selected image layers, free layer dragging, and an edit-image modal with deep cursor-centered zoom, Move/pan tool, precise circular brush erase, and automatic transparent-edge trimming on image load, brush erase, and fill removal so layer bounds shrink to visible pixels.
-- Image quality enhancement now runs when Add to Design is clicked in the image editor, using print-scale high-quality smoothing and sharpening to create the layer's final image buffer before it is placed on the mockup.
-- Mockup layer resizing is ratio-locked to each layer's natural image dimensions across wheel zoom, pinch zoom, render, export, and live dimension labels.
-- Live print dimensions for selected layers are scaled from the portion visibly clipped inside the print box while preserving the selected image's fixed natural aspect ratio in the cm label.
-- Export Design composites the already-processed layer images with uniform X/Y scaling so exported PNGs preserve the same aspect ratio shown on the mockup.
-- Export Design outputs high-resolution PNG files using print-DPI canvas scaling while keeping filename dimensions aligned with the live selected-layer size shown on the mockup.
-- Tools includes Share Design, which generates a ready-to-share PNG combining the full front and back mockups side-by-side with all visible design layers applied.
-- Mobile support: The "Desktop Only" hard-block is replaced with a one-time soft-suggestion popup (`MobileDesktopSuggestion` in `App.tsx`, stored in `localStorage` key `ww_mobile_suggestion_seen`). Design page has a fully responsive layout: on `< md` a scrollable vertical stack (mockup → Pinterest inline → tools → config → Order Now) with a floating "Layers" button that opens a bottom-sheet drawer; single-finger touch drag moves selected layers (touchstart → `startTouchDrag`, global touchmove → `onTouchMoveGlobal`), second tap selects. ImageEditor is responsive (`flex-col md:flex-row`): canvas fills top, tool panel is collapsible at bottom on mobile; touch pan (1 finger) and pinch-zoom (2 fingers) added (`onTouchStartEditor` / `onTouchMoveEditor`).
+_Populate as you build_
 
-### Backend (artifacts/api-server)
+## Gotchas
 
-- Express 5 API — fully migrated to persistent storage (no more db.json)
-- **Store**: PostgreSQL `store_data` table with a single JSONB row (`key='main'`); in-memory cache with **coalesced** async upsert via `store.ts`. `updateStore` mutates the in-memory copy and marks the row dirty; a single debounced (~250ms) save flushes per window, with at most one follow-up save queued while a write is in flight. `flushPendingSaves()` is called on SIGTERM so the last batch is never lost.
-- **File storage**: Cloudflare R2 (S3-compatible) via `services/storageService.ts` re-exported through `lib/objectStorage.ts` (`uploadBuffer`, `deleteObject`, `objectExists`, `streamObject`, `downloadBuffer`, `getPublicUrl`). Bucket id comes from `DEFAULT_OBJECT_STORAGE_BUCKET_ID`; auth uses the local Replit sidecar.
-  - Mockup images: `uploads/mockups/`
-  - Shared layer uploads: `uploads/shared-layers/`
-  - Size chart images: `size-charts/`
-  - Order export files / payment proofs: `orders/<orderId>/`
-- Admin password: set via `ADMIN_PASSWORD` env var (default: `admin123`)
-- API is served under `/api`; frontend calls remain same-origin through the Vite proxy in development and shared host routing in Replit.
-- Admin session tokens are generated with Node crypto and stored in process memory.
-- AI image-assist routes load the OpenAI integration lazily per request so the API server can start without AI credentials; if the integration is not configured, those endpoints return 503 instead of crashing startup.
+- Vite dev proxy forwards `/api` → `http://localhost:8080` — API must be on port 8080
+- `pnpm install` must be run before any build steps (node_modules were absent on first import)
+- `SUPABASE_URL` takes priority over `DATABASE_URL` if it's a postgres:// URI — on Replit, `DATABASE_URL` is used
+- Order outbox retries uploads + Telegram forever with exponential backoff; state persists in the JSONB store row
+- Sharp and esbuild are in `onlyBuiltDependencies` — must be built from source on install
 
-### Routes
+## Pointers
 
-- `GET /api/products` — list products
-- `POST /api/products` — create product (admin)
-- `PATCH /api/products/:id` — update product (admin)
-- `DELETE /api/products/:id` — delete product + cascade (admin)
-- `GET /api/fits` — list fits
-- `POST /api/fits` — create fit (admin)
-- `PATCH /api/fits/:id` — update fit (admin)
-- `DELETE /api/fits/:id` — delete fit + cascade (admin)
-- `GET /api/fits/:fitId/colors` — list colors for a fit
-- `POST /api/fits/:fitId/colors` — add a color (admin)
-- `DELETE /api/fits/:fitId/colors/:colorId` — remove a color (admin)
-- `GET /api/fits/:fitId/sizes` — list sizes for a fit
-- `POST /api/fits/:fitId/sizes` — add a size (admin)
-- `PATCH /api/fits/:fitId/sizes/:sizeId` — update a size (admin)
-- `DELETE /api/fits/:fitId/sizes/:sizeId` — delete a size (admin)
-- `POST /api/uploads` — upload image file (multipart/form-data, field: "file") → stored in Object Storage, returns { url, filename }
-- `GET /api/uploads/mockups/:filename` — stream mockup image from Object Storage
-- `GET /api/uploads/shared-layers/:filename` — stream shared layer from Object Storage
-- `GET /api/size-charts/:filename` — stream size chart from Object Storage
-- `POST /api/admin/login` — admin login (returns Bearer token)
-- `POST /api/admin/logout` — admin logout
-- `GET /api/admin/me` — check admin session
-- `POST /api/create-order` — atomic submission. Body carries delivery info, payment proof, the design job spec, the customer feedback, and (preferred) the high-resolution design PNGs the browser already rendered. When `body.exportFiles` includes any of `design-front.png`, `mockup-front.png`, `design-back.png`, `mockup-back.png`, the server **skips** its server-side sharp render and stores the client bytes in R2 verbatim — so the files in storage are pixel-identical to the ones the designer downloaded via Export. The server-side renderer is kept as a fallback for older clients that don't ship `exportFiles`. Uploads and the Telegram notification are pushed onto a persistent retry outbox so they never silently fail. Notification is gated until all uploads for that order succeed.
-- `POST /api/orders/:orderId/documents` and `/documents/upload` — legacy enqueue endpoints, still wired to the outbox.
-- `POST /api/orders/:orderId/complete` — legacy "send notification" endpoint, still wired to the outbox (the new client flow does not call it because feedback ships in `/create-order`).
-- Order outbox: `services/orderOutbox.ts` retries every pending upload and notification with exponential backoff (cap 60s) forever, persists state in the `store_data` JSONB row, and resumes on server restart.
-
-### Client-side order durability (instant success + background work)
-
-Submitting an order is split into two phases. The customer sees the success screen the instant they tap Complete Order; everything else happens in the background and survives page-close, browser-close, and offline.
-
-- `lib/order-queue.ts` stores two record kinds in the IndexedDB DB `wearurway-order-queue` / store `pending-orders`:
-  - `kind: "spec"` — record with customer info, payment proof data URL, design job spec (layer JSON for fallback), the high-res `exportFiles` (design + mockup PNGs as data URLs) the browser pre-rendered, feedback, and a **client-generated order id** (`WW-XXXXXXXX`). Saved via `saveSpecQueuedOrder` in tens of ms.
-  - `kind: "submit"` — legacy: full payload with rendered export PNG data URLs, ready to POST. New code does not produce these.
-- The high-res `exportFiles` are produced by `OrderReviewModal` as soon as the customer reaches the review step (in parallel with the on-screen previews), persisted to IndexedDB via `saveCheckoutExportFiles`, then loaded by `/checkout` and forwarded inline in the `/api/create-order` POST so the server uploads them straight to R2 without re-rendering. If the render fails, `designJob` still travels with the request and the server falls back to its sharp-based renderer.
-- `flushQueuedOrders` walks the queue: for `spec` records it POSTs `/api/create-order` with the saved `exportFiles` already attached. Retries forever with exponential backoff (cap 60 s). Called on every app boot and every `online` event.
-- The server treats `body.orderId` as an idempotency key — repeat POSTs never create duplicate orders or duplicate Telegram messages.
-- `public/order-sync-sw.js` is a Service Worker that drains `submit`-kind records on the `wearurway-order-sync` Background Sync tag, so retries continue with no tab open (Chromium-based browsers). It skips `spec`-kind records because Service Workers can't render Canvas; those wait for the next time a tab is open.
-- Net effect: once the customer taps Complete Order, the success screen appears within ~200 ms, and the order is guaranteed to reach R2 + Telegram even if they immediately close the tab, lock the phone, or stay offline for hours.
-- `GET /api/admin/order-files` — list all orders with their stored file metadata (admin)
-- `DELETE /api/admin/order-files/:orderId` — delete order files from Object Storage + remove record (admin)
-
-### Assets
-
-- Logo: `artifacts/wearurway/public/logo.png` (1024x1024) — if absent, a styled text wordmark is shown
-- Size images: `artifacts/wearurway/public/size-images/` — naming format: `Boxy-Fit-Small.png`, `Regular-Fit-Medium.png`, etc.
-
-### Text Tool & Custom Fonts
-
-- **Font files**: `artifacts/wearurway/public/fonts/` — drop `.woff2` files here
-- **Font config**: `artifacts/wearurway/src/config/fonts.ts` — single file to add/remove/rename fonts in the UI
-- To add a font: copy `.woff2` to `public/fonts/` and add an entry to `CUSTOM_FONTS` in `fonts.ts`
-- Text layers are rendered to PNG via Canvas API and added as standard DesignLayers
-- Supports: font selection, text color, outline (color + thickness), arc/curve (-300° to +300°)
-
-### Admin Panel
-
-- URL: `/admin`
-- Default password: `admin123`
-- Auth: Bearer token stored in `localStorage` as `wearurway_admin_token`
-- Features:
-  - **Products tab**: Add/edit/delete products, toggle available/coming-soon, upload product image
-  - **Fits tab**: Add/edit/delete fits (linked to a product), toggle available/coming-soon, grouped by product
-  - **Colors tab**: Add/delete colors per fit with hex color picker; fit filter tabs
-  - **Sizes tab**: Add/edit/delete sizes per fit with width/height/image; fit filter tabs
-  - **Mockups tab**: Automatically generates required mockup image filenames from product, fit, color, and side using `product_fit_color_front.png` / `product_fit_color_back.png` format; images served from Object Storage
-  - **Settings tab**: Admin can edit shipping company, shipping description, shipping price, front-only price, front+back price, InstaPay phone, Telegram chat ID, and Telegram bot token
-  - **Order Files tab**: List and delete order file records (files stored in Object Storage under `orders/<orderId>/`)
-- Size availability, coming-soon state, and height/weight ranges are included in the API schema so admin controls persist and storefront size cards remain selectable when available.
-- `POST /api/create-order` returns the `WW-xxxxx` order ID immediately, then asynchronously saves order documents (payment proof, export PNGs) to Object Storage under `orders/<orderId>/` and sends a Telegram summary message.
-- Image uploads: click "Upload" in any image field → stored in Object Storage, URL auto-filled
-
-
-### Phone Validation (Egyptian)
-
-- Checkout phone field strips non-digits as user types and limits to 11 chars
-- Validates against `/^01[0125]\d{8}$/` (must be 11 digits, starting with 010/011/012/015)
-- Cleaned phone (digits-only) is sent to the API
-
+- Skills: `react-vite`, `database`, `environment-secrets`, `workflows`, `package-management`
