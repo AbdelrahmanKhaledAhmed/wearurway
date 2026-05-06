@@ -575,6 +575,30 @@ export default function Design() {
     };
   }, [onTouchStart, onTouchMove, onTouchEnd, bbox]);
 
+  // Same pinch handlers wired to the mobile clip area.
+  useEffect(() => {
+    const el = mobileClipAreaRef.current;
+    if (!el) return;
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [onTouchStart, onTouchMove, onTouchEnd]);
+
+  // Prevent the browser's native pinch-zoom on the design page.
+  // We intercept any 2-finger touchmove at the document level so the OS
+  // never gets a chance to zoom the viewport.
+  useEffect(() => {
+    const prevent = (e: TouchEvent) => {
+      if (e.touches.length >= 2) e.preventDefault();
+    };
+    document.addEventListener("touchmove", prevent, { passive: false });
+    return () => document.removeEventListener("touchmove", prevent);
+  }, []);
 
   const selectedLayer = layers.find(l => l.id === selectedLayerId) ?? null;
 
@@ -1652,6 +1676,7 @@ export default function Design() {
         className="relative w-full overflow-hidden shrink-0"
         style={{
           height: `${Math.round((mockupSize * (4 / 3) + 16) * viewZoom)}px`,
+          touchAction: "none",
           backgroundImage:
             "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
           backgroundSize: "24px 24px",
