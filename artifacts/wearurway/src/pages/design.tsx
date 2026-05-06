@@ -139,10 +139,24 @@ export default function Design() {
   const touchDragRef = useRef<DragState | null>(null);
 
   const clipAreaRef = useRef<HTMLDivElement>(null);
+  const mobileClipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const pinchRef = useRef<{ dist: number } | null>(null);
   const mockupSizeRef = useRef(mockupSize);
   useEffect(() => { mockupSizeRef.current = mockupSize; }, [mockupSize]);
+
+  // Returns the dimensions of whichever clip area is currently visible.
+  // On desktop the desktop ref is active; on mobile the mobile ref is active.
+  // Falls back to mockupSize-based dimensions when both are zero (e.g. SSR).
+  const getClipDims = useCallback(() => {
+    const desktop = clipAreaRef.current;
+    const mobile = mobileClipAreaRef.current;
+    const active = (desktop && desktop.offsetWidth > 0) ? desktop : mobile;
+    return {
+      w: active?.offsetWidth || mockupSizeRef.current,
+      h: active?.offsetHeight || Math.round(mockupSizeRef.current * 4 / 3),
+    };
+  }, []);
 
   // Per-user visual zoom for the mockup. Purely a CSS scale on the mockup
   // viewer — does NOT change mockupSize (the canonical coordinate space),
@@ -626,9 +640,7 @@ export default function Design() {
       try {
         const objectUrl = URL.createObjectURL(file);
 
-        const clipEl2 = clipAreaRef.current;
-        const clipW = clipEl2?.offsetWidth ?? 200;
-        const clipH = clipEl2?.offsetHeight ?? 200;
+        const { w: clipW, h: clipH } = getClipDims();
 
         const natural = await new Promise<{ w: number; h: number }>((resolve) => {
           const img = new Image();
@@ -681,9 +693,7 @@ export default function Design() {
     setUploading(true);
     try {
       const objectUrl = URL.createObjectURL(file);
-      const clipEl2 = clipAreaRef.current;
-      const clipW = clipEl2?.offsetWidth ?? 200;
-      const clipH = clipEl2?.offsetHeight ?? 200;
+      const { w: clipW, h: clipH } = getClipDims();
       const natural = await new Promise<{ w: number; h: number }>((resolve) => {
         const img = new Image();
         img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
@@ -767,9 +777,7 @@ export default function Design() {
         return;
       }
 
-      const clipEl2 = clipAreaRef.current;
-      const clipW = clipEl2?.offsetWidth ?? 200;
-      const clipH = clipEl2?.offsetHeight ?? 200;
+      const { w: clipW, h: clipH } = getClipDims();
 
       const natural = await new Promise<{ w: number; h: number }>((resolve) => {
         const img = new Image();
@@ -844,9 +852,7 @@ export default function Design() {
   const handleAddTextBlob = useCallback(async (blob: Blob, opts: TextLayerOptions) => {
     setShowTextModal(false);
     const objectUrl = URL.createObjectURL(blob);
-    const clipEl = clipAreaRef.current;
-    const clipW = clipEl?.offsetWidth ?? 200;
-    const clipH = clipEl?.offsetHeight ?? 200;
+    const { w: clipW, h: clipH } = getClipDims();
     const natural = await new Promise<{ w: number; h: number }>((resolve) => {
       const img = new Image();
       img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
@@ -1727,6 +1733,7 @@ export default function Design() {
 
             {/* Design clip area (touch-draggable layers) */}
             <div
+              ref={mobileClipAreaRef}
               style={{
                 position: "absolute",
                 left: `${effectiveBbox.x}%`,
