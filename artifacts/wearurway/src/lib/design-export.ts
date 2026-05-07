@@ -32,30 +32,25 @@ interface GenerateDesignExportFilesOptions {
   frontMockupImage?: string;
   backMockupImage?: string;
 }
+
 const MIN_LAYER_SIZE = 10;
 const CHECKOUT_EXPORT_DB = "wearurway-checkout-exports";
 const CHECKOUT_EXPORT_STORE = "exports";
 const CHECKOUT_EXPORT_KEY = "latest";
-// Floor for export scale: even with no layers (e.g. shirt-mockup only), we
-// still upscale this much so the result is print-quality.
-const EXPORT_SCALE_MIN = 8;
-// Hard cap on export scale to stay well under browser canvas-size limits
-// (most browsers are safe up to ~16384px per dimension).
-const EXPORT_SCALE_MAX = 16;
 
-function computeExportScale(
-  loaded: { l: DesignLayerForExport; img: HTMLImageElement }[],
-): number {
-  let scale = EXPORT_SCALE_MIN;
-  for (const { l: layer, img } of loaded) {
-    const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
-    const natW = layer.naturalWidth ?? img.naturalWidth ?? 0;
-    const natH = layer.naturalHeight ?? img.naturalHeight ?? 0;
-    if (natW > 0 && displayW > 0) scale = Math.max(scale, natW / displayW);
-    if (natH > 0 && displayH > 0) scale = Math.max(scale, natH / displayH);
-  }
-  return Math.min(EXPORT_SCALE_MAX, Math.ceil(scale));
-}
+// ── Fixed export base — identical on every device (desktop, mobile, tablet).
+// Layer coordinates are remapped from clipW/clipH space into this fixed space
+// so output is always the same regardless of the screen the user designed on.
+const EXPORT_BASE_W = 800;
+const EXPORT_BASE_H = Math.round(EXPORT_BASE_W * (4 / 3)); // 1067
+
+// design-front/back.png — maximum scale for DTF printing.
+// 800 × 16 = 12,800px — far exceeds any print requirement.
+const DESIGN_EXPORT_SCALE = 16;
+
+// mockup-front/back.png — reference preview only, not sent to printer.
+// 800 × 4 = 3,200px — sharp enough to review, reasonable file size.
+const MOCKUP_EXPORT_SCALE = 4;
 
 async function loadImg(src: string): Promise<HTMLImageElement | null> {
   try {
@@ -166,6 +161,114 @@ function canvasToDataUrl(canvas: HTMLCanvasElement): Promise<string | null> {
   });
 }
 
+// ── Core composite renderer.
+// clipW/clipH = the coordinate space layers were placed in (from getClipDims).
+// Layers are remapped into EXPORT_BASE_W×EXPORT_BASE_H before scaling,
+// so output is identical regardless of device.
+async function renderComposite(
+  visibleLayers: DesignLayerForExport[],
+  shirtImg: HTMLImageElement | null,
+  clipW: number,
+  clipH: number,
+  designScale: number,
+  mockupScale: number,
+): Promise<{ designCanvas: HTMLCanvasElement | null; mockupCanvas: HTMLCanvasElement | null }> {
+  // Remap layer coords from clip space → fixed export base space
+  const coordScaleX = EXPORT_BASE_W / clipW;
+  const coordScaleY = EXPORT_BASE_H / clipH;
+
+  const loaded = (
+    await Promise.all(visibleLayers.map(async l => ({ l, img: await loadImg(l.imageUrl) })))
+  ).filter((x): x is { l: DesignLayerForExport; img: HTMLImageElement } => x.img !== null);
+
+  if (loaded.length < visibleLayers.length) {
+    console.warn(
+      `[design-export] ${visibleLayers.length - loaded.length} of ${visibleLayers.length} layers failed to load`,
+    );
+  }
+
+  // ── Design canvas (high res, DTF print quality) ──
+  let designCanvas: HTMLCanvasElement | null = null;
+  if (loaded.length > 0) {
+    const dW = EXPORT_BASE_W * designScale;
+    const dH = EXPORT_BASE_H * designScale;
+    const dc = document.createElement("canvas");
+    dc.width = dW;
+    dc.height = dH;
+    const dctx = dc.getContext("2d")!;
+    dctx.imageSmoothingEnabled = true;
+    dctx.imageSmoothingQuality = "high";
+    dctx.scale(designScale, designScale);
+
+    for (const { l: layer, img } of loaded) {
+      const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
+      // Remap position from clip space → export base space
+      const exportW = displayW * coordScaleX;
+      const exportH = displayH * coordScaleY;
+      const cx = (layer.x + displayW / 2) * coordScaleX;
+      const cy = (layer.y + displayH / 2) * coordScaleY;
+      const angle = (layer.rotation * Math.PI) / 180;
+      dctx.save();
+      dctx.translate(cx, cy);
+      dctx.rotate(angle);
+      // Draw the image at its native resolution mapped to export space
+      dctx.drawImage(img, -exportW / 2, -exportH / 2, exportW, exportH);
+      dctx.restore();
+    }
+
+    // Clip to shirt shape
+    if (shirtImg) {
+      dctx.globalCompositeOperation = "destination-in";
+      drawContain(dctx, shirtImg, EXPORT_BASE_W, EXPORT_BASE_H);
+      dctx.globalCompositeOperation = "source-over";
+    }
+
+    designCanvas = trimCanvas(dc);
+  }
+
+  // ── Mockup canvas (lower res, reference preview) ──
+  let mockupCanvas: HTMLCanvasElement | null = null;
+  if (shirtImg) {
+    const mW = EXPORT_BASE_W * mockupScale;
+    const mH = EXPORT_BASE_H * mockupScale;
+    const mc = document.createElement("canvas");
+    mc.width = mW;
+    mc.height = mH;
+    const mctx = mc.getContext("2d")!;
+    mctx.imageSmoothingEnabled = true;
+    mctx.imageSmoothingQuality = "high";
+    mctx.scale(mockupScale, mockupScale);
+
+    // Draw shirt
+    drawContain(mctx, shirtImg, EXPORT_BASE_W, EXPORT_BASE_H);
+
+    // Draw layers on top at mockup scale
+    if (loaded.length > 0) {
+      for (const { l: layer, img } of loaded) {
+        const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
+        const exportW = displayW * coordScaleX;
+        const exportH = displayH * coordScaleY;
+        const cx = (layer.x + displayW / 2) * coordScaleX;
+        const cy = (layer.y + displayH / 2) * coordScaleY;
+        const angle = (layer.rotation * Math.PI) / 180;
+        mctx.save();
+        mctx.translate(cx, cy);
+        mctx.rotate(angle);
+        mctx.drawImage(img, -exportW / 2, -exportH / 2, exportW, exportH);
+        mctx.restore();
+      }
+      // Clip layers to shirt shape
+      mctx.globalCompositeOperation = "destination-in";
+      drawContain(mctx, shirtImg, EXPORT_BASE_W, EXPORT_BASE_H);
+      mctx.globalCompositeOperation = "source-over";
+    }
+
+    mockupCanvas = trimCanvas(mc);
+  }
+
+  return { designCanvas, mockupCanvas };
+}
+
 export async function generateDesignExportFiles({
   frontLayers,
   backLayers,
@@ -180,8 +283,8 @@ export async function generateDesignExportFiles({
   const backVisible = backLayers.filter(l => l.visible);
   const resolvedClipW = clipW ?? mockupSize;
   const resolvedClipH = clipH ?? Math.round(mockupSize * (4 / 3));
-  
-  const exportComposite = async (
+
+  const exportSide = async (
     visibleLayers: DesignLayerForExport[],
     shirtUrl: string | undefined,
     designFileName: string,
@@ -189,78 +292,24 @@ export async function generateDesignExportFiles({
   ) => {
     const shirtImg = shirtUrl ? await loadImg(shirtUrl) : null;
     if (visibleLayers.length === 0 && !shirtImg) return;
-    const loaded = (
-      await Promise.all(visibleLayers.map(async l => ({ l, img: await loadImg(l.imageUrl) })))
-    ).filter((x): x is { l: DesignLayerForExport; img: HTMLImageElement } => x.img !== null);
-    if (visibleLayers.length > 0 && loaded.length < visibleLayers.length) {
-      console.warn(
-        `[design-export] ${visibleLayers.length - loaded.length} of ${visibleLayers.length} ` +
-          `layers failed to load for ${designFileName}`,
-      );
+
+    const { designCanvas, mockupCanvas } = await renderComposite(
+      visibleLayers, shirtImg, resolvedClipW, resolvedClipH,
+      DESIGN_EXPORT_SCALE, MOCKUP_EXPORT_SCALE,
+    );
+
+    if (designCanvas) {
+      const dataUrl = await canvasToDataUrl(designCanvas);
+      if (dataUrl) files.push({ fileName: designFileName, dataUrl });
     }
-
-    // Render at a high-resolution scale so the file is print-quality while
-    // still matching the on-screen layout exactly. All layout math stays in
-    // the canonical mockup-space; we expand the physical canvas and use
-    // ctx.scale() so source images (e.g. 1200x1200 photos) are drawn at full
-    // native resolution. The scale is chosen adaptively from the largest
-    // uploaded image so we never waste detail and never blow up memory.
-    const scale = computeExportScale(loaded);
-    const baseW = resolvedClipW;
-    const baseH = resolvedClipH;
-    const exportW = baseW * scale;
-    const exportH = baseH * scale;
-    const makeCanvas = () => {
-      const c = document.createElement("canvas");
-      c.width = exportW;
-      c.height = exportH;
-      return c;
-    };
-    const setupCtx = (c: HTMLCanvasElement) => {
-      const ctx = c.getContext("2d")!;
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.scale(scale, scale);
-      return ctx;
-    };
-
-    const layerCanvas = makeCanvas();
-    const layerCtx = setupCtx(layerCanvas);
-    for (const { l: layer, img } of loaded) {
-      const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
-      const cx = layer.x + displayW / 2;
-      const cy = layer.y + displayH / 2;
-      const angle = (layer.rotation * Math.PI) / 180;
-      layerCtx.save();
-      layerCtx.translate(cx, cy);
-      layerCtx.rotate(angle);
-      layerCtx.drawImage(img, -displayW / 2, -displayH / 2, displayW, displayH);
-      layerCtx.restore();
-    }
-
-    if (shirtImg) {
-      layerCtx.globalCompositeOperation = "destination-in";
-      drawContain(layerCtx, shirtImg, baseW, baseH);
-      layerCtx.globalCompositeOperation = "source-over";
-    }
-
-    if (loaded.length > 0) {
-      const designDataUrl = await canvasToDataUrl(trimCanvas(layerCanvas));
-      if (designDataUrl) files.push({ fileName: designFileName, dataUrl: designDataUrl });
-    }
-
-    if (shirtImg) {
-      const finalCanvas = makeCanvas();
-      const finalCtx = setupCtx(finalCanvas);
-      drawContain(finalCtx, shirtImg, baseW, baseH);
-      finalCtx.drawImage(layerCanvas, 0, 0, baseW, baseH);
-      const mockupDataUrl = await canvasToDataUrl(trimCanvas(finalCanvas));
-      if (mockupDataUrl) files.push({ fileName: mockupFileName, dataUrl: mockupDataUrl });
+    if (mockupCanvas) {
+      const dataUrl = await canvasToDataUrl(mockupCanvas);
+      if (dataUrl) files.push({ fileName: mockupFileName, dataUrl });
     }
   };
 
-  await exportComposite(frontVisible, frontMockupImage, "design-front.png", "mockup-front.png");
-  await exportComposite(backVisible, backMockupImage, "design-back.png", "mockup-back.png");
+  await exportSide(frontVisible, frontMockupImage, "design-front.png", "mockup-front.png");
+  await exportSide(backVisible, backMockupImage, "design-back.png", "mockup-back.png");
   return files;
 }
 
@@ -279,7 +328,7 @@ export async function generateDesignExportBlobs({
   const resolvedClipW = clipW ?? mockupSize;
   const resolvedClipH = clipH ?? Math.round(mockupSize * (4 / 3));
 
-  const exportComposite = async (
+  const exportSide = async (
     visibleLayers: DesignLayerForExport[],
     shirtUrl: string | undefined,
     designFileName: string,
@@ -287,77 +336,24 @@ export async function generateDesignExportBlobs({
   ) => {
     const shirtImg = shirtUrl ? await loadImg(shirtUrl) : null;
     if (visibleLayers.length === 0 && !shirtImg) return;
-    const loaded = (
-      await Promise.all(visibleLayers.map(async l => ({ l, img: await loadImg(l.imageUrl) })))
-    ).filter((x): x is { l: DesignLayerForExport; img: HTMLImageElement } => x.img !== null);
-    if (visibleLayers.length > 0 && loaded.length < visibleLayers.length) {
-      console.warn(
-        `[design-export] ${visibleLayers.length - loaded.length} of ${visibleLayers.length} ` +
-          `layers failed to load for ${designFileName}`,
-      );
+
+    const { designCanvas, mockupCanvas } = await renderComposite(
+      visibleLayers, shirtImg, resolvedClipW, resolvedClipH,
+      DESIGN_EXPORT_SCALE, MOCKUP_EXPORT_SCALE,
+    );
+
+    if (designCanvas) {
+      const blob = await canvasToBlob(designCanvas);
+      if (blob) files.push({ fileName: designFileName, blob, contentType: "image/png" });
     }
-
-    // Render at a high-resolution scale so the file is print-quality while
-    // still matching the on-screen layout exactly. All layout math stays in
-    // the canonical mockup-space; we expand the physical canvas and use
-    // ctx.scale() so source images are drawn at full native resolution. The
-    // scale is chosen adaptively from the largest uploaded image.
-    const scale = computeExportScale(loaded);
-    const baseW = resolvedClipW;
-    const baseH = resolvedClipH;
-    const exportW = baseW * scale;
-    const exportH = baseH * scale;
-    const makeCanvas = () => {
-      const c = document.createElement("canvas");
-      c.width = exportW;
-      c.height = exportH;
-      return c;
-    };
-    const setupCtx = (c: HTMLCanvasElement) => {
-      const ctx = c.getContext("2d")!;
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.scale(scale, scale);
-      return ctx;
-    };
-
-    const layerCanvas = makeCanvas();
-    const layerCtx = setupCtx(layerCanvas);
-    for (const { l: layer, img } of loaded) {
-      const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
-      const cx = layer.x + displayW / 2;
-      const cy = layer.y + displayH / 2;
-      const angle = (layer.rotation * Math.PI) / 180;
-      layerCtx.save();
-      layerCtx.translate(cx, cy);
-      layerCtx.rotate(angle);
-      layerCtx.drawImage(img, -displayW / 2, -displayH / 2, displayW, displayH);
-      layerCtx.restore();
-    }
-
-    if (shirtImg) {
-      layerCtx.globalCompositeOperation = "destination-in";
-      drawContain(layerCtx, shirtImg, baseW, baseH);
-      layerCtx.globalCompositeOperation = "source-over";
-    }
-
-    if (loaded.length > 0) {
-      const designBlob = await canvasToBlob(trimCanvas(layerCanvas));
-      if (designBlob) files.push({ fileName: designFileName, blob: designBlob, contentType: "image/png" });
-    }
-
-    if (shirtImg) {
-      const finalCanvas = makeCanvas();
-      const finalCtx = setupCtx(finalCanvas);
-      drawContain(finalCtx, shirtImg, baseW, baseH);
-      finalCtx.drawImage(layerCanvas, 0, 0, baseW, baseH);
-      const mockupBlob = await canvasToBlob(trimCanvas(finalCanvas));
-      if (mockupBlob) files.push({ fileName: mockupFileName, blob: mockupBlob, contentType: "image/png" });
+    if (mockupCanvas) {
+      const blob = await canvasToBlob(mockupCanvas);
+      if (blob) files.push({ fileName: mockupFileName, blob, contentType: "image/png" });
     }
   };
 
-  await exportComposite(frontVisible, frontMockupImage, "design-front.png", "mockup-front.png");
-  await exportComposite(backVisible, backMockupImage, "design-back.png", "mockup-back.png");
+  await exportSide(frontVisible, frontMockupImage, "design-front.png", "mockup-front.png");
+  await exportSide(backVisible, backMockupImage, "design-back.png", "mockup-back.png");
   return files;
 }
 
