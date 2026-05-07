@@ -170,6 +170,8 @@ export async function generateDesignExportFiles({
   frontLayers,
   backLayers,
   mockupSize,
+  clipW,
+  clipH,
   frontMockupImage,
   backMockupImage,
 }: GenerateDesignExportFilesOptions): Promise<DesignExportFile[]> {
@@ -178,7 +180,6 @@ export async function generateDesignExportFiles({
   const backVisible = backLayers.filter(l => l.visible);
   const resolvedClipW = clipW ?? mockupSize;
   const resolvedClipH = clipH ?? Math.round(mockupSize * (4 / 3));
-
   
   const exportComposite = async (
     visibleLayers: DesignLayerForExport[],
@@ -205,8 +206,8 @@ export async function generateDesignExportFiles({
     // native resolution. The scale is chosen adaptively from the largest
     // uploaded image so we never waste detail and never blow up memory.
     const scale = computeExportScale(loaded);
-    const baseW = Math.round(clipW ?? mockupSize);
-    const baseH = Math.round(clipH ?? mockupSize * (4 / 3));
+    const baseW = resolvedClipW;
+    const baseH = resolvedClipH;
     const exportW = baseW * scale;
     const exportH = baseH * scale;
     const makeCanvas = () => {
@@ -267,6 +268,8 @@ export async function generateDesignExportBlobs({
   frontLayers,
   backLayers,
   mockupSize,
+  clipW,
+  clipH,
   frontMockupImage,
   backMockupImage,
 }: GenerateDesignExportFilesOptions): Promise<DesignExportBlob[]> {
