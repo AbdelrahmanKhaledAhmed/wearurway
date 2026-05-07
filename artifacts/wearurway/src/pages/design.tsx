@@ -76,6 +76,8 @@ export default function Design() {
   const [localBackBbox, setLocalBackBbox] = useState<BBox | null>(null);
   const [mockupSize, setMockupSize] = useState(320);
   const [mockupOffsetY, setMockupOffsetY] = useState(0);
+  // Add this state near the other state declarations in design.tsx
+  const [orderModalClipDims, setOrderModalClipDims] = useState<{w: number, h: number} | null>(null);
 
   const [frontLayers, setFrontLayers] = useState<DesignLayer[]>([]);
   const [backLayers, setBackLayers] = useState<DesignLayer[]>([]);
@@ -1569,7 +1571,11 @@ export default function Design() {
           {/* ── ORDER NOW ── */}
           <div className="px-6 py-5 border-b border-border">
             <button
-              onClick={() => setShowOrderModal(true)}
+              onClick={() => {
+                const dims = getClipDims();
+                setOrderModalClipDims(dims);
+                setShowOrderModal(true);
+              }}
               className="w-full py-4 font-black uppercase text-sm tracking-[0.2em] transition-all active:scale-[0.98] hover:opacity-90"
               style={{ backgroundColor: "#f5c842", color: "#0d0d0d", letterSpacing: "0.25em" }}
             >
@@ -2027,6 +2033,8 @@ export default function Design() {
       selectedColor={selectedColor}
       selectedSize={selectedSize}
       viewZoom={viewZoom}
+      clipW={orderModalClipDims?.w ?? mockupSize}
+      clipH={orderModalClipDims?.h ?? Math.round(mockupSize * 4 / 3)}
     />
 
     </>
