@@ -232,7 +232,7 @@ async function renderComposite(
       dctx.globalCompositeOperation = "source-over";
     }
 
-    designCanvas = dc;
+    designCanvas = trimCanvas(dc);
   }
 
   // ── Mockup canvas (lower res, reference preview) ──
