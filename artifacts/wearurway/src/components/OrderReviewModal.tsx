@@ -306,52 +306,46 @@ export default function OrderReviewModal({
   const { mockup: m, mockupSize: ms } = previewParamsRef.current;
   const fl = resolvedLayersRef.current?.front ?? previewParamsRef.current.frontLayers;
   const bl = resolvedLayersRef.current?.back ?? previewParamsRef.current.backLayers;
+
+  // Strip imageUrl from layers before saving to sessionStorage —
+  // the full base64 data is too large for sessionStorage quota.
+  // The export files in IndexedDB are the source of truth for the server.
+  const stripUrl = (layers: DesignLayer[]) =>
+    layers.map(l => ({ ...l, imageUrl: "" }));
+
   const designJob = {
-    frontLayers: fl,
-    backLayers: bl,
+    frontLayers: stripUrl(fl),
+    backLayers: stripUrl(bl),
     mockupSize: ms,
     frontMockupImage: m?.front?.image,
     backMockupImage:  m?.back?.image,
   };
+
   try {
-    let exportFiles: DesignExportFile[] = [];
     try {
-      console.log("[confirm] waiting for export files...");
-      exportFiles = exportFilesPromiseRef.current
+      const exportFiles = exportFilesPromiseRef.current
         ? await exportFilesPromiseRef.current
         : [];
-      console.log("[confirm] export files count:", exportFiles.length);
-      exportFiles.forEach(f => console.log("[confirm] file:", f.fileName, "size:", f.dataUrl?.length));
-    } catch (err) {
-      console.error("[confirm] export promise threw:", err);
-    }
-
-    if (exportFiles.length > 0) {
-      try {
-        console.log("[confirm] saving to IndexedDB...");
+      if (exportFiles.length > 0) {
         await saveCheckoutExportFiles(exportFiles);
-        console.log("[confirm] IndexedDB save OK");
-      } catch (err) {
-        console.error("[confirm] IndexedDB save failed:", err);
       }
+    } catch (err) {
+      console.warn("[order-review] export save failed, proceeding anyway:", err);
     }
 
-    console.log("[confirm] writing sessionStorage...");
     sessionStorage.setItem("ww_checkout_design_job", JSON.stringify(designJob));
     sessionStorage.setItem("ww_checkout_front",      frontPreview ?? "");
     sessionStorage.setItem("ww_checkout_back",       backPreview  ?? "");
     sessionStorage.setItem("ww_checkout_price",      String(price));
-    console.log("[confirm] navigating to checkout...");
     setLocation("/checkout");
     onClose();
   } catch (err) {
-    console.error("[confirm] OUTER catch:", err);
+    console.error("[order-review] checkout failed:", err);
     setPrepareError("Could not open checkout. Please try again.");
   } finally {
     setConfirming(false);
   }
 };
-
   return (
     <AnimatePresence>
       {isOpen && (
