@@ -27,10 +27,11 @@ interface GenerateDesignExportFilesOptions {
   frontLayers: DesignLayerForExport[];
   backLayers: DesignLayerForExport[];
   mockupSize: number;
+  clipW?: number;
+  clipH?: number;
   frontMockupImage?: string;
   backMockupImage?: string;
 }
-
 const MIN_LAYER_SIZE = 10;
 const CHECKOUT_EXPORT_DB = "wearurway-checkout-exports";
 const CHECKOUT_EXPORT_STORE = "exports";
@@ -175,7 +176,10 @@ export async function generateDesignExportFiles({
   const files: DesignExportFile[] = [];
   const frontVisible = frontLayers.filter(l => l.visible);
   const backVisible = backLayers.filter(l => l.visible);
+  const resolvedClipW = clipW ?? mockupSize;
+  const resolvedClipH = clipH ?? Math.round(mockupSize * (4 / 3));
 
+  
   const exportComposite = async (
     visibleLayers: DesignLayerForExport[],
     shirtUrl: string | undefined,
@@ -201,8 +205,8 @@ export async function generateDesignExportFiles({
     // native resolution. The scale is chosen adaptively from the largest
     // uploaded image so we never waste detail and never blow up memory.
     const scale = computeExportScale(loaded);
-    const baseW = Math.round(mockupSize);
-    const baseH = Math.round(mockupSize * (4 / 3));
+    const baseW = Math.round(clipW ?? mockupSize);
+    const baseH = Math.round(clipH ?? mockupSize * (4 / 3));
     const exportW = baseW * scale;
     const exportH = baseH * scale;
     const makeCanvas = () => {
@@ -269,6 +273,8 @@ export async function generateDesignExportBlobs({
   const files: DesignExportBlob[] = [];
   const frontVisible = frontLayers.filter(l => l.visible);
   const backVisible = backLayers.filter(l => l.visible);
+  const resolvedClipW = clipW ?? mockupSize;
+  const resolvedClipH = clipH ?? Math.round(mockupSize * (4 / 3));
 
   const exportComposite = async (
     visibleLayers: DesignLayerForExport[],
@@ -294,8 +300,8 @@ export async function generateDesignExportBlobs({
     // ctx.scale() so source images are drawn at full native resolution. The
     // scale is chosen adaptively from the largest uploaded image.
     const scale = computeExportScale(loaded);
-    const baseW = Math.round(mockupSize);
-    const baseH = Math.round(mockupSize * (4 / 3));
+    const baseW = resolvedClipW;
+    const baseH = resolvedClipH;
     const exportW = baseW * scale;
     const exportH = baseH * scale;
     const makeCanvas = () => {
