@@ -35,8 +35,12 @@ export default function FuzzySelectPanel({
   const colorInputRef = useRef<HTMLInputElement>(null);
 
   const handleOpenBgRemover = () => {
-    onDownloadImage();
+    // Open the link first (must be synchronous in the click handler to avoid popup blockers)
     window.open("https://www.photoroom.com/tools/background-remover", "_blank", "noopener,noreferrer");
+    // Then trigger download — slight delay so the tab open isn't blocked
+    setTimeout(() => {
+      onDownloadImage();
+    }, 100);
   };
 
   const updateColor = (color: string) => {
