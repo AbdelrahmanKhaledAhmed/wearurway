@@ -43,7 +43,9 @@ export default function FuzzySelectPanel({
   const handleBgRemoverConfirm = () => {
     setShowBgRemoverConfirm(false);
     onDownloadImage();
-    window.open("https://www.photoroom.com/tools/background-remover", "_blank", "noopener,noreferrer");
+    setTimeout(() => {
+      window.open("https://www.photoroom.com/tools/background-remover", "_blank", "noopener,noreferrer");
+    }, 1500);
   };
 
   const updateColor = (color: string) => {
