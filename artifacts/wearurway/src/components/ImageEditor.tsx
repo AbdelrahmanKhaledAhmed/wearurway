@@ -1068,17 +1068,21 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
             onDownloadImage={() => {
               const c = canvasRef.current;
               if (!c) return;
+              // Use jpeg for mobile gallery saving (iOS/Android save jpeg to Photos, png goes to Files)
+              const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+              const mimeType = isMobile ? "image/jpeg" : "image/png";
+              const ext = isMobile ? "jpg" : "png";
               c.toBlob(blob => {
                 if (!blob) return;
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;
-                a.download = "design.png";
+                a.download = `design.${ext}`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
                 setTimeout(() => URL.revokeObjectURL(url), 500);
-              }, "image/png");
+              }, mimeType, 0.95);
             }}
           />
         </div>
