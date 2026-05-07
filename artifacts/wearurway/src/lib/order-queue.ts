@@ -320,14 +320,23 @@ async function uploadExportFiles(
   for (const file of exportFiles) {
     if (!file.fileName || !file.dataUrl) continue;
     try {
-      // Convert base64 data URL → binary blob
-      const res = await fetch(file.dataUrl);
-      const blob = await res.blob();
+      // Convert base64 data URL → binary blob without using fetch()
+      // fetch(dataUrl) is unreliable on Safari iOS — use atob() instead.
+      const [header, base64] = file.dataUrl.split(",");
+      const mimeMatch = header.match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : "image/png";
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: mime });
+
       const uploadRes = await fetch(
         `/api/orders/${orderId}/documents/upload?fileName=${encodeURIComponent(file.fileName)}`,
         {
           method: "POST",
-          headers: { "Content-Type": blob.type || "image/png" },
+          headers: { "Content-Type": mime },
           body: blob,
         },
       );
