@@ -60,6 +60,33 @@ interface Props {
   clipH: number;
 }
 
+// ── Converts a blob: URL to a base64 data URL while the blob is still alive.
+// Blob URLs die on page navigation, so we must convert them before checkout.
+async function blobUrlToDataUrl(url: string): Promise<string> {
+  if (!url.startsWith("blob:")) return url;
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return url;
+  }
+}
+
+async function resolveLayerUrls(layers: DesignLayer[]): Promise<DesignLayer[]> {
+  return Promise.all(
+    layers.map(async (layer) => ({
+      ...layer,
+      imageUrl: await blobUrlToDataUrl(layer.imageUrl),
+    }))
+  );
+}
+
 async function loadCanvasImage(src?: string): Promise<HTMLImageElement | null> {
   if (!src) return null;
   try {
@@ -89,19 +116,6 @@ function drawImageContain(
   ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
 }
 
-// ─── KEY FIX ──────────────────────────────────────────────────────────────────
-// Layer x/y coordinates are stored relative to the clip-area's actual DOM size
-// at the time the user placed them (via getClipDims() in Design.tsx).
-//
-// On desktop: clip area = mockupSize × (mockupSize * 4/3)  ✓ always correct
-// On mobile:  clip area = min(viewport width, mockupSize) × proportional height
-//             because the mockup element is mockupSize px wide in the DOM but
-//             the viewport may be narrower, so only the visible portion is
-//             interactive. getClipDims() in Design.tsx returns the offsetWidth
-//             of the active clip area ref, which is the real rendered width.
-//
-// So the preview must scale from that same clip-area space → 600×800 canvas,
-// not from mockupSize-space → 600×800.
 async function generatePreview(
   sideLabel: "FRONT" | "BACK",
   mockupImage: string | undefined,
@@ -114,7 +128,6 @@ async function generatePreview(
   const W = 600;
   const H = 800;
 
-  // Scale from the space where layers were stored → preview canvas.
   const scaleX = W / clipW;
   const scaleY = H / clipH;
 
@@ -163,10 +176,6 @@ async function generatePreview(
   return canvas.toDataURL("image/png");
 }
 
-// Mirrors getClipDims() from Design.tsx.
-// Called once when the modal opens to capture the dimensions that were active
-// while the user was placing layers.
-
 export default function OrderReviewModal({
   isOpen, onClose,
   frontLayers, backLayers,
@@ -185,17 +194,16 @@ export default function OrderReviewModal({
     query: { enabled: !!fitId, queryKey: getGetSizesQueryKey(fitId) }
   });
 
-  const [step, setStep]                         = useState<"size" | "review">("size");
-  const [frontPreview, setFrontPreview]         = useState<string | null>(null);
-  const [backPreview, setBackPreview]           = useState<string | null>(null);
+  const [step, setStep]                             = useState<"size" | "review">("size");
+  const [frontPreview, setFrontPreview]             = useState<string | null>(null);
+  const [backPreview, setBackPreview]               = useState<string | null>(null);
   const [generatingPreviews, setGeneratingPreviews] = useState(false);
-  const [prepareError, setPrepareError]         = useState("");
-  const [confirming, setConfirming]             = useState(false);
+  const [prepareError, setPrepareError]             = useState("");
+  const [confirming, setConfirming]                 = useState(false);
 
-  const generatedRef        = useRef(false);
+  const generatedRef          = useRef(false);
   const exportFilesPromiseRef = useRef<Promise<DesignExportFile[]> | null>(null);
 
-  // Capture clip dims once when the modal opens (mirrors what Design.tsx used).
   const clipDimsRef = useRef<{ clipW: number; clipH: number }>({
     clipW: mockupSize,
     clipH: Math.round(mockupSize * 4 / 3),
@@ -207,7 +215,6 @@ export default function OrderReviewModal({
     ? (orderSettings?.frontBackPrice ?? 700)
     : (orderSettings?.frontOnlyPrice ?? 550);
 
-  // Stable ref always holding the latest props — lets generatePreviews be stable.
   const previewParamsRef = useRef({
     mockup, localFrontBbox, localBackBbox, frontLayers, backLayers, mockupSize, clipW, clipH,
   });
@@ -217,25 +224,43 @@ export default function OrderReviewModal({
     };
   });
 
-  // Stable — empty dep array intentional, reads live values from refs.
   const generatePreviews = useCallback(async () => {
     if (generatedRef.current) return;
     generatedRef.current = true;
     setGeneratingPreviews(true);
 
-    const { mockup: m, localFrontBbox: fb, localBackBbox: bb, frontLayers: fl, backLayers: bl, mockupSize: ms, clipW, clipH } = previewParamsRef.current;
+    const {
+      mockup: m,
+      localFrontBbox: fb,
+      localBackBbox: bb,
+      frontLayers: fl,
+      backLayers: bl,
+      mockupSize: ms,
+      clipW,
+      clipH,
+    } = previewParamsRef.current;
+
+    // ── Convert blob: URLs → base64 data URLs BEFORE anything else.
+    // Blob URLs are only alive in the current page session. Converting them
+    // now (while still on the design page) ensures the canvas export and
+    // preview both work, and that the data survives navigation to checkout.
+    const resolvedFl = await resolveLayerUrls(fl);
+    const resolvedBl = await resolveLayerUrls(bl);
 
     exportFilesPromiseRef.current = generateDesignExportFiles({
-      frontLayers: fl, backLayers: bl, mockupSize: ms,
-      clipW, clipH,
+      frontLayers: resolvedFl,
+      backLayers: resolvedBl,
+      mockupSize: ms,
+      clipW,
+      clipH,
       frontMockupImage: m?.front?.image,
       backMockupImage:  m?.back?.image,
     }).catch(err => { console.warn("[order-review] export failed", err); return []; });
 
     try {
       const [fp, bp] = await Promise.all([
-        generatePreview("FRONT", m?.front?.image, fb, fl, ms, clipW, clipH),
-        generatePreview("BACK",  m?.back?.image,  bb, bl, ms, clipW, clipH),
+        generatePreview("FRONT", m?.front?.image, fb, resolvedFl, ms, clipW, clipH),
+        generatePreview("BACK",  m?.back?.image,  bb, resolvedBl, ms, clipW, clipH),
       ]);
       setFrontPreview(fp);
       setBackPreview(bp);
@@ -247,7 +272,6 @@ export default function OrderReviewModal({
 
   useEffect(() => {
     if (isOpen) {
-      // Capture clip dims right now, while the design canvas is still rendered.
       clipDimsRef.current = { clipW, clipH };
       setStep("size");
       generatedRef.current = false;
@@ -275,12 +299,16 @@ export default function OrderReviewModal({
     setConfirming(true);
     const { mockup: m, frontLayers: fl, backLayers: bl, mockupSize: ms } = previewParamsRef.current;
     const designJob = {
-      frontLayers: fl, backLayers: bl, mockupSize: ms,
+      frontLayers: fl,
+      backLayers: bl,
+      mockupSize: ms,
       frontMockupImage: m?.front?.image,
       backMockupImage:  m?.back?.image,
     };
     try {
-      const exportFiles = exportFilesPromiseRef.current ? await exportFilesPromiseRef.current : [];
+      const exportFiles = exportFilesPromiseRef.current
+        ? await exportFilesPromiseRef.current
+        : [];
       if (exportFiles.length > 0) {
         try { await saveCheckoutExportFiles(exportFiles); }
         catch (err) { console.warn("[order-review] could not persist export files", err); }
