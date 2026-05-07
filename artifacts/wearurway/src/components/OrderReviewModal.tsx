@@ -93,11 +93,19 @@ async function generatePreview(
   sideLayers: DesignLayer[],
   mockupSize: number,
 ): Promise<string | null> {
+  // Preview canvas size — always fixed at 600×800.
   const W = 600;
   const H = 800;
 
-  const scaleX = W / mockupSize;
-  const scaleY = H / (mockupSize * (4 / 3));
+  // The canonical coordinate space is mockupSize × (mockupSize * 4/3).
+  // Layer x/y/width/height are stored in this space regardless of whether
+  // the user was on desktop or mobile (viewZoom is purely a CSS scale and
+  // does NOT affect the stored layer coordinates).
+  // So we only need to scale from mockupSize-space → 600×800 preview-space.
+  const canvasW = mockupSize;
+  const canvasH = mockupSize * (4 / 3);
+  const scaleX = W / canvasW;
+  const scaleY = H / canvasH;
 
   const shirtImg = await loadCanvasImage(mockupImage);
 
@@ -113,13 +121,17 @@ async function generatePreview(
     const img = await loadCanvasImage(layer.imageUrl);
     if (!img) continue;
     const { width: dispW, height: dispH } = getLayerDisplaySize(layer);
+
+    // Center of the layer in canvas-space, then scaled to preview-space.
     const cx    = (layer.x + dispW / 2) * scaleX;
     const cy    = (layer.y + dispH / 2) * scaleY;
     const angle = (layer.rotation * Math.PI) / 180;
+
     dctx.save();
     dctx.translate(cx, cy);
     dctx.rotate(angle);
-    dctx.drawImage(img,
+    dctx.drawImage(
+      img,
       -dispW * scaleX / 2,
       -dispH * scaleY / 2,
        dispW * scaleX,
@@ -128,12 +140,14 @@ async function generatePreview(
     dctx.restore();
   }
 
+  // Clip the design to the shirt silhouette.
   if (shirtImg) {
     dctx.globalCompositeOperation = "destination-in";
     drawImageContain(dctx, shirtImg, 0, 0, W, H);
     dctx.globalCompositeOperation = "source-over";
   }
 
+  // Composite: dark background → shirt → clipped design.
   const canvas = document.createElement("canvas");
   canvas.width  = W;
   canvas.height = H;
@@ -173,44 +187,72 @@ export default function OrderReviewModal({
   const [generatingPreviews, setGeneratingPreviews] = useState(false);
   const [prepareError, setPrepareError] = useState("");
   const [confirming, setConfirming] = useState(false);
+
+  // ── FIX Bug 1: use a ref instead of a boolean state so generatePreviews
+  // doesn't need to be a useCallback dependency, which was causing the
+  // effect to re-fire and reset the modal on mobile. ──────────────────────
   const generatedRef = useRef(false);
-  // High-res export files (same ones the Export button on /design produces).
-  // We start rendering as soon as the user reaches the review step so the
-  // bytes are ready (or near-ready) by the time they click Confirm — they
-  // get persisted to IndexedDB and uploaded to R2 from /checkout.
+
   const exportFilesPromiseRef = useRef<Promise<DesignExportFile[]> | null>(null);
 
   const hasFront = frontLayers.some(l => l.visible);
-  const hasBack = backLayers.some(l => l.visible);
-  const price = hasFront && hasBack ? (orderSettings?.frontBackPrice ?? 700) : (orderSettings?.frontOnlyPrice ?? 550);
+  const hasBack  = backLayers.some(l => l.visible);
+  const price    = hasFront && hasBack
+    ? (orderSettings?.frontBackPrice ?? 700)
+    : (orderSettings?.frontOnlyPrice ?? 550);
 
+  // ── FIX Bug 1: stable ref that always holds the latest snapshot of props
+  // so generatePreviews itself never needs to change identity. ─────────────
+  const previewParamsRef = useRef({
+    mockup, localFrontBbox, localBackBbox, frontLayers, backLayers, mockupSize,
+  });
+  useEffect(() => {
+    previewParamsRef.current = {
+      mockup, localFrontBbox, localBackBbox, frontLayers, backLayers, mockupSize,
+    };
+  });
+
+  // Stable function reference — never changes, so it never triggers the
+  // useEffect below, eliminating the 2-second refresh loop on mobile.
   const generatePreviews = useCallback(async () => {
     if (generatedRef.current) return;
     generatedRef.current = true;
     setGeneratingPreviews(true);
-    // Kick off the high-res export in parallel — don't block previews on it.
+
+    const {
+      mockup: m,
+      localFrontBbox: fb,
+      localBackBbox: bb,
+      frontLayers: fl,
+      backLayers: bl,
+      mockupSize: ms,
+    } = previewParamsRef.current;
+
     exportFilesPromiseRef.current = generateDesignExportFiles({
-      frontLayers,
-      backLayers,
-      mockupSize,
-      frontMockupImage: mockup?.front?.image,
-      backMockupImage: mockup?.back?.image,
+      frontLayers: fl,
+      backLayers: bl,
+      mockupSize: ms,
+      frontMockupImage: m?.front?.image,
+      backMockupImage: m?.back?.image,
     }).catch((err) => {
       console.warn("[order-review] high-res export render failed", err);
       return [];
     });
+
     try {
       const [fp, bp] = await Promise.all([
-        generatePreview("FRONT", mockup?.front?.image, localFrontBbox, frontLayers, mockupSize),
-        generatePreview("BACK", mockup?.back?.image, localBackBbox, backLayers, mockupSize),
+        generatePreview("FRONT", m?.front?.image, fb, fl, ms),
+        generatePreview("BACK",  m?.back?.image,  bb, bl, ms),
       ]);
       setFrontPreview(fp);
       setBackPreview(bp);
     } finally {
       setGeneratingPreviews(false);
     }
-  }, [mockup, localFrontBbox, localBackBbox, frontLayers, backLayers, mockupSize]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — uses previewParamsRef for live values
 
+  // Reset when the modal opens.
   useEffect(() => {
     if (isOpen) {
       setStep("size");
@@ -223,6 +265,8 @@ export default function OrderReviewModal({
     }
   }, [isOpen]);
 
+  // Generate previews once when the user reaches the review step.
+  // generatePreviews is now stable so this never re-fires unexpectedly.
   useEffect(() => {
     if (step === "review") {
       generatePreviews();
@@ -238,18 +282,18 @@ export default function OrderReviewModal({
   const handleConfirm = async () => {
     setPrepareError("");
     setConfirming(true);
+
+    const { mockup: m, frontLayers: fl, backLayers: bl, mockupSize: ms } = previewParamsRef.current;
+
     const designJob = {
-      frontLayers,
-      backLayers,
-      mockupSize,
-      frontMockupImage: mockup?.front?.image,
-      backMockupImage: mockup?.back?.image,
+      frontLayers: fl,
+      backLayers: bl,
+      mockupSize: ms,
+      frontMockupImage: m?.front?.image,
+      backMockupImage:  m?.back?.image,
     };
 
     try {
-      // Wait for the high-res export render that started when we entered the
-      // review step, then persist the bytes to IndexedDB. /checkout reads
-      // them and ships them to the server as the order's R2 design files.
       const exportFiles = exportFilesPromiseRef.current
         ? await exportFilesPromiseRef.current
         : [];
@@ -262,9 +306,9 @@ export default function OrderReviewModal({
       }
 
       sessionStorage.setItem("ww_checkout_design_job", JSON.stringify(designJob));
-      sessionStorage.setItem("ww_checkout_front", frontPreview ?? "");
-      sessionStorage.setItem("ww_checkout_back", backPreview ?? "");
-      sessionStorage.setItem("ww_checkout_price", String(price));
+      sessionStorage.setItem("ww_checkout_front",      frontPreview ?? "");
+      sessionStorage.setItem("ww_checkout_back",       backPreview  ?? "");
+      sessionStorage.setItem("ww_checkout_price",      String(price));
       setLocation("/checkout");
       onClose();
     } catch {
@@ -285,6 +329,7 @@ export default function OrderReviewModal({
             className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
             onClick={onClose}
           />
+
           {/* ── Mobile: bottom sheet ── */}
           <motion.div
             initial={{ y: "100%" }}
@@ -295,7 +340,7 @@ export default function OrderReviewModal({
             style={{ maxHeight: "90vh" }}
             onClick={e => e.stopPropagation()}
           >
-            {/* drag handle — tapping also closes */}
+            {/* drag handle */}
             <div
               className="flex justify-center pt-3 pb-2 shrink-0 cursor-pointer"
               onClick={onClose}
@@ -313,10 +358,15 @@ export default function OrderReviewModal({
                   {step === "size" ? "Select Size" : "Review Order"}
                 </h2>
               </div>
-              <button onClick={onClose} className="text-white/40 hover:text-white transition-colors text-2xl leading-none font-light w-10 h-10 flex items-center justify-center">×</button>
+              <button
+                onClick={onClose}
+                className="text-white/40 hover:text-white transition-colors text-2xl leading-none font-light w-10 h-10 flex items-center justify-center"
+              >
+                ×
+              </button>
             </div>
 
-            {/* scrollable content — flex-1 + min-h-0 lets overflow work inside a flex column */}
+            {/* scrollable content */}
             <div className="flex-1 min-h-0 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
 
               {/* Size step */}
@@ -325,7 +375,9 @@ export default function OrderReviewModal({
                   <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase mb-4">Perfect your fit</p>
                   {sizesLoading ? (
                     <div className="grid grid-cols-2 gap-3">
-                      {[1,2,3,4].map(i => <div key={i} className="h-24 bg-white/5 animate-pulse border border-white/10" />)}
+                      {[1,2,3,4].map(i => (
+                        <div key={i} className="h-24 bg-white/5 animate-pulse border border-white/10" />
+                      ))}
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-3">
@@ -342,13 +394,17 @@ export default function OrderReviewModal({
                           }`}
                         >
                           <span className="text-xl font-black uppercase tracking-tight mb-1">{size.name}</span>
-                          <span className="text-[11px] font-mono text-white/60 mb-1">{size.realWidth} × {size.realHeight} cm</span>
+                          <span className="text-[11px] font-mono text-white/60 mb-1">
+                            {size.realWidth} × {size.realHeight} cm
+                          </span>
                           <div className="flex flex-col gap-0.5 text-[10px] text-white/40">
                             <span>{size.heightMin}–{size.heightMax} cm tall</span>
                             <span>{size.weightMin}–{size.weightMax} kg</span>
                           </div>
                           {size.comingSoon && (
-                            <span className="mt-2 px-2 py-0.5 bg-white/10 text-white/50 text-[10px] tracking-widest uppercase">Coming Soon</span>
+                            <span className="mt-2 px-2 py-0.5 bg-white/10 text-white/50 text-[10px] tracking-widest uppercase">
+                              Coming Soon
+                            </span>
                           )}
                         </motion.button>
                       ))}
@@ -361,10 +417,15 @@ export default function OrderReviewModal({
               {step === "review" && (
                 <div className="pb-10">
                   <div className="px-4 pt-4 pb-2">
-                    <button onClick={() => setStep("size")} className="text-[10px] tracking-[0.2em] text-white/40 hover:text-white uppercase transition-colors flex items-center gap-1.5">← Change Size</button>
+                    <button
+                      onClick={() => setStep("size")}
+                      className="text-[10px] tracking-[0.2em] text-white/40 hover:text-white uppercase transition-colors flex items-center gap-1.5"
+                    >
+                      ← Change Size
+                    </button>
                   </div>
 
-                  {/* Design previews — single column on mobile for better readability */}
+                  {/* Design previews */}
                   <div className="px-4 pt-2">
                     <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase mb-3">Design Preview</p>
                     <div className="flex gap-3">
@@ -422,7 +483,9 @@ export default function OrderReviewModal({
                   <div className="px-4 pt-5 flex items-end justify-between">
                     <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase">Total</p>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black tracking-tight" style={{ fontFamily: "monospace", color: "#f5c842" }}>{price}</span>
+                      <span className="text-3xl font-black tracking-tight" style={{ fontFamily: "monospace", color: "#f5c842" }}>
+                        {price}
+                      </span>
                       <span className="text-sm font-bold text-white/50 tracking-widest uppercase">EGP</span>
                     </div>
                   </div>
@@ -467,7 +530,12 @@ export default function OrderReviewModal({
                     {step === "size" ? "Select Size" : "Review Order"}
                   </h2>
                 </div>
-                <button onClick={onClose} className="text-white/40 hover:text-white transition-colors text-2xl leading-none font-light">×</button>
+                <button
+                  onClick={onClose}
+                  className="text-white/40 hover:text-white transition-colors text-2xl leading-none font-light"
+                >
+                  ×
+                </button>
               </div>
 
               {/* Size Selection Step */}
@@ -476,7 +544,9 @@ export default function OrderReviewModal({
                   <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase mb-6">Perfect your fit</p>
                   {sizesLoading ? (
                     <div className="grid grid-cols-2 gap-4">
-                      {[1,2,3,4].map(i => <div key={i} className="h-28 bg-white/5 animate-pulse border border-white/10" />)}
+                      {[1,2,3,4].map(i => (
+                        <div key={i} className="h-28 bg-white/5 animate-pulse border border-white/10" />
+                      ))}
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
@@ -494,13 +564,17 @@ export default function OrderReviewModal({
                           }`}
                         >
                           <span className="text-xl font-black uppercase tracking-tight mb-2">{size.name}</span>
-                          <span className="text-[11px] font-mono text-white/60 mb-2">{size.realWidth} × {size.realHeight} cm</span>
+                          <span className="text-[11px] font-mono text-white/60 mb-2">
+                            {size.realWidth} × {size.realHeight} cm
+                          </span>
                           <div className="flex flex-col gap-0.5 text-[10px] text-white/40">
                             <span>{size.heightMin}–{size.heightMax} cm tall</span>
                             <span>{size.weightMin}–{size.weightMax} kg</span>
                           </div>
                           {size.comingSoon && (
-                            <span className="mt-3 px-2 py-0.5 bg-white/10 text-white/50 text-[10px] tracking-widest uppercase">Coming Soon</span>
+                            <span className="mt-3 px-2 py-0.5 bg-white/10 text-white/50 text-[10px] tracking-widest uppercase">
+                              Coming Soon
+                            </span>
                           )}
                         </motion.button>
                       ))}
@@ -513,7 +587,12 @@ export default function OrderReviewModal({
               {step === "review" && (
                 <>
                   <div className="px-8 pt-5">
-                    <button onClick={() => setStep("size")} className="text-[10px] tracking-[0.2em] text-white/40 hover:text-white uppercase transition-colors flex items-center gap-1.5">← Change Size</button>
+                    <button
+                      onClick={() => setStep("size")}
+                      className="text-[10px] tracking-[0.2em] text-white/40 hover:text-white uppercase transition-colors flex items-center gap-1.5"
+                    >
+                      ← Change Size
+                    </button>
                   </div>
                   <div className="px-8 pt-4">
                     <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase mb-4">Design Preview</p>
@@ -545,8 +624,14 @@ export default function OrderReviewModal({
                     <div className="border border-white/10 divide-y divide-white/10">
                       {[
                         { label: "Product", value: selectedProduct?.name },
-                        { label: "Fit", value: selectedFit?.name },
-                        { label: "Color", value: selectedColor?.name, extra: selectedColor?.hex ? <div className="w-3.5 h-3.5 border border-white/20 mr-2" style={{ backgroundColor: selectedColor.hex }} /> : null },
+                        { label: "Fit",     value: selectedFit?.name },
+                        {
+                          label: "Color",
+                          value: selectedColor?.name,
+                          extra: selectedColor?.hex
+                            ? <div className="w-3.5 h-3.5 border border-white/20 mr-2" style={{ backgroundColor: selectedColor.hex }} />
+                            : null,
+                        },
                         { label: "Size", value: selectedSize?.name },
                       ].map(row => (
                         <div key={row.label} className="flex justify-between items-center px-5 py-3.5">
@@ -562,7 +647,9 @@ export default function OrderReviewModal({
                   <div className="px-8 pt-6 flex items-end justify-between">
                     <p className="text-[10px] tracking-[0.25em] text-white/40 uppercase">Total</p>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-black tracking-tight" style={{ fontFamily: "monospace", color: "#f5c842" }}>{price}</span>
+                      <span className="text-4xl font-black tracking-tight" style={{ fontFamily: "monospace", color: "#f5c842" }}>
+                        {price}
+                      </span>
                       <span className="text-sm font-bold text-white/50 tracking-widest uppercase">EGP</span>
                     </div>
                   </div>
