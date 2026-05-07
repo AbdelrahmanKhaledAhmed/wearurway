@@ -314,27 +314,38 @@ export default function OrderReviewModal({
     backMockupImage:  m?.back?.image,
   };
   try {
-    // Wait for export files and save to IndexedDB — but never let this crash checkout
+    let exportFiles: DesignExportFile[] = [];
     try {
-      const exportFiles = exportFilesPromiseRef.current
+      console.log("[confirm] waiting for export files...");
+      exportFiles = exportFilesPromiseRef.current
         ? await exportFilesPromiseRef.current
         : [];
-      if (exportFiles.length > 0) {
-        await saveCheckoutExportFiles(exportFiles);
-      }
+      console.log("[confirm] export files count:", exportFiles.length);
+      exportFiles.forEach(f => console.log("[confirm] file:", f.fileName, "size:", f.dataUrl?.length));
     } catch (err) {
-      console.warn("[order-review] export save failed, proceeding anyway:", err);
+      console.error("[confirm] export promise threw:", err);
     }
 
-    // These are small (preview thumbnails + metadata) — safe for sessionStorage
+    if (exportFiles.length > 0) {
+      try {
+        console.log("[confirm] saving to IndexedDB...");
+        await saveCheckoutExportFiles(exportFiles);
+        console.log("[confirm] IndexedDB save OK");
+      } catch (err) {
+        console.error("[confirm] IndexedDB save failed:", err);
+      }
+    }
+
+    console.log("[confirm] writing sessionStorage...");
     sessionStorage.setItem("ww_checkout_design_job", JSON.stringify(designJob));
     sessionStorage.setItem("ww_checkout_front",      frontPreview ?? "");
     sessionStorage.setItem("ww_checkout_back",       backPreview  ?? "");
     sessionStorage.setItem("ww_checkout_price",      String(price));
+    console.log("[confirm] navigating to checkout...");
     setLocation("/checkout");
     onClose();
   } catch (err) {
-    console.error("[order-review] checkout navigation failed:", err);
+    console.error("[confirm] OUTER catch:", err);
     setPrepareError("Could not open checkout. Please try again.");
   } finally {
     setConfirming(false);
