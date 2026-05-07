@@ -211,10 +211,26 @@ async function renderComposite(
       dctx.save();
       dctx.translate(cx, cy);
       dctx.rotate(angle);
-      // Draw the image at its native resolution mapped to export space
-      dctx.drawImage(img, -exportW / 2, -exportH / 2, exportW, exportH);
+      // Always draw at the image's natural full resolution regardless of
+      // how small the user placed it on the mockup. This ensures a small
+      // chest logo exports at the same quality as a full-back design.
+      // We use the natural size scaled up by the design scale factor so
+      // the image is never downsampled below its original pixel count.
+      const natW = img.naturalWidth;
+      const natH = img.naturalHeight;
+      const aspect = natW / natH;
+      // Use whichever is larger: the display size or the native resolution.
+      // Compare by area so we always pick the bigger representation while
+      // keeping aspect ratio locked — never distort the image.
+      const nativeExportW = natW / designScale;
+      const nativeExportH = natH / designScale;
+      const useNative = (nativeExportW * nativeExportH) > (exportW * exportH);
+      const drawW = useNative ? nativeExportW : exportW;
+      const drawH = drawW / aspect;
+      dctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
       dctx.restore();
     }
+
 
     // Clip to shirt shape
     if (shirtImg) {
