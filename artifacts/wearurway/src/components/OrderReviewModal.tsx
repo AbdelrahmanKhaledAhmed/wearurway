@@ -164,19 +164,10 @@ async function generatePreview(
 // Called once when the modal opens to capture the dimensions that were active
 // while the user was placing layers.
 function getEffectiveClipDims(mockupSize: number): { clipW: number; clipH: number } {
-  if (typeof window === "undefined") {
-    return { clipW: mockupSize, clipH: Math.round(mockupSize * 4 / 3) };
-  }
-  const isMobile = window.innerWidth < 768;
-  if (!isMobile) {
-    // Desktop: clip area is exactly mockupSize × (mockupSize * 4/3).
-    return { clipW: mockupSize, clipH: Math.round(mockupSize * (4 / 3)) };
-  }
-  // Mobile: the clip area element is mockupSize px wide in the DOM, but the
-  // viewport may be narrower. The browser clips overflow so the user only
-  // sees/interacts with min(viewport, mockupSize) pixels.
-  const visibleW = Math.min(window.innerWidth, mockupSize);
-  return { clipW: visibleW, clipH: Math.round(visibleW * (4 / 3)) };
+  return {
+    clipW: mockupSize,
+    clipH: Math.round(mockupSize * (4 / 3)),
+  };
 }
 
 export default function OrderReviewModal({
