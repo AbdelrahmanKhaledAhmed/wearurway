@@ -2026,6 +2026,7 @@ export default function Design() {
       selectedFit={selectedFit}
       selectedColor={selectedColor}
       selectedSize={selectedSize}
+      viewZoom={viewZoom}
     />
 
     </>
