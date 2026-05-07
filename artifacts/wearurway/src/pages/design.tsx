@@ -1017,10 +1017,13 @@ export default function Design() {
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
+      const dims = getClipDims();
       const files = await generateDesignExportFiles({
         frontLayers,
         backLayers,
         mockupSize,
+        clipW: dims.w,
+        clipH: dims.h,
         frontMockupImage: mockup?.front?.image,
         backMockupImage: mockup?.back?.image,
       });
