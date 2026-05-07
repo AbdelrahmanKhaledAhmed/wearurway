@@ -34,13 +34,16 @@ export default function FuzzySelectPanel({
   const [showPicker,  setShowPicker]  = useState(false);
   const colorInputRef = useRef<HTMLInputElement>(null);
 
+  const [showBgRemoverConfirm, setShowBgRemoverConfirm] = useState(false);
+
   const handleOpenBgRemover = () => {
-    // Open the link first (must be synchronous in the click handler to avoid popup blockers)
+    setShowBgRemoverConfirm(true);
+  };
+
+  const handleBgRemoverConfirm = () => {
+    setShowBgRemoverConfirm(false);
+    onDownloadImage();
     window.open("https://www.photoroom.com/tools/background-remover", "_blank", "noopener,noreferrer");
-    // Then trigger download — slight delay so the tab open isn't blocked
-    setTimeout(() => {
-      onDownloadImage();
-    }, 100);
   };
 
   const updateColor = (color: string) => {
@@ -77,6 +80,39 @@ export default function FuzzySelectPanel({
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#0d0d0d" }}>
+
+      {/* ── BG Remover Confirm Modal ── */}
+      {showBgRemoverConfirm && (
+        <div className="fixed inset-0 z-[200] flex items-end justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
+          onClick={() => setShowBgRemoverConfirm(false)}
+        >
+          <div className="w-full max-w-sm rounded-2xl p-5 mb-4"
+            style={{ background: "linear-gradient(135deg,rgba(30,15,50,0.98),rgba(15,5,30,0.98))", border: "1px solid rgba(168,85,247,0.4)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-2" style={{ color: "#c48cff" }}>
+              Background Remover
+            </p>
+            <p className="text-sm text-white/80 leading-relaxed mb-4">
+              Do you want to download your image and open the background remover tool?
+            </p>
+            <button
+              onClick={handleBgRemoverConfirm}
+              className="w-full py-3.5 rounded-xl text-[13px] font-black uppercase tracking-widest transition-all active:scale-[0.98] mb-2"
+              style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff" }}
+            >
+              Yes, Download & Open →
+            </button>
+            <button
+              onClick={() => setShowBgRemoverConfirm(false)}
+              className="w-full py-2 text-[10px] uppercase tracking-widest text-white/30"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Header ── */}
       <div className="px-5 pt-5 pb-4 border-b shrink-0" style={{ borderColor: "rgba(168,85,247,0.15)" }}>
