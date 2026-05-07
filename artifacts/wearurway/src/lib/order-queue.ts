@@ -309,9 +309,55 @@ async function hydrateDesignJob(
 }
 
 /**
- * Hand the entire order off to the server in a single tiny POST. Once the
- * server returns 200 it owns the rest: render → upload → notify. The client
- * has zero further work, so we drop the local spec.
+ * Upload each export file individually as raw binary to the documents/upload
+ * endpoint which supports large files (60MB limit). This avoids hitting the
+ * Express JSON body limit on /create-order when sending large base64 PNGs.
+ */
+async function uploadExportFiles(
+  orderId: string,
+  exportFiles: QueuedOrderFile[],
+): Promise<void> {
+  for (const file of exportFiles) {
+    if (!file.fileName || !file.dataUrl) continue;
+    try {
+      // Convert base64 data URL → binary blob
+      const res = await fetch(file.dataUrl);
+      const blob = await res.blob();
+      const uploadRes = await fetch(
+        `/api/orders/${orderId}/documents/upload?fileName=${encodeURIComponent(file.fileName)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": blob.type || "image/png" },
+          body: blob,
+        },
+      );
+      if (!uploadRes.ok) {
+        console.warn(
+          `[order-queue] Failed to upload ${file.fileName}: HTTP ${uploadRes.status}`,
+        );
+      } else {
+        console.log(`[order-queue] Uploaded ${file.fileName} OK`);
+      }
+    } catch (err) {
+      console.warn(`[order-queue] Error uploading ${file.fileName}:`, err);
+    }
+  }
+}
+
+/**
+ * Hand the entire order off to the server.
+ *
+ * Step 1 — POST order metadata (customer info + designJob) to /create-order.
+ *           Export files are NOT included here — the JSON body must stay small
+ *           (under the default Express 1 MB JSON limit).
+ *
+ * Step 2 — Upload each export PNG individually as raw binary via the
+ *           /documents/upload endpoint which accepts up to 60 MB per file.
+ *           Files land in R2 under orders/{orderId}/ exactly like before.
+ *
+ * Once Step 1 returns 200 the server owns the order. Step 2 failures are
+ * logged but do NOT fail the order — the server still has the designJob
+ * fallback renderer if any export file is missing.
  */
 async function uploadLayersAndSubmit(record: QueuedOrderSpecRecord): Promise<SubmitResult> {
   let designJob: CreateOrderDesignJob | undefined;
@@ -319,8 +365,6 @@ async function uploadLayersAndSubmit(record: QueuedOrderSpecRecord): Promise<Sub
     try {
       designJob = await hydrateDesignJob(record.designJob);
     } catch (err) {
-      // Layer uploads can fail for transient reasons (network drop, server
-      // hiccup) — keep retrying.
       return {
         ok: false,
         error: err instanceof Error ? err.message : String(err),
@@ -329,20 +373,30 @@ async function uploadLayersAndSubmit(record: QueuedOrderSpecRecord): Promise<Sub
     }
   }
 
+  // Step 1 — POST metadata only (no export files — they are too large for JSON).
   const payload: QueuedOrderPayload = {
     orderId: record.orderId,
     ...record.customer,
     paymentProof: record.paymentProof,
     designJob,
-    exportFiles: record.exportFiles,
+    exportFiles: undefined,
     feedback: record.feedback,
   };
 
-  return doFetch("/api/create-order", {
+  const orderResult = await doFetch("/api/create-order", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+
+  if (!orderResult.ok) return orderResult;
+
+  // Step 2 — Upload export files as raw binary (non-blocking for order success).
+  if (record.exportFiles && record.exportFiles.length > 0) {
+    await uploadExportFiles(record.orderId, record.exportFiles);
+  }
+
+  return { ok: true, retriable: false };
 }
 
 async function doFetch(input: RequestInfo, init: RequestInit): Promise<SubmitResult> {
@@ -385,7 +439,6 @@ async function processSpecRecord(record: QueuedOrderSpecRecord): Promise<void> {
   if (processInFlight.has(record.id)) return;
   processInFlight.add(record.id);
   try {
-    // Reload the latest copy so attempts/lastError stay accurate across runs.
     const fresh = await getRecord(record.id);
     const current = fresh && fresh.kind === "spec" ? fresh : record;
 
@@ -398,9 +451,6 @@ async function processSpecRecord(record: QueuedOrderSpecRecord): Promise<void> {
       await bumpAttempt(current.id, result.error ?? "Unknown error").catch(() => {});
       current.attempts += 1;
       if (!result.retriable) {
-        // 4xx from the server — payload is structurally bad and retrying
-        // won't help. Drop the record so we don't loop forever.
-        // eslint-disable-next-line no-console
         console.error(
           "[order-queue] Order dropped non-retriably:",
           current.orderId,
@@ -428,14 +478,10 @@ function backoff(attempt: number): number {
 }
 
 /**
- * Foreground submission. Saves the spec for durability, renders the design
- * exports, and POSTs the full payload to `/api/create-order`. Resolves only
- * after the server returns 200, by which point the order is guaranteed
- * (uploads + Telegram are now the server's responsibility, not the client's).
- *
- * On a retriable failure (network down, 5xx) the spec stays in IndexedDB and
- * the background worker / Service Worker Background Sync keep retrying — the
- * customer is told their order is saved and will go through automatically.
+ * Foreground submission. Saves the spec for durability, then POSTs the order
+ * metadata to /create-order and uploads export files separately. Resolves only
+ * after the server returns 200 for the order creation, by which point the
+ * order is guaranteed (uploads + Telegram are now the server's responsibility).
  */
 export async function submitOrderAndWait(
   args: SaveSpecArgs,
@@ -454,9 +500,6 @@ export async function submitOrderAndWait(
   const result = await uploadLayersAndSubmit(record);
 
   if (result.ok) {
-    // Server has the full payload (customer + payment proof + rendered design
-    // files) in its outbox. We can drop the local record — the order is now
-    // entirely the server's responsibility.
     await removeQueuedOrder(record.id).catch(() => {});
     return { orderId };
   }
@@ -471,7 +514,6 @@ export async function submitOrderAndWait(
     );
   }
 
-  // Non-retriable (4xx). Drop the record so we don't loop.
   await removeQueuedOrder(record.id).catch(() => {});
   throw new Error(result.error ?? "Could not place order");
 }
@@ -493,10 +535,7 @@ export async function flushQueuedOrders(): Promise<void> {
     if (record.kind === "spec") {
       void processSpecRecord(record).catch(() => {});
     } else {
-      // Legacy record from a previous version of the queue. Drop it so the
-      // queue doesn't loop forever on a payload shape we no longer process.
       void removeQueuedOrder(record.id).catch(() => {});
-      // eslint-disable-next-line no-console
       console.warn("[order-queue] Dropping legacy submit record:", record.id);
     }
   }
