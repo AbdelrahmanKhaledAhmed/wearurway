@@ -216,7 +216,15 @@ async function renderComposite(
       // chest logo exports at the same quality as a full-back design.
       // We use the natural size scaled up by the design scale factor so
       // the image is never downsampled below its original pixel count.
-      dctx.drawImage(img, -exportW / 2, -exportH / 2, exportW, exportH);
+      const scaleUp = Math.max(1, img.naturalWidth / (exportW * designScale));
+      dctx.scale(1 / scaleUp, 1 / scaleUp);
+      dctx.drawImage(
+        img,
+        (-exportW / 2) * scaleUp,
+        (-exportH / 2) * scaleUp,
+        exportW * scaleUp,
+        exportH * scaleUp,
+      );
       dctx.restore();
     }
 
