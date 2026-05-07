@@ -203,6 +203,8 @@ export default function OrderReviewModal({
 
   const generatedRef          = useRef(false);
   const exportFilesPromiseRef = useRef<Promise<DesignExportFile[]> | null>(null);
+  const resolvedLayersRef = useRef<{ front: DesignLayer[]; back: DesignLayer[] } | null>(null); // ADD THIS
+
 
   const clipDimsRef = useRef<{ clipW: number; clipH: number }>({
     clipW: mockupSize,
@@ -246,6 +248,8 @@ export default function OrderReviewModal({
     // preview both work, and that the data survives navigation to checkout.
     const resolvedFl = await resolveLayerUrls(fl);
     const resolvedBl = await resolveLayerUrls(bl);
+    resolvedLayersRef.current = { front: resolvedFl, back: resolvedBl }; // ADD THIS
+
 
     exportFilesPromiseRef.current = generateDesignExportFiles({
       frontLayers: resolvedFl,
@@ -280,6 +284,8 @@ export default function OrderReviewModal({
       setPrepareError("");
       setConfirming(false);
       exportFilesPromiseRef.current = null;
+      resolvedLayersRef.current = null; // ADD THIS
+
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -297,7 +303,9 @@ export default function OrderReviewModal({
   const handleConfirm = async () => {
     setPrepareError("");
     setConfirming(true);
-    const { mockup: m, frontLayers: fl, backLayers: bl, mockupSize: ms } = previewParamsRef.current;
+    const { mockup: m, mockupSize: ms } = previewParamsRef.current;
+    const fl = resolvedLayersRef.current?.front ?? previewParamsRef.current.frontLayers;
+    const bl = resolvedLayersRef.current?.back ?? previewParamsRef.current.backLayers;
     const designJob = {
       frontLayers: fl,
       backLayers: bl,
