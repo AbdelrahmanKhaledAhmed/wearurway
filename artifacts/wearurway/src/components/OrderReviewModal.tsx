@@ -228,6 +228,7 @@ export default function OrderReviewModal({
 
     exportFilesPromiseRef.current = generateDesignExportFiles({
       frontLayers: fl, backLayers: bl, mockupSize: ms,
+      clipW, clipH,
       frontMockupImage: m?.front?.image,
       backMockupImage:  m?.back?.image,
     }).catch(err => { console.warn("[order-review] export failed", err); return []; });
