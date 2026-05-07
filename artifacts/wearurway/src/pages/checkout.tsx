@@ -130,20 +130,11 @@ export default function Checkout() {
         ? (JSON.parse(designJobText) as CreateOrderDesignJob)
         : undefined;
 
-      // 1. Read the (small) payment proof to a data URL. This is the only
-      //    blocking I/O the customer waits for — typically <200ms even on
-      //    a phone, since it's just a screenshot.
       const paymentProof =
         payment === "instapay" && proofFile
           ? { fileName: proofFile.name, dataUrl: await fileToDataUrl(proofFile) }
           : undefined;
 
-      // 1b. Pull the high-resolution design PNGs that the OrderReviewModal
-      //     rendered (same renderer as the on-screen Export button). When
-      //     present these go straight to R2 verbatim — the server skips its
-      //     lower-res sharp render. If they're missing for any reason
-      //     (older client, render failure) we still send the designJob so
-      //     the server can render server-side as a fallback.
       let exportFiles: { fileName: string; dataUrl: string }[] | undefined;
       try {
         const stored = await loadCheckoutExportFiles();
@@ -177,13 +168,6 @@ export default function Checkout() {
         backImage: backPreview || undefined,
       };
 
-      // 2. Save the spec to IndexedDB for durability, render the design
-      //    export PNGs, then POST to /api/create-order and AWAIT the
-      //    response. The "Placing Order…" loading state stays on screen for
-      //    the entire duration. Resolves only after the server returns
-      //    HTTP 200 with an orderId; on any failure the spec stays in the
-      //    queue so the background worker / Service Worker can retry, and
-      //    the error is surfaced to the customer.
       const { orderId: newOrderId } = await submitOrderAndWait({
         customer,
         paymentProof,
@@ -192,20 +176,12 @@ export default function Checkout() {
         feedback: feedback.trim() || undefined,
       });
 
-      // 3. Clear sessionStorage so a refresh doesn't re-prepare the same
-      //    design — the order is now safely on the server.
       sessionStorage.removeItem("ww_checkout_front");
       sessionStorage.removeItem("ww_checkout_back");
       sessionStorage.removeItem("ww_checkout_price");
       sessionStorage.removeItem("ww_checkout_design_job");
-      // High-res export files are durably saved on the server now too.
       void clearCheckoutExportFiles().catch(() => {});
 
-      // 4. The server has confirmed the order. Show the success screen with
-      //    the confirmed orderId. The server-side outbox continues to
-      //    upload files to object storage and send the Telegram
-      //    notification in the background after responding, so the
-      //    customer doesn't wait for those.
       setOrderId(newOrderId);
       setSubmitting(false);
       setSubmitted(true);
@@ -271,10 +247,108 @@ export default function Checkout() {
           <h1 className="text-3xl font-black uppercase tracking-[0.08em]" style={{ fontFamily: "monospace" }}>Checkout</h1>
         </div>
 
+        {/* On mobile: flex-col so order matters. On desktop: flex-row side by side. */}
         <div className="flex flex-col lg:flex-row gap-10">
 
-          {/* ── LEFT COLUMN ── */}
-          <div className="flex-1 space-y-8">
+          {/* ── RIGHT COLUMN (shown first on mobile via order-first, second on desktop) ── */}
+          <div className="w-full lg:w-[380px] shrink-0 space-y-6 order-first lg:order-last">
+
+            {/* Design Previews */}
+            <section>
+              <SectionLabel>Your Design</SectionLabel>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Front", src: frontPreview },
+                  { label: "Back",  src: backPreview },
+                ].map(({ label, src }) => (
+                  <div key={label}>
+                    <div
+                      className="aspect-[3/4] border border-white/8 overflow-hidden flex items-center justify-center"
+                      style={{ backgroundColor: "#111" }}
+                    >
+                      {src && (
+                        <img src={src} alt={label} className="w-full h-full object-cover" />
+                      )}
+                    </div>
+                    <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] text-center mt-1.5 font-bold">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Pricing breakdown */}
+            <section>
+              <SectionLabel>Order Summary</SectionLabel>
+              <div className="border border-white/10 divide-y divide-white/10">
+                {selectedProduct && (
+                  <SummaryRow label="Product" value={selectedProduct.name} />
+                )}
+                {selectedFit && (
+                  <SummaryRow label="Fit" value={selectedFit.name} />
+                )}
+                {selectedColor && (
+                  <SummaryRow
+                    label="Color"
+                    value={
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-3 h-3 border border-white/20" style={{ backgroundColor: selectedColor.hex }} />
+                        <span>{selectedColor.name}</span>
+                      </div>
+                    }
+                  />
+                )}
+                {selectedSize && (
+                  <SummaryRow label="Size" value={selectedSize.name} />
+                )}
+
+                <div className="px-5 py-3.5 flex justify-between items-center">
+                  <span className="text-[10px] tracking-[0.2em] text-white/40 uppercase">Design</span>
+                  <span className="text-xs font-bold">{productPrice} EGP</span>
+                </div>
+                <div className="px-5 py-3.5 flex justify-between items-center">
+                  <span className="text-[10px] tracking-[0.2em] text-white/40 uppercase">Shipping</span>
+                  <span className="text-xs font-bold" style={{ color: shippingCost === 0 ? "#4ade80" : "white" }}>
+                    {shippingCost === 0 ? "FREE" : `${shippingCost} EGP`}
+                  </span>
+                </div>
+                <div className="px-5 py-4 flex justify-between items-center bg-white/[0.03]">
+                  <span className="text-[10px] tracking-[0.2em] text-white/60 uppercase font-bold">Total</span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black" style={{ fontFamily: "monospace", color: "#f5c842" }}>{total}</span>
+                    <span className="text-xs font-bold text-white/40 uppercase">EGP</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Complete Order — desktop only */}
+            <div className="hidden lg:block pt-4 mt-2">
+              <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleCompleteOrderClick} />
+              {submitError && <p className="text-xs text-red-400 mt-3">{submitError}</p>}
+              <div className="mt-3 flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setShowRefundPolicy(true)}
+                  className="text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
+                >
+                  Refund Policy
+                </button>
+                <span className="text-white/20">·</span>
+                <a
+                  href={`https://wa.me/20${(orderSettings?.contactPhone || orderSettings?.instaPayPhone || "01069383482").replace(/^0/, "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
+                >
+                  Contact Us
+                </a>
+              </div>
+            </div>
+
+          </div>
+
+          {/* ── LEFT COLUMN (shown second on mobile, first on desktop) ── */}
+          <div className="flex-1 space-y-8 order-last lg:order-first">
 
             {/* Delivery Form */}
             <section>
@@ -416,7 +490,7 @@ export default function Checkout() {
               </div>
             </section>
 
-            {/* Complete Order — mobile visible */}
+            {/* Complete Order — mobile only */}
             <div className="lg:hidden pt-6 mt-2 border-t border-white/10">
               <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleCompleteOrderClick} />
               {submitError && <p className="text-xs text-red-400 mt-3">{submitError}</p>}
@@ -442,102 +516,6 @@ export default function Checkout() {
 
           </div>
 
-          {/* ── RIGHT COLUMN ── */}
-          <div className="w-full lg:w-[380px] shrink-0 space-y-6">
-
-            {/* Design Previews */}
-            <section>
-              <SectionLabel>Your Design</SectionLabel>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Front", src: frontPreview },
-                  { label: "Back",  src: backPreview },
-                ].map(({ label, src }) => (
-                  <div key={label}>
-                    <div
-                      className="aspect-[3/4] border border-white/8 overflow-hidden flex items-center justify-center"
-                      style={{ backgroundColor: "#111" }}
-                    >
-                      {src && (
-                        <img src={src} alt={label} className="w-full h-full object-cover" />
-                      )}
-                    </div>
-                    <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] text-center mt-1.5 font-bold">{label}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* Pricing breakdown */}
-            <section>
-              <SectionLabel>Order Summary</SectionLabel>
-              <div className="border border-white/10 divide-y divide-white/10">
-                {selectedProduct && (
-                  <SummaryRow label="Product" value={selectedProduct.name} />
-                )}
-                {selectedFit && (
-                  <SummaryRow label="Fit" value={selectedFit.name} />
-                )}
-                {selectedColor && (
-                  <SummaryRow
-                    label="Color"
-                    value={
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-3 h-3 border border-white/20" style={{ backgroundColor: selectedColor.hex }} />
-                        <span>{selectedColor.name}</span>
-                      </div>
-                    }
-                  />
-                )}
-                {selectedSize && (
-                  <SummaryRow label="Size" value={selectedSize.name} />
-                )}
-
-                <div className="px-5 py-3.5 flex justify-between items-center">
-                  <span className="text-[10px] tracking-[0.2em] text-white/40 uppercase">Design</span>
-                  <span className="text-xs font-bold">{productPrice} EGP</span>
-                </div>
-                <div className="px-5 py-3.5 flex justify-between items-center">
-                  <span className="text-[10px] tracking-[0.2em] text-white/40 uppercase">Shipping</span>
-                  <span className="text-xs font-bold" style={{ color: shippingCost === 0 ? "#4ade80" : "white" }}>
-                    {shippingCost === 0 ? "FREE" : `${shippingCost} EGP`}
-                  </span>
-                </div>
-                <div className="px-5 py-4 flex justify-between items-center bg-white/[0.03]">
-                  <span className="text-[10px] tracking-[0.2em] text-white/60 uppercase font-bold">Total</span>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-2xl font-black" style={{ fontFamily: "monospace", color: "#f5c842" }}>{total}</span>
-                    <span className="text-xs font-bold text-white/40 uppercase">EGP</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Complete Order — desktop */}
-            <div className="hidden lg:block pt-4 mt-2">
-              <CompleteOrderButton total={total} submitting={submitting} onSubmit={handleCompleteOrderClick} />
-              {submitError && <p className="text-xs text-red-400 mt-3">{submitError}</p>}
-              <div className="mt-3 flex items-center justify-center gap-4">
-                <button
-                  type="button"
-                  onClick={() => setShowRefundPolicy(true)}
-                  className="text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
-                >
-                  Refund Policy
-                </button>
-                <span className="text-white/20">·</span>
-                <a
-                  href={`https://wa.me/20${(orderSettings?.contactPhone || orderSettings?.instaPayPhone || "01069383482").replace(/^0/, "")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
-                >
-                  Contact Us
-                </a>
-              </div>
-            </div>
-
-          </div>
         </div>
       </div>
 
