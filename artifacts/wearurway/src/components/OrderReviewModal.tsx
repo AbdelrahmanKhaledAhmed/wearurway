@@ -301,38 +301,45 @@ export default function OrderReviewModal({
   };
 
   const handleConfirm = async () => {
-    setPrepareError("");
-    setConfirming(true);
-    const { mockup: m, mockupSize: ms } = previewParamsRef.current;
-    const fl = resolvedLayersRef.current?.front ?? previewParamsRef.current.frontLayers;
-    const bl = resolvedLayersRef.current?.back ?? previewParamsRef.current.backLayers;
-    const designJob = {
-      frontLayers: fl,
-      backLayers: bl,
-      mockupSize: ms,
-      frontMockupImage: m?.front?.image,
-      backMockupImage:  m?.back?.image,
-    };
+  setPrepareError("");
+  setConfirming(true);
+  const { mockup: m, mockupSize: ms } = previewParamsRef.current;
+  const fl = resolvedLayersRef.current?.front ?? previewParamsRef.current.frontLayers;
+  const bl = resolvedLayersRef.current?.back ?? previewParamsRef.current.backLayers;
+  const designJob = {
+    frontLayers: fl,
+    backLayers: bl,
+    mockupSize: ms,
+    frontMockupImage: m?.front?.image,
+    backMockupImage:  m?.back?.image,
+  };
+  try {
+    // Wait for export files and save to IndexedDB — but never let this crash checkout
     try {
       const exportFiles = exportFilesPromiseRef.current
         ? await exportFilesPromiseRef.current
         : [];
       if (exportFiles.length > 0) {
-        try { await saveCheckoutExportFiles(exportFiles); }
-        catch (err) { console.warn("[order-review] could not persist export files", err); }
+        await saveCheckoutExportFiles(exportFiles);
       }
-      sessionStorage.setItem("ww_checkout_design_job", JSON.stringify(designJob));
-      sessionStorage.setItem("ww_checkout_front",      frontPreview ?? "");
-      sessionStorage.setItem("ww_checkout_back",       backPreview  ?? "");
-      sessionStorage.setItem("ww_checkout_price",      String(price));
-      setLocation("/checkout");
-      onClose();
-    } catch {
-      setPrepareError("Could not open checkout. Please try again.");
-    } finally {
-      setConfirming(false);
+    } catch (err) {
+      console.warn("[order-review] export save failed, proceeding anyway:", err);
     }
-  };
+
+    // These are small (preview thumbnails + metadata) — safe for sessionStorage
+    sessionStorage.setItem("ww_checkout_design_job", JSON.stringify(designJob));
+    sessionStorage.setItem("ww_checkout_front",      frontPreview ?? "");
+    sessionStorage.setItem("ww_checkout_back",       backPreview  ?? "");
+    sessionStorage.setItem("ww_checkout_price",      String(price));
+    setLocation("/checkout");
+    onClose();
+  } catch (err) {
+    console.error("[order-review] checkout navigation failed:", err);
+    setPrepareError("Could not open checkout. Please try again.");
+  } finally {
+    setConfirming(false);
+  }
+};
 
   return (
     <AnimatePresence>
