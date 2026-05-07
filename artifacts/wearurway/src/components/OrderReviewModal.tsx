@@ -209,11 +209,11 @@ export default function OrderReviewModal({
 
   // Stable ref always holding the latest props — lets generatePreviews be stable.
   const previewParamsRef = useRef({
-    mockup, localFrontBbox, localBackBbox, frontLayers, backLayers, mockupSize,
+    mockup, localFrontBbox, localBackBbox, frontLayers, backLayers, mockupSize, clipW, clipH,
   });
   useEffect(() => {
     previewParamsRef.current = {
-      mockup, localFrontBbox, localBackBbox, frontLayers, backLayers, mockupSize,
+      mockup, localFrontBbox, localBackBbox, frontLayers, backLayers, mockupSize, clipW, clipH,
     };
   });
 
@@ -223,8 +223,7 @@ export default function OrderReviewModal({
     generatedRef.current = true;
     setGeneratingPreviews(true);
 
-    const { mockup: m, localFrontBbox: fb, localBackBbox: bb, frontLayers: fl, backLayers: bl, mockupSize: ms } = previewParamsRef.current;
-    const { clipW, clipH } = clipDimsRef.current;
+    const { mockup: m, localFrontBbox: fb, localBackBbox: bb, frontLayers: fl, backLayers: bl, mockupSize: ms, clipW, clipH } = previewParamsRef.current;
 
     exportFilesPromiseRef.current = generateDesignExportFiles({
       frontLayers: fl, backLayers: bl, mockupSize: ms,
