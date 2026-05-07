@@ -46,11 +46,11 @@ const EXPORT_BASE_H = Math.round(EXPORT_BASE_W * (4 / 3)); // 1067
 
 // design-front/back.png — maximum scale for DTF printing.
 // 800 × 16 = 12,800px — far exceeds any print requirement.
-const DESIGN_EXPORT_SCALE = 16;
+const DESIGN_EXPORT_SCALE = 4;
 
 // mockup-front/back.png — reference preview only, not sent to printer.
 // 800 × 4 = 3,200px — sharp enough to review, reasonable file size.
-const MOCKUP_EXPORT_SCALE = 4;
+const MOCKUP_EXPORT_SCALE = 2;
 
 async function loadImg(src: string): Promise<HTMLImageElement | null> {
   try {
