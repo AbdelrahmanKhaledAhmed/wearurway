@@ -312,8 +312,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   // ── Pan state ───────────────────────────────────────────────────────────────
   const isMoving         = useRef(false);
   const moveStartRef     = useRef<{pointerX:number;pointerY:number;panX:number;panY:number}|null>(null);
-  const pinchEditorRef   = useRef<number|null>(null);
-  const [showToolPanel,  setShowToolPanel]  = useState(false);
+  const pinchEditorRef   = useRef<{dist:number;midX:number;midY:number}|null>(null);
 
   // ── History ─────────────────────────────────────────────────────────────────
   const undoRef          = useRef<CanvasSnapshot[]>([]);
@@ -768,12 +767,14 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       }
       isMoving.current=true;
       moveStartRef.current={pointerX:touch.clientX,pointerY:touch.clientY,panX:panRef.current.x,panY:panRef.current.y};
-    } else if (e.touches.length===2) {
+   } else if (e.touches.length===2) {
       isMoving.current=false;
       moveStartRef.current=null;
       const dx=e.touches[0].clientX-e.touches[1].clientX;
       const dy=e.touches[0].clientY-e.touches[1].clientY;
-      pinchEditorRef.current=Math.sqrt(dx*dx+dy*dy);
+      const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      pinchEditorRef.current={dist:Math.sqrt(dx*dx+dy*dy),midX,midY};
     }
   },[loaded,nativeSize,toolMode,getImageCoords,handleFuzzySelect]);
 
@@ -787,13 +788,16 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       const dx=e.touches[0].clientX-e.touches[1].clientX;
       const dy=e.touches[0].clientY-e.touches[1].clientY;
       const newDist=Math.sqrt(dx*dx+dy*dy);
-      const scale=newDist/pinchEditorRef.current;
-      pinchEditorRef.current=newDist;
+      const scale=newDist/pinchEditorRef.current.dist;
+      const cx=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      const cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      const mdx=cx-pinchEditorRef.current.midX;
+      const mdy=cy-pinchEditorRef.current.midY;
+      pinchEditorRef.current={dist:newDist,midX:cx,midY:cy};
+      setPan(p=>({x:p.x+mdx,y:p.y+mdy}));
       const el=areaRef.current;
       if (el) {
         const rect=el.getBoundingClientRect();
-        const cx=(e.touches[0].clientX+e.touches[1].clientX)/2;
-        const cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
         applyZoom(zoomRef.current*scale,(cx-rect.left)/rect.width,(cy-rect.top)/rect.height);
       } else {
         applyZoom(zoomRef.current*scale);
