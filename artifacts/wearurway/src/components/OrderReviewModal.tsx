@@ -55,6 +55,7 @@ interface Props {
   selectedFit: { id: string; name: string } | null;
   selectedColor: { name: string; hex: string } | null;
   selectedSize: { name: string } | null;
+  viewZoom: number;
 }
 
 async function loadCanvasImage(src?: string): Promise<HTMLImageElement | null> {
@@ -163,10 +164,15 @@ async function generatePreview(
 // Mirrors getClipDims() from Design.tsx.
 // Called once when the modal opens to capture the dimensions that were active
 // while the user was placing layers.
-function getEffectiveClipDims(mockupSize: number): { clipW: number; clipH: number } {
+function getEffectiveClipDims(mockupSize: number, viewZoom: number): { clipW: number; clipH: number } {
+  // viewZoom is a CSS scale() on the mockup div. It visually enlarges the
+  // canvas but offsetWidth stays mockupSize. However the user placed layers
+  // relative to the zoomed visual, so we must scale the coordinate space
+  // by the same factor so the preview matches.
+  const z = viewZoom || 1;
   return {
-    clipW: mockupSize,
-    clipH: Math.round(mockupSize * (4 / 3)),
+    clipW: mockupSize / z,
+    clipH: Math.round((mockupSize / z) * (4 / 3)),
   };
 }
 
@@ -176,6 +182,7 @@ export default function OrderReviewModal({
   localFrontBbox, localBackBbox,
   mockup, mockupSize,
   selectedProduct, selectedFit, selectedColor,
+  viewZoom,
 }: Props) {
   const [, setLocation] = useLocation();
   const { selectedSize, setSize } = useCustomizer();
@@ -248,7 +255,7 @@ export default function OrderReviewModal({
   useEffect(() => {
     if (isOpen) {
       // Capture clip dims right now, while the design canvas is still rendered.
-      clipDimsRef.current = getEffectiveClipDims(mockupSize);
+      clipDimsRef.current = getEffectiveClipDims(mockupSize, viewZoom);
       setStep("size");
       generatedRef.current = false;
       setFrontPreview(null);
