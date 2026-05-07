@@ -215,26 +215,10 @@ async function renderComposite(
       // This guarantees the same pixel quality regardless of how small the user
       // placed it on the mockup. Then we stamp that onto the design canvas
       // at the correct display position/size.
-      const layerCanvas = document.createElement("canvas");
-      layerCanvas.width = img.naturalWidth;
-      layerCanvas.height = img.naturalHeight;
-      const lctx = layerCanvas.getContext("2d")!;
-      lctx.imageSmoothingEnabled = true;
-      lctx.imageSmoothingQuality = "high";
-      lctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
-
       dctx.save();
       dctx.translate(cx, cy);
       dctx.rotate(angle);
-      // Draw the full-res layer canvas at the display size on the design canvas.
-      // The browser downsamples from native→display using high quality Lanczos,
-      // preserving all detail. A small chest logo gets the same source pixels
-      // as a large back design — only the destination size differs.
-      const nativeInScale = img.naturalWidth / dynamicScale;
-      const useNative = nativeInScale > exportW;
-      const finalW = useNative ? nativeInScale : exportW;
-      const finalH = finalW / (img.naturalWidth / img.naturalHeight);
-      dctx.drawImage(layerCanvas, -finalW / 2, -finalH / 2, finalW, finalH);
+      dctx.drawImage(img, -exportW / 2, -exportH / 2, exportW, exportH);
       dctx.restore();
     }
 
