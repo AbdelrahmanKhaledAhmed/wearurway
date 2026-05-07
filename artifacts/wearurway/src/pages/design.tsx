@@ -143,7 +143,7 @@ export default function Design() {
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const mobileClipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
-  const pinchRef = useRef<{ dist: number } | null>(null);
+  const pinchRef = useRef<{ dist: number; midX: number; midY: number } | null>(null);
   const mockupSizeRef = useRef(mockupSize);
   useEffect(() => { mockupSizeRef.current = mockupSize; }, [mockupSize]);
 
@@ -537,7 +537,11 @@ export default function Design() {
   const onTouchStart = useCallback((e: TouchEvent) => {
     if (e.touches.length === 2) {
       e.preventDefault();
-      pinchRef.current = { dist: getTouchDist(e) };
+      pinchRef.current = {
+        dist: getTouchDist(e),
+        midX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        midY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      };
     }
   }, []);
 
@@ -546,13 +550,20 @@ export default function Design() {
       e.preventDefault();
       const newDist = getTouchDist(e);
       const ratio = newDist / pinchRef.current.dist;
+      const newMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const newMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const dx = (newMidX - pinchRef.current.midX) / (viewZoomRef.current || 1);
+      const dy = (newMidY - pinchRef.current.midY) / (viewZoomRef.current || 1);
       pinchRef.current.dist = newDist;
+      pinchRef.current.midX = newMidX;
+      pinchRef.current.midY = newMidY;
       setSelectedLayerId(prev => {
         if (!prev) return prev;
         setLayers(layers =>
           layers.map(l => {
             if (l.id !== prev) return l;
-            return scaleLayerAtPoint(l, ratio);
+            const scaled = scaleLayerAtPoint(l, ratio);
+            return { ...scaled, x: scaled.x + dx, y: scaled.y + dy };
           })
         );
         return prev;
