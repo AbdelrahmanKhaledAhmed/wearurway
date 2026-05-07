@@ -1049,17 +1049,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
 
         {/* ── Tool panel ── */}
         {/* On mobile: collapsible bottom sheet toggle */}
-        <div className="md:hidden flex items-center justify-between px-4 py-2 border-t shrink-0" style={{borderColor:"rgba(168,85,247,0.2)",backgroundColor:"#0d0d0d"}}>
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">Tools</span>
-          <button
-            onClick={()=>setShowToolPanel(p=>!p)}
-            className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded border transition-all"
-            style={{borderColor:"rgba(168,85,247,0.4)",color:"rgba(196,140,255,0.85)",backgroundColor:showToolPanel?"rgba(168,85,247,0.12)":"transparent"}}
-          >
-            {showToolPanel?"Hide":"Show"}
-          </button>
-        </div>
-        <div className={`${showToolPanel?"flex":"hidden"} md:flex w-full md:w-80 border-t md:border-t-0 md:border-l flex-col shrink-0 max-h-64 md:max-h-none overflow-y-auto`} style={{borderColor:"rgba(168,85,247,0.2)"}}>
+        <div className="flex md:flex w-full md:w-80 border-t md:border-t-0 md:border-l flex-col shrink-0 max-h-64 md:max-h-none overflow-y-auto" style={{borderColor:"rgba(168,85,247,0.2)"}}>
           <FuzzySelectPanel
             toolMode={toolMode}
             hasSelection={!!selectionMask}
