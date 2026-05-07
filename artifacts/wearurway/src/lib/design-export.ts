@@ -190,15 +190,17 @@ async function renderComposite(
   // ── Design canvas (high res, DTF print quality) ──
   let designCanvas: HTMLCanvasElement | null = null;
   if (loaded.length > 0) {
-    const dW = EXPORT_BASE_W * designScale;
-    const dH = EXPORT_BASE_H * designScale;
+    const maxNativeW = Math.max(...loaded.map(({ img }) => img.naturalWidth), EXPORT_BASE_W * designScale);
+    const dynamicScale = Math.max(designScale, Math.ceil(maxNativeW / EXPORT_BASE_W));
+    const dW = EXPORT_BASE_W * dynamicScale;
+    const dH = EXPORT_BASE_H * dynamicScale;
     const dc = document.createElement("canvas");
     dc.width = dW;
     dc.height = dH;
     const dctx = dc.getContext("2d")!;
     dctx.imageSmoothingEnabled = true;
     dctx.imageSmoothingQuality = "high";
-    dctx.scale(designScale, designScale);
+    dctx.scale(dynamicScale, dynamicScale);
 
     for (const { l: layer, img } of loaded) {
       const { width: displayW, height: displayH } = getRatioLockedSize(layer, layer.width);
@@ -208,28 +210,38 @@ async function renderComposite(
       const cx = (layer.x + displayW / 2) * coordScaleX;
       const cy = (layer.y + displayH / 2) * coordScaleY;
       const angle = (layer.rotation * Math.PI) / 180;
+
+      // Render this layer onto a separate canvas at its full native resolution.
+      // This guarantees the same pixel quality regardless of how small the user
+      // placed it on the mockup. Then we stamp that onto the design canvas
+      // at the correct display position/size.
+      const layerCanvas = document.createElement("canvas");
+      layerCanvas.width = img.naturalWidth;
+      layerCanvas.height = img.naturalHeight;
+      const lctx = layerCanvas.getContext("2d")!;
+      lctx.imageSmoothingEnabled = true;
+      lctx.imageSmoothingQuality = "high";
+      lctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
+
       dctx.save();
       dctx.translate(cx, cy);
       dctx.rotate(angle);
-      // Always draw at the image's natural full resolution regardless of
-      // how small the user placed it on the mockup. This ensures a small
-      // chest logo exports at the same quality as a full-back design.
-      // We use the natural size scaled up by the design scale factor so
-      // the image is never downsampled below its original pixel count.
-      const scaleUp = Math.max(1, img.naturalWidth / (exportW * designScale));
-      dctx.scale(1 / scaleUp, 1 / scaleUp);
-      dctx.drawImage(
-        img,
-        (-exportW / 2) * scaleUp,
-        (-exportH / 2) * scaleUp,
-        exportW * scaleUp,
-        exportH * scaleUp,
-      );
+      // Draw the full-res layer canvas at the display size on the design canvas.
+      // The browser downsamples from native→display using high quality Lanczos,
+      // preserving all detail. A small chest logo gets the same source pixels
+      // as a large back design — only the destination size differs.
+      const nativeInScale = img.naturalWidth / dynamicScale;
+      const useNative = nativeInScale > exportW;
+      const finalW = useNative ? nativeInScale : exportW;
+      const finalH = finalW / (img.naturalWidth / img.naturalHeight);
+      dctx.drawImage(layerCanvas, -finalW / 2, -finalH / 2, finalW, finalH);
       dctx.restore();
     }
 
 
-    // Clip to shirt shape
+    // Clip to shirt shape — must use EXPORT_BASE_W not the full canvas size
+    // because dctx is already scaled by dynamicScale, so EXPORT_BASE_W in
+    // pre-scale coords = EXPORT_BASE_W * dynamicScale actual canvas pixels.
     if (shirtImg) {
       dctx.globalCompositeOperation = "destination-in";
       drawContain(dctx, shirtImg, EXPORT_BASE_W, EXPORT_BASE_H);
