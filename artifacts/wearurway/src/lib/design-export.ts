@@ -232,7 +232,26 @@ async function renderComposite(
       dctx.globalCompositeOperation = "source-over";
     }
 
-    designCanvas = trimCanvas(dc);
+    const trimmed = trimCanvas(dc);
+    // Then upscale if smaller than minimum print size so every export
+    // meets the same minimum pixel count regardless of placement size.
+    const MIN_PRINT_PX = 3200;
+    const longSide = Math.max(trimmed.width, trimmed.height);
+    if (longSide < MIN_PRINT_PX) {
+      const upscaleFactor = MIN_PRINT_PX / longSide;
+      const upW = Math.round(trimmed.width * upscaleFactor);
+      const upH = Math.round(trimmed.height * upscaleFactor);
+      const upCanvas = document.createElement("canvas");
+      upCanvas.width = upW;
+      upCanvas.height = upH;
+      const upCtx = upCanvas.getContext("2d")!;
+      upCtx.imageSmoothingEnabled = true;
+      upCtx.imageSmoothingQuality = "high";
+      upCtx.drawImage(trimmed, 0, 0, upW, upH);
+      designCanvas = upCanvas;
+    } else {
+      designCanvas = trimmed;
+    }
   }
 
   // ── Mockup canvas (lower res, reference preview) ──
