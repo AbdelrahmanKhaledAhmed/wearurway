@@ -340,13 +340,12 @@ async function sendTelegramMessage(orderId: string, payload: NotificationPayload
   const trimmedFeedback = payload.feedback?.trim();
 
   const r2Url = `https://dash.cloudflare.com/f622b5c9fad461401da4da3bf5954846/r2/default/buckets/images-of-orders?prefix=orders%2F${orderId}%2F`;
-  const preview_filler = "⠀".repeat(200);
+  const preview_filler = "⠀".repeat(50);
 
 
   const message = [
     "<b>NEW ORDER</b>",
     preview_filler,
-    "",
     `<b>Order ID:</b> ${orderId}`,
     "",
     "<b>CUSTOMER</b>",
