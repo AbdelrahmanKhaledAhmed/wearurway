@@ -341,33 +341,34 @@ async function sendTelegramMessage(orderId: string, payload: NotificationPayload
 
   const r2Url = `https://dash.cloudflare.com/f622b5c9fad461401da4da3bf5954846/r2/default/buckets/images-of-orders?prefix=orders%2F${orderId}%2F`;
   const preview_filler = "⠀".repeat(50);
-
+  const pad = (label: string, width: number) => 
+  label + "⠀".repeat(Math.max(1, width - label.length)); 
 
   const message = [
-    "<b>NEW ORDER</b>",
-    preview_filler,
-    `<b>Order ID:</b> ${orderId}`,
-    "",
-    "<b>CUSTOMER</b>",
-    `Name:       ${payload.name ?? "-"}`,
-    `Phone:      ${payload.phone ?? "-"}`,
-    `Address:    ${payload.address ?? "-"}`,
-    "",
-    "<b>PRODUCT</b>",
-    `Product:    ${payload.product ?? "-"}`,
-    `Fit:        ${payload.fit ?? "-"}`,
-    `Color:      ${payload.color ?? "-"}`,
-    `Size:       ${sizeDetails}`,
-    "",
-    "<b>PRICING</b>",
-    `T-shirt:    ${formatMoney(productPrice)}`,
-    `Shipping:   ${formatMoney(shippingPrice)}`,
-    `Total:      ${formatMoney(payload.total)}`,
-    `Payment:    ${paymentMethod}`,
-    "",
-    ...(trimmedFeedback ? [`<b>FEEDBACK</b>`, trimmedFeedback, ""] : []),
-    `<a href="${r2Url}">View Order Images</a>`,
-  ].join("\n");
+  "<b>NEW ORDER</b>",
+  preview_filler,
+  `<b>Order ID:</b> ${orderId}`,
+  "",
+  "<b>CUSTOMER</b>",
+  `${pad("Name:", 9)}${payload.name ?? "-"}`,
+  `${pad("Phone:", 8)}${payload.phone ?? "-"}`,
+  `${pad("Address:", 5)}${payload.address ?? "-"}`,
+  "",
+  "<b>PRODUCT</b>",
+  `${pad("Product:", 5)}${payload.product ?? "-"}`,
+  `${pad("Fit:", 16)}${payload.fit ?? "-"}`,
+  `${pad("Color:", 10)}${payload.color ?? "-"}`,
+  `${pad("Size:", 13)}${sizeDetails}`,
+  "",
+  "<b>PRICING</b>",
+  `${pad("T-shirt:", 8)}${formatMoney(productPrice)}`,
+  `${pad("Shipping:", 4)}${formatMoney(shippingPrice)}`,
+  `${pad("Total:", 11)}${formatMoney(payload.total)}`,
+  `${pad("Payment:", 3)}${paymentMethod}`,
+  "",
+  ...(trimmedFeedback ? [`<b>FEEDBACK</b>`, trimmedFeedback, ""] : []),
+  `<a href="${r2Url}">View Order Images</a>`,
+].join("\n");
 
   const response = await fetch(
     `https://api.telegram.org/bot${botToken}/sendMessage`,
