@@ -338,31 +338,32 @@ async function sendTelegramMessage(orderId: string, payload: NotificationPayload
     payload.shippingPrice ?? Math.max(0, (payload.total ?? 0) - productPrice);
   const sizeDetails = `${payload.size?.name ?? "-"} (${payload.size?.realWidth ?? "-"} x ${payload.size?.realHeight ?? "-"} cm)`;
   const trimmedFeedback = payload.feedback?.trim();
-  const div = "——————————————";
+
   const r2Url = `https://dash.cloudflare.com/f622b5c9fad461401da4da3bf5954846/r2/default/buckets/images-of-orders?prefix=orders%2F${orderId}%2F`;
 
   const message = [
-    `<b>NEW ORDER</b>`,
-    `<code>${orderId}</code>`,
-    div,
-    "<b>Customer</b>",
-    `<code>Name     ${payload.name ?? "-"}</code>`,
-    `<code>Phone    ${payload.phone ?? "-"}</code>`,
-    `<code>Address  ${payload.address ?? "-"}</code>`,
-    div,
-    "<b>Product</b>",
-    `<code>Product  ${payload.product ?? "-"}</code>`,
-    `<code>Fit      ${payload.fit ?? "-"}</code>`,
-    `<code>Color    ${payload.color ?? "-"}</code>`,
-    `<code>Size     ${sizeDetails}</code>`,
-    div,
-    "<b>Pricing</b>",
-    `<code>T-shirt  ${formatMoney(productPrice)}</code>`,
-    `<code>Shipping ${formatMoney(shippingPrice)}</code>`,
-    `<code>Total    ${formatMoney(payload.total)}</code>`,
-    `<code>Payment  ${paymentMethod}</code>`,
-    ...(trimmedFeedback ? [div, "<b>Feedback</b>", trimmedFeedback] : []),
-    div,
+    "<b>NEW ORDER</b>",
+    "",
+    `<b>Order ID:</b> ${orderId}`,
+    "",
+    "<b>CUSTOMER</b>",
+    `Name:       ${payload.name ?? "-"}`,
+    `Phone:      ${payload.phone ?? "-"}`,
+    `Address:    ${payload.address ?? "-"}`,
+    "",
+    "<b>PRODUCT</b>",
+    `Product:    ${payload.product ?? "-"}`,
+    `Fit:        ${payload.fit ?? "-"}`,
+    `Color:      ${payload.color ?? "-"}`,
+    `Size:       ${sizeDetails}`,
+    "",
+    "<b>PRICING</b>",
+    `T-shirt:    ${formatMoney(productPrice)}`,
+    `Shipping:   ${formatMoney(shippingPrice)}`,
+    `Total:      ${formatMoney(payload.total)}`,
+    `Payment:    ${paymentMethod}`,
+    "",
+    ...(trimmedFeedback ? [`<b>FEEDBACK</b>`, trimmedFeedback, ""] : []),
     `<a href="${r2Url}">View Order Images</a>`,
   ].join("\n");
 
