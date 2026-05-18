@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 
 // ── Replace these with the actual paths to your images in attached_assets ──
-import RealImg1 from "@assets/photo_2026-05-16_11-35-44_1779108138424.jpg";
-import RealImg2 from "@assets/ChatGPT_Image_May_18,_2026,_04_45_37_PM_1779111947596.png";
-import RealImg3 from "@assets/photo_2026-05-16_11-35-38_1779108138425.jpg";
-import RealImg4 from "@assets/ChatGPT_Image_May_18,_2026,_04_14_21_PM_1779110074878.png";
+import RealImg1 from "@assets/photo_1.jpg";
+import RealImg2 from "@assets/photo_2.png";
+import RealImg3 from "@assets/photo_3.jpg";
+import RealImg4 from "@assets/photo_4.png";
 
-import MockImg1 from "@assets/Screenshot_2026-05-16_015603_1779108330602.png";
-import MockImg2 from "@assets/Screenshot_2026-05-16_015018_1779108330601.png";
-import MockImg3 from "@assets/Screenshot_2026-05-16_015256_1779108330601.png";
-import MockImg4 from "@assets/Screenshot_2026-05-16_020438_1779108330602.png";
+import MockImg1 from "@assets/mockup_1.png";
+import MockImg2 from "@assets/mockup_2.png";
+import MockImg3 from "@assets/mockup_3.png";
+import MockImg4 from "@assets/mockup_4.png";
 
 type MockSettings = { scale: number; y: number; x: number; splitHeight: number };
 type RealSettings = { scale: number; y: number; x: number };
