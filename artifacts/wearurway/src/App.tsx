@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
-
 import Landing from "@/pages/landing";
 import Products from "@/pages/products";
 import Fits from "@/pages/fits";
@@ -15,40 +14,44 @@ import AdminLogin from "@/pages/admin/login";
 import AdminDashboard from "@/pages/admin/dashboard";
 import Design from "@/pages/design";
 import Checkout from "@/pages/checkout";
-
 import { Navbar } from "@/components/layout/navbar";
 import { CustomizerProvider } from "@/hooks/use-customizer";
 import { getAdminToken } from "@/lib/admin-token";
 
 const queryClient = new QueryClient();
-
 setAuthTokenGetter(() => getAdminToken());
 
 function Router() {
   return (
-    <div className="flex flex-col min-h-screen">
-      <Navbar />
-      <main className="flex-grow">
-        <Switch>
-          <Route path="/" component={Landing} />
-          <Route path="/products" component={Products} />
-          <Route path="/fits" component={Fits} />
-          <Route path="/colors" component={Colors} />
-          <Route path="/sizes" component={Sizes} />
-          <Route path="/design" component={Design} />
-          <Route path="/checkout" component={Checkout} />
-          <Route path="/admin" component={AdminLogin} />
-          <Route path="/admin/dashboard" component={AdminDashboard} />
-          <Route component={NotFound} />
-        </Switch>
-      </main>
-    </div>
+    <Switch>
+      {/* Landing page — no Navbar, full screen */}
+      <Route path="/" component={Landing} />
+
+      {/* All other pages — with Navbar */}
+      <Route>
+        <div className="flex flex-col min-h-screen">
+          <Navbar />
+          <main className="flex-grow">
+            <Switch>
+              <Route path="/products" component={Products} />
+              <Route path="/fits" component={Fits} />
+              <Route path="/colors" component={Colors} />
+              <Route path="/sizes" component={Sizes} />
+              <Route path="/design" component={Design} />
+              <Route path="/checkout" component={Checkout} />
+              <Route path="/admin" component={AdminLogin} />
+              <Route path="/admin/dashboard" component={AdminDashboard} />
+              <Route component={NotFound} />
+            </Switch>
+          </main>
+        </div>
+      </Route>
+    </Switch>
   );
 }
 
 function MobileDesktopSuggestion() {
   const [visible, setVisible] = useState(false);
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.innerWidth >= 768) return;
@@ -57,14 +60,11 @@ function MobileDesktopSuggestion() {
     } catch {}
     setVisible(true);
   }, []);
-
   const dismiss = () => {
     setVisible(false);
     try { localStorage.setItem("ww_mobile_suggestion_seen", "1"); } catch {}
   };
-
   if (!visible) return null;
-
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm">
       <div className="w-full max-w-md bg-background border border-border p-8 space-y-5 shadow-2xl text-center">
