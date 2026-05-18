@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import Logo from "@assets/LOGO-2_1776952314150.png";
 
+// ── Replace these with the actual paths to your images in attached_assets ──
 import RealImg1 from "@assets/photo_1.png";
 import RealImg2 from "@assets/photo_2.png";
 import RealImg3 from "@assets/photo_3.png";
@@ -11,8 +12,6 @@ import MockImg1 from "@assets/mockup_1.png";
 import MockImg2 from "@assets/mockup_2.png";
 import MockImg3 from "@assets/mockup_3.png";
 import MockImg4 from "@assets/mockup_4.png";
-
-import { getAdminToken } from "@/lib/admin-token";
 
 type MockSettings = { scale: number; y: number; x: number; splitHeight: number };
 type RealSettings = { scale: number; y: number; x: number };
@@ -36,8 +35,6 @@ export default function LandingPage() {
   const [mock, setMock] = useState<MockSettings>({ ...defaultMock });
   const [reals, setReals] = useState<RealSettings[]>(slidesData.map(() => ({ ...defaultReal })));
 
-  const isAdmin = !!getAdminToken();
-
   const goTo = useCallback((index: number) => {
     if (transitioning || index === current) return;
     setTransitioning(true);
@@ -45,10 +42,11 @@ export default function LandingPage() {
   }, [transitioning, current]);
 
   const goNext = useCallback(() => goTo((current + 1) % slidesData.length), [current, goTo]);
+  const goPrev = useCallback(() => goTo((current - 1 + slidesData.length) % slidesData.length), [current, goTo]);
 
   useEffect(() => {
     if (editMode) return;
-    const t = setInterval(goNext, 3000);
+    const t = setInterval(goNext, 5000);
     return () => clearInterval(t);
   }, [goNext, editMode]);
 
@@ -156,36 +154,43 @@ export default function LandingPage() {
           <SlidePanel mobile={true} />
         </div>
 
-        <div className="relative z-20 flex flex-col items-center px-5 pt-3 pb-2">
-          <h1 className="text-white leading-none text-center" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(3rem, 14vw, 5rem)", letterSpacing: "-0.01em", textTransform: "uppercase", lineHeight: 0.88 }}>
+        <div className="relative z-20 flex flex-col px-5 pt-3 pb-2">
+          <div className="mb-3" />
+
+          <h1 className="text-white leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(3rem, 14vw, 5rem)", letterSpacing: "-0.01em", textTransform: "uppercase", lineHeight: 0.88 }}>
             WEARURWAY
           </h1>
 
-          <p className="text-white mt-2 text-center" style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 300, fontSize: "0.6rem", letterSpacing: "0.22em", opacity: 0.6 }}>
+          <p className="text-white mt-2" style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 300, fontSize: "0.6rem", letterSpacing: "0.22em", opacity: 0.6 }}>
             PREMIUM STREETWEAR. YOUR RULES.
           </p>
 
-          <div className="mt-4">
-            <button
-              onClick={() => navigate("/products")}
-              className="flex items-center gap-3 text-white tracking-widest px-5 py-3 transition-all duration-300 hover:bg-white hover:text-black group"
-              style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 600, letterSpacing: "0.18em", border: "1.5px solid rgba(255,255,255,0.6)", background: "transparent", fontSize: "0.6rem" }}
+          <div className="flex items-center gap-3 mt-3">
+            <button onClick={goPrev} className="flex items-center justify-center text-white" style={{ width: "28px", height: "28px", border: "1px solid rgba(255,255,255,0.3)", background: "transparent", cursor: "pointer" }} aria-label="Previous">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+            <div className="flex items-center gap-2">
+              {slidesData.map((_, i) => (
+                <button key={i} onClick={() => goTo(i)} style={{ width: i === current ? "18px" : "5px", height: "2px", background: i === current ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.28)", border: "none", padding: 0, borderRadius: "1px", cursor: "pointer", transition: "all 0.4s ease" }} aria-label={`Slide ${i + 1}`} />
+              ))}
+            </div>
+            <button onClick={goNext} className="flex items-center justify-center text-white" style={{ width: "28px", height: "28px", border: "1px solid rgba(255,255,255,0.3)", background: "transparent", cursor: "pointer" }} aria-label="Next">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+            <p key={current} style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 600, fontSize: "0.45rem", letterSpacing: "0.2em", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", animation: "fadeUp 0.5s ease" }}>
+              {slidesData[current].label}
+            </p>
+          </div>
+
+          <div className="mt-3">
+            <button className="flex items-center gap-3 text-white tracking-widest px-5 py-3 transition-all duration-300 hover:bg-white hover:text-black group"
+              onClick={() => navigate("/products")} style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 600, letterSpacing: "0.18em", border: "1.5px solid rgba(255,255,255,0.6)", background: "transparent", fontSize: "0.6rem" }}
             >
               START CUSTOMIZING
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-300 group-hover:translate-x-1">
                 <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
               </svg>
             </button>
-          </div>
-
-          {/* Social links - mobile */}
-          <div className="flex items-center gap-5 mt-4">
-            <a href="https://www.tiktok.com/@wearurway" target="_blank" rel="noopener noreferrer" className="text-white opacity-50 hover:opacity-100 transition-opacity">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.17 8.17 0 0 0 4.78 1.52V6.75a4.85 4.85 0 0 1-1.01-.06z"/></svg>
-            </a>
-            <a href="https://www.instagram.com/wearurway.store/" target="_blank" rel="noopener noreferrer" className="text-white opacity-50 hover:opacity-100 transition-opacity">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
-            </a>
           </div>
         </div>
       </div>
@@ -197,6 +202,8 @@ export default function LandingPage() {
         </div>
 
         <div className="relative z-20 flex flex-col px-10 pt-4 w-full items-center justify-center">
+          <div className="mb-6" />
+
           <h1 className="text-white leading-none text-center" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(4.5rem, 12vw, 9.5rem)", letterSpacing: "-0.01em", textTransform: "uppercase", lineHeight: 0.88 }}>
             WEARURWAY
           </h1>
@@ -206,26 +213,14 @@ export default function LandingPage() {
           </p>
 
           <div className="mt-6 flex flex-col items-center gap-4">
-            <button
-              onClick={() => navigate("/products")}
-              className="flex items-center gap-4 text-white text-xs tracking-widest px-7 py-4 transition-all duration-300 hover:bg-white hover:text-black group"
-              style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 600, letterSpacing: "0.2em", border: "1.5px solid rgba(255,255,255,0.6)", background: "transparent" }}
+            <button className="flex items-center gap-4 text-white text-xs tracking-widest px-7 py-4 transition-all duration-300 hover:bg-white hover:text-black group"
+              onClick={() => navigate("/products")} style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 600, letterSpacing: "0.2em", border: "1.5px solid rgba(255,255,255,0.6)", background: "transparent" }}
             >
               START CUSTOMIZING
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-300 group-hover:translate-x-1">
                 <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
               </svg>
             </button>
-
-            {/* Social links - desktop */}
-            <div className="flex items-center gap-5 mt-2">
-              <a href="https://www.tiktok.com/@wearurway" target="_blank" rel="noopener noreferrer" className="text-white opacity-50 hover:opacity-100 transition-opacity">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.17 8.17 0 0 0 4.78 1.52V6.75a4.85 4.85 0 0 1-1.01-.06z"/></svg>
-              </a>
-              <a href="https://www.instagram.com/wearurway.store/" target="_blank" rel="noopener noreferrer" className="text-white opacity-50 hover:opacity-100 transition-opacity">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
-              </a>
-            </div>
           </div>
         </div>
 
@@ -236,34 +231,45 @@ export default function LandingPage() {
           </p>
         </div>
 
-        {/* EDIT PANEL — admin only */}
-        {isAdmin && editMode && (
-          <div className="hidden md:flex absolute z-30 flex-col gap-2" style={{ right: "51%", top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.93)", border: "1px solid rgba(255,255,255,0.15)", padding: "14px 16px", minWidth: "230px" }}>
-            <p style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 700, fontSize: "0.55rem", letterSpacing: "0.2em", color: "rgba(255,255,255,0.85)" }}>SLIDE {current + 1} — {slidesData[current].label}</p>
-            <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── MOCKUP (all slides) ──</p>
-            <ControlRow label="Zoom"         onMinus={() => updateMock("scale", -0.05)} onPlus={() => updateMock("scale", 0.05)} value={mock.scale} />
-            <ControlRow label="Up / Down"    onMinus={() => updateMock("y", -2)}        onPlus={() => updateMock("y", 2)}        value={mock.y} />
-            <ControlRow label="Left / Right" onMinus={() => updateMock("x", -2)}        onPlus={() => updateMock("x", 2)}        value={mock.x} />
-            <ControlRow label="Height %"     onMinus={() => updateMock("splitHeight", -2)} onPlus={() => updateMock("splitHeight", 2)} value={mock.splitHeight} />
-            <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── REAL PHOTO (this slide) ──</p>
-            <ControlRow label="Zoom"         onMinus={() => updateReal("scale", -0.05)} onPlus={() => updateReal("scale", 0.05)} value={r.scale} />
-            <ControlRow label="Up / Down"    onMinus={() => updateReal("y", -2)}        onPlus={() => updateReal("y", 2)}        value={r.y} />
-            <ControlRow label="Left / Right" onMinus={() => updateReal("x", -2)}        onPlus={() => updateReal("x", 2)}        value={r.x} />
-            <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "7px" }}>
-              <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.43rem", color: "rgba(255,255,255,0.28)", letterSpacing: "0.07em" }}>Slides auto-switch every 3 seconds.</p>
-            </div>
-          </div>
-        )}
-
-        {/* EDIT BUTTON — admin only */}
-        {isAdmin && (
-          <button onClick={() => setEditMode(v => !v)}
-            className="hidden md:block absolute z-30"
-            style={{ top: "10px", right: "10px", fontFamily: "'Barlow', sans-serif", fontWeight: 600, fontSize: "0.5rem", letterSpacing: "0.18em", color: editMode ? "#080808" : "rgba(255,255,255,0.7)", background: editMode ? "rgba(255,255,255,0.95)" : "rgba(0,0,0,0.7)", border: "1px solid rgba(255,255,255,0.3)", padding: "5px 12px", cursor: "pointer" }}>
-            {editMode ? "✓ EDITING" : "EDIT PHOTOS"}
+        {/* Nav arrows + dots */}
+        <div className="absolute z-20 flex items-center gap-3" style={{ left: "40px", bottom: "18%" }}>
+          <button onClick={goPrev} className="flex items-center justify-center text-white hover:bg-white hover:text-black transition-all" style={{ width: "32px", height: "32px", border: "1px solid rgba(255,255,255,0.3)", background: "transparent", cursor: "pointer" }} aria-label="Previous">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
-        )}
-      </div>
+          <div className="flex items-center gap-2">
+            {slidesData.map((_, i) => (
+              <button key={i} onClick={() => goTo(i)} style={{ width: i === current ? "22px" : "6px", height: "2px", background: i === current ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.28)", border: "none", padding: 0, borderRadius: "1px", cursor: "pointer", transition: "all 0.4s ease" }} aria-label={`Slide ${i + 1}`} />
+            ))}
+          </div>
+          <button onClick={goNext} className="flex items-center justify-center text-white hover:bg-white hover:text-black transition-all" style={{ width: "32px", height: "32px", border: "1px solid rgba(255,255,255,0.3)", background: "transparent", cursor: "pointer" }} aria-label="Next">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </button>
+        </div>
+
+      {/* EDIT PANEL (desktop only) */}
+      {editMode && (
+        <div className="hidden md:flex absolute z-30 flex-col gap-2" style={{ right: "51%", top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.93)", border: "1px solid rgba(255,255,255,0.15)", padding: "14px 16px", minWidth: "230px" }}>
+          <p style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 700, fontSize: "0.55rem", letterSpacing: "0.2em", color: "rgba(255,255,255,0.85)" }}>SLIDE {current + 1} — {slidesData[current].label}</p>
+          <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── MOCKUP (all slides) ──</p>
+          <ControlRow label="Zoom"         onMinus={() => updateMock("scale", -0.05)} onPlus={() => updateMock("scale", 0.05)} value={mock.scale} />
+          <ControlRow label="Up / Down"    onMinus={() => updateMock("y", -2)}        onPlus={() => updateMock("y", 2)}        value={mock.y} />
+          <ControlRow label="Left / Right" onMinus={() => updateMock("x", -2)}        onPlus={() => updateMock("x", 2)}        value={mock.x} />
+          <ControlRow label="Height %"     onMinus={() => updateMock("splitHeight", -2)} onPlus={() => updateMock("splitHeight", 2)} value={mock.splitHeight} />
+          <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── REAL PHOTO (this slide) ──</p>
+          <ControlRow label="Zoom"         onMinus={() => updateReal("scale", -0.05)} onPlus={() => updateReal("scale", 0.05)} value={r.scale} />
+          <ControlRow label="Up / Down"    onMinus={() => updateReal("y", -2)}        onPlus={() => updateReal("y", 2)}        value={r.y} />
+          <ControlRow label="Left / Right" onMinus={() => updateReal("x", -2)}        onPlus={() => updateReal("x", 2)}        value={r.x} />
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "7px" }}>
+            <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.43rem", color: "rgba(255,255,255,0.28)", letterSpacing: "0.07em" }}>Use ‹ › arrows to switch slides while editing.</p>
+          </div>
+        </div>
+      )}
+
+      <button onClick={() => setEditMode(v => !v)}
+        className="hidden md:block absolute z-30"
+        style={{ top: "10px", right: "10px", fontFamily: "'Barlow', sans-serif", fontWeight: 600, fontSize: "0.5rem", letterSpacing: "0.18em", color: editMode ? "#080808" : "rgba(255,255,255,0.7)", background: editMode ? "rgba(255,255,255,0.95)" : "rgba(0,0,0,0.7)", border: "1px solid rgba(255,255,255,0.3)", padding: "5px 12px", cursor: "pointer" }}>
+        {editMode ? "✓ EDITING" : "EDIT PHOTOS"}
+      </button>
 
       <style>{`
         @keyframes fadeUp {
