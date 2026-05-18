@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 
 // ── Replace these with the actual paths to your images in attached_assets ──
-import RealImg1 from "@assets/photo_1.jpg";
+import RealImg1 from "@assets/photo_1.png";
 import RealImg2 from "@assets/photo_2.png";
-import RealImg3 from "@assets/photo_3.jpg";
+import RealImg3 from "@assets/photo_3.png";
 import RealImg4 from "@assets/photo_4.png";
 
 import MockImg1 from "@assets/mockup_1.png";
