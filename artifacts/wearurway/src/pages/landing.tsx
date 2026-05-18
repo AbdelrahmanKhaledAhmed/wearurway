@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useLocation } from "wouter";
 
 // ── Replace these with the actual paths to your images in attached_assets ──
 import RealImg1 from "@assets/photo_1.png";
@@ -25,6 +26,7 @@ const slidesData = [
 ];
 
 export default function LandingPage() {
+  const [, navigate] = useLocation();
   const [current, setCurrent] = useState(0);
   const [transitioning, setTransitioning] = useState(false);
   const [visibleIndex, setVisibleIndex] = useState(0);
@@ -191,9 +193,9 @@ export default function LandingPage() {
 
           <div className="mt-3">
             <button className="flex items-center gap-3 text-white tracking-widest px-5 py-3 transition-all duration-300 hover:bg-white hover:text-black group"
-              style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 600, letterSpacing: "0.18em", border: "1.5px solid rgba(255,255,255,0.6)", background: "transparent", fontSize: "0.6rem" }}
+              onClick={() => navigate("/products")} style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 600, letterSpacing: "0.18em", border: "1.5px solid rgba(255,255,255,0.6)", background: "transparent", fontSize: "0.6rem" }}
             >
-              EXPLORE COLLECTION
+              START CUSTOMIZING
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-300 group-hover:translate-x-1">
                 <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
               </svg>
@@ -229,9 +231,9 @@ export default function LandingPage() {
 
           <div className="mt-6">
             <button className="flex items-center gap-4 text-white text-xs tracking-widest px-7 py-4 transition-all duration-300 hover:bg-white hover:text-black group"
-              style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 600, letterSpacing: "0.2em", border: "1.5px solid rgba(255,255,255,0.6)", background: "transparent" }}
+              onClick={() => navigate("/products")} style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 600, letterSpacing: "0.2em", border: "1.5px solid rgba(255,255,255,0.6)", background: "transparent" }}
             >
-              EXPLORE COLLECTION
+              START CUSTOMIZING
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-300 group-hover:translate-x-1">
                 <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
               </svg>
