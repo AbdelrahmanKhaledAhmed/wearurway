@@ -15,6 +15,7 @@ interface Props {
   onConfirm: (blob: Blob, edit: ImageEditResult) => void;
   onCancel: () => void;
   qualityScale?: number;
+  autoSelectMode?: boolean;
 }
 
 interface CanvasSnapshot {
@@ -298,7 +299,7 @@ const RedoIcon = () => (
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 }: Props) {
+export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1, autoSelectMode=false }: Props) {
   const [currentFile, setCurrentFile] = useState<File>(file);
   useEffect(()=>{ setCurrentFile(file); },[file]);
   const [showHelpWizard, setShowHelpWizard] = useState(false);
@@ -350,7 +351,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const [nativeSize,    setNativeSize]    = useState<{w:number;h:number}|null>(null);
   const [histSig,       setHistSig]       = useState(0);
   const [displaySrc,    setDisplaySrc]    = useState("");
-  const [toolMode,      setToolMode]      = useState<ToolMode>(null);
+  const [toolMode, setToolMode] = useState<ToolMode>(autoSelectMode ? "select" : null);
   const [selectionMask, setSelectionMask] = useState<Uint8Array|null>(null);
   const [availArea,     setAvailArea]     = useState<{w:number;h:number}|null>(null);
   // sensitivity: 1 (very precise) → 100 (very wide). Default ≈ 40 matches old hardcoded values.
