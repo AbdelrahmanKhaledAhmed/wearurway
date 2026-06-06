@@ -44,6 +44,18 @@ export default function LandingPage() {
       })
       .catch(() => {});
 
+    // Load from localStorage first (instant, no auth needed)
+    try {
+      const savedMock = localStorage.getItem("ww_landing_mock");
+      const savedReals = localStorage.getItem("ww_landing_reals");
+      if (savedMock) setMock(JSON.parse(savedMock));
+      if (savedReals) {
+        const parsed = JSON.parse(savedReals);
+        if (Array.isArray(parsed) && parsed.length === slidesData.length) setReals(parsed);
+      }
+    } catch {}
+
+    // Also try server (will override localStorage if server has newer data)
     fetch("/api/landing-settings")
       .then((r) => r.json())
       .then((data: { mock?: MockSettings; reals?: RealSettings[] } | null) => {
@@ -54,24 +66,28 @@ export default function LandingPage() {
   }, []);
 
   const saveSettings = useCallback(async (mockData: MockSettings, realsData: RealSettings[]) => {
-    const token = getAdminToken();
-    if (!token) return;
     setSaving(true);
     try {
-      await fetch("/api/admin/landing-settings", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ mock: mockData, reals: realsData }),
-      });
+      // Save to localStorage so it persists without needing admin auth
+      localStorage.setItem("ww_landing_mock", JSON.stringify(mockData));
+      localStorage.setItem("ww_landing_reals", JSON.stringify(realsData));
+      // Also try server save if admin token exists
+      const token = getAdminToken();
+      if (token) {
+        await fetch("/api/admin/landing-settings", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ mock: mockData, reals: realsData }),
+        });
+      }
     } catch {
     } finally {
       setSaving(false);
     }
   }, []);
-
   const goTo = useCallback((index: number) => {
     if (transitioning || index === current) return;
     setTransitioning(true);
@@ -163,7 +179,7 @@ export default function LandingPage() {
         <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to right, #080808 0%, #080808 4%, rgba(8,8,8,0.85) 18%, rgba(8,8,8,0.3) 38%, transparent 65%)" }} />
       )}
       {mobile && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808 0%, transparent 12%, transparent 70%, rgba(8,8,8,0.3) 88%, #080808 100%)" }} />
+        <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808 0%, transparent 8%, transparent 88%, #080808 100%)" }} />
       )}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "18px", zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, transparent, #080808)" }} />
     </div>
@@ -180,14 +196,14 @@ export default function LandingPage() {
         </div>
 
         {/* Bottom overlay: WEARURWAY + button */}
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 20, padding: "0 20px 44px" }}>
-          <h1 className="text-white leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(3.5rem, 16vw, 5.5rem)", letterSpacing: "-0.01em", textTransform: "uppercase", lineHeight: 0.88 }}>
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 20, padding: "0 0 44px" }}>
+          <h1 className="text-white leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(3.5rem, 22.5vw, 5.5rem)", letterSpacing: "-0.02em", textTransform: "uppercase", lineHeight: 0.88, width: "100%", textAlign: "left", paddingLeft: "16px" }}>
             WEARURWAY
           </h1>
-          <p className="text-white mt-2" style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 300, fontSize: "0.6rem", letterSpacing: "0.22em", opacity: 0.6 }}>
+          <p className="text-white mt-2" style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 300, fontSize: "0.6rem", letterSpacing: "0.22em", opacity: 0.6, paddingLeft: "16px" }}>
             PREMIUM STREETWEAR. YOUR RULES.
           </p>
-          <div className="mt-4">
+          <div className="mt-4" style={{ paddingLeft: "16px" }}>
             <button
               className="flex items-center gap-3 text-white tracking-widest px-5 py-3 transition-all duration-300 hover:bg-white hover:text-black group"
               onClick={navigateToProducts}
