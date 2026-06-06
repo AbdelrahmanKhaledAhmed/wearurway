@@ -163,7 +163,7 @@ export default function LandingPage() {
         <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to right, #080808 0%, #080808 4%, rgba(8,8,8,0.85) 18%, rgba(8,8,8,0.3) 38%, transparent 65%)" }} />
       )}
       {mobile && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808 0%, transparent 12%, transparent 50%, rgba(8,8,8,0.5) 75%, #080808 100%)" }} />
+        <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808 0%, transparent 12%, transparent 70%, rgba(8,8,8,0.3) 88%, #080808 100%)" }} />
       )}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "18px", zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, transparent, #080808)" }} />
     </div>
