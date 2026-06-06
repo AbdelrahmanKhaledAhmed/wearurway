@@ -278,5 +278,6 @@ export default function LandingPage() {
         }
       `}</style>
     </div>
+    </div>
   );
 }
