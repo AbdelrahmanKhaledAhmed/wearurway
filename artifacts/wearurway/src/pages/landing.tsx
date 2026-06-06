@@ -12,10 +12,10 @@ import MockImg2 from "@assets/mockup_2.png";
 import MockImg3 from "@assets/mockup_3.png";
 import MockImg4 from "@assets/mockup_4.png";
 
-type MockSettings = { scale: number; y: number; x: number; splitHeight: number };
+type MockSettings = { scale: number; y: number; x: number; splitHeight: number; shadowTop: number; shadowBottom: number; shadowLeft: number; shadowRight: number };
 type RealSettings = { scale: number; y: number; x: number };
 
-const DEFAULT_MOCK: MockSettings = { scale: 1.65, y: -48, x: -50, splitHeight: 42 };
+const DEFAULT_MOCK: MockSettings = { scale: 1.65, y: -48, x: -50, splitHeight: 42, shadowTop: 80, shadowBottom: 25, shadowLeft: 0, shadowRight: 60 };
 const DEFAULT_REAL: RealSettings = { scale: 1.0, y: 0, x: 0 };
 
 const slidesData = [
@@ -178,9 +178,9 @@ export default function LandingPage() {
       {!mobile && (
         <>
           <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to right, #080808 0%, #080808 4%, rgba(8,8,8,0.85) 18%, rgba(8,8,8,0.3) 38%, transparent 65%)" }} />
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "80px", zIndex: 6, pointerEvents: "none", background: "linear-gradient(to bottom, #080808, transparent)" }} />
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "25px", zIndex: 6, pointerEvents: "none", background: "linear-gradient(to top, #080808, transparent)" }} />
-          <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "60px", zIndex: 6, pointerEvents: "none", background: "linear-gradient(to left, #080808, transparent)" }} />
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: `${mock.shadowTop}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to bottom, #080808, transparent)" }} />
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: `${mock.shadowBottom}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to top, #080808, transparent)" }} />
+          <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: `${mock.shadowRight}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to left, #080808, transparent)" }} />
         </>
       )}
       {mobile && (
@@ -259,6 +259,10 @@ export default function LandingPage() {
             <ControlRow label="Up / Down" onMinus={() => updateMock("y", -2)} onPlus={() => updateMock("y", 2)} value={mock.y} />
             <ControlRow label="Left / Right" onMinus={() => updateMock("x", -2)} onPlus={() => updateMock("x", 2)} value={mock.x} />
             <ControlRow label="Height %" onMinus={() => updateMock("splitHeight", -2)} onPlus={() => updateMock("splitHeight", 2)} value={mock.splitHeight} />
+            <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── SHADOWS (edges) ──</p>
+            <ControlRow label="Top Shadow" onMinus={() => updateMock("shadowTop", -5)} onPlus={() => updateMock("shadowTop", 5)} value={mock.shadowTop} />
+            <ControlRow label="Bottom Shadow" onMinus={() => updateMock("shadowBottom", -5)} onPlus={() => updateMock("shadowBottom", 5)} value={mock.shadowBottom} />
+            <ControlRow label="Right Shadow" onMinus={() => updateMock("shadowRight", -5)} onPlus={() => updateMock("shadowRight", 5)} value={mock.shadowRight} />
             <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── REAL PHOTO (this slide) ──</p>
             <ControlRow label="Zoom" onMinus={() => updateReal("scale", -0.05)} onPlus={() => updateReal("scale", 0.05)} value={r.scale} />
             <ControlRow label="Up / Down" onMinus={() => updateReal("y", -2)} onPlus={() => updateReal("y", 2)} value={r.y} />
