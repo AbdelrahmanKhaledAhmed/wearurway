@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>WEARURWAY</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <meta property="og:title" content="WEARURWAY" />
+    <meta property="og:image" content="/opengraph.jpg" />
+    <meta property="og:type" content="website" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // iOS Safari: when returning from an external app (e.g. Pinterest),
+      // the page may be restored from bfcache with a blank React root.
+      // Force a reload so the app re-hydrates cleanly.
+      window.addEventListener('pageshow', function (e) {
+        if (e.persisted) {
+          window.location.reload();
+        }
+      });
+    </script>
+  </body>
+</html>
