@@ -1073,7 +1073,7 @@ function MockupsManager() {
   const [selectedColorId, setSelectedColorId] = useState<string>("");
   const [activeSide, setActiveSide] = useState<"front" | "back">("front");
   const [showExportButton, setShowExportButton] = useState(false);
-
+  const [showEditPhotosButton, setShowEditPhotosButton] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: adminSettings } = useGetAdminOrderSettings();
@@ -1082,6 +1082,9 @@ function MockupsManager() {
   useEffect(() => {
     if (adminSettings?.showExportButton !== undefined) {
       setShowExportButton(adminSettings.showExportButton);
+    }
+    if (adminSettings?.showEditPhotosButton !== undefined) {
+      setShowEditPhotosButton(adminSettings.showEditPhotosButton);
     }
   }, [adminSettings]);
   const [, setLocation] = useLocation();
@@ -1315,6 +1318,26 @@ function MockupsManager() {
                           onSuccess: () => {
                             queryClient.invalidateQueries({ queryKey: getGetAdminOrderSettingsQueryKey() });
                             toast({ title: v ? "Export button enabled" : "Export button disabled" });
+                          },
+                          onError: () => toast({ title: "Failed to save setting", variant: "destructive" }),
+                        }
+                      );
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="toggle-edit-photos-button" className="text-xs uppercase tracking-widest cursor-pointer">Show Edit Photos Button (Landing Page)</Label>
+                  <Switch
+                    id="toggle-edit-photos-button"
+                    checked={showEditPhotosButton}
+                    onCheckedChange={v => {
+                      setShowEditPhotosButton(v);
+                      updateAdminSettings.mutate(
+                        { data: { ...adminSettings!, showEditPhotosButton: v } },
+                        {
+                          onSuccess: () => {
+                            queryClient.invalidateQueries({ queryKey: getGetAdminOrderSettingsQueryKey() });
+                            toast({ title: v ? "Edit Photos button enabled" : "Edit Photos button disabled" });
                           },
                           onError: () => toast({ title: "Failed to save setting", variant: "destructive" }),
                         }
