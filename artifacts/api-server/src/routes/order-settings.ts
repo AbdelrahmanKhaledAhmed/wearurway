@@ -46,6 +46,7 @@ router.put("/admin/order-settings", (req, res) => {
       telegramChatId: body.telegramChatId ?? store.orderSettings.telegramChatId,
       telegramBotToken: body.telegramBotToken ?? store.orderSettings.telegramBotToken,
       showExportButton: body.showExportButton !== undefined ? body.showExportButton : store.orderSettings.showExportButton,
+      showEditPhotosButton: body.showEditPhotosButton !== undefined ? body.showEditPhotosButton : store.orderSettings.showEditPhotosButton,
     };
     saved = store.orderSettings;
   });
