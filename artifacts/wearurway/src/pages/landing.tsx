@@ -176,7 +176,12 @@ export default function LandingPage() {
         </div>
       ))}
       {!mobile && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to right, #080808 0%, #080808 4%, rgba(8,8,8,0.85) 18%, rgba(8,8,8,0.3) 38%, transparent 65%)" }} />
+        <>
+          <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to right, #080808 0%, #080808 4%, rgba(8,8,8,0.85) 18%, rgba(8,8,8,0.3) 38%, transparent 65%)" }} />
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "80px", zIndex: 6, pointerEvents: "none", background: "linear-gradient(to bottom, #080808, transparent)" }} />
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "80px", zIndex: 6, pointerEvents: "none", background: "linear-gradient(to top, #080808, transparent)" }} />
+          <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "60px", zIndex: 6, pointerEvents: "none", background: "linear-gradient(to left, #080808, transparent)" }} />
+        </>
       )}
       {mobile && (
         <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808 0%, transparent 8%, transparent 88%, #080808 100%)" }} />
