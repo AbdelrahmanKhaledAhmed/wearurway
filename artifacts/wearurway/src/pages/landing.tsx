@@ -170,10 +170,10 @@ export default function LandingPage() {
   );
 
   return (
-    <div className="relative w-full h-full flex flex-col" style={{ background: "#080808", fontFamily: "'Barlow Condensed', sans-serif", overflowX: "hidden", overflowY: "auto" }}>
+    <div className="relative w-full flex flex-col" style={{ background: "#080808", fontFamily: "'Barlow Condensed', sans-serif", overflowX: "hidden", overflowY: "auto", height: "100dvh" }}>
 
       {/* ── MOBILE LAYOUT ── */}
-      <div className="flex md:hidden" style={{ flex: 1, minHeight: 0, position: "relative" }}>
+      <div className="flex md:hidden" style={{ flex: 1, minHeight: 0, position: "relative", minHeight: "calc(100dvh - 0px)" }}>
         {/* Full-screen photo background */}
         <div style={{ position: "absolute", inset: 0 }}>
           <SlidePanel mobile={true} />
@@ -203,7 +203,7 @@ export default function LandingPage() {
       </div>
 
       {/* ── DESKTOP LAYOUT ── */}
-      <div className="hidden md:flex flex-1 min-h-0 relative">
+      <div className="hidden md:flex relative" style={{ flex: 1, minHeight: 0, height: "100%" }}>
         <div className="absolute z-0" style={{ right: 0, top: 0, width: "50%", height: "100%" }}>
           <SlidePanel mobile={false} />
         </div>
