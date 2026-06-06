@@ -351,7 +351,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   const [nativeSize,    setNativeSize]    = useState<{w:number;h:number}|null>(null);
   const [histSig,       setHistSig]       = useState(0);
   const [displaySrc,    setDisplaySrc]    = useState("");
-  const [toolMode, setToolMode] = useState<ToolMode>(autoSelectMode ? "select" : null);
+  const [toolMode,      setToolMode]      = useState<ToolMode>(autoSelectMode ? "select" : null);
   const [selectionMask, setSelectionMask] = useState<Uint8Array|null>(null);
   const [availArea,     setAvailArea]     = useState<{w:number;h:number}|null>(null);
   // sensitivity: 1 (very precise) → 100 (very wide). Default ≈ 40 matches old hardcoded values.
