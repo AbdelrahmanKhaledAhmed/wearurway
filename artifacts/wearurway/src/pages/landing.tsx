@@ -184,7 +184,7 @@ export default function LandingPage() {
         </>
       )}
       {mobile && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808 0%, transparent 8%)" }} />
+        <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808 0%, transparent 8%, transparent 100%)" }} />
       )}
       
     </div>
@@ -194,7 +194,7 @@ export default function LandingPage() {
     <div className="relative w-full flex flex-col" style={{ background: "#080808", fontFamily: "'Barlow Condensed', sans-serif", overflowX: "hidden", overflowY: "hidden", height: "100dvh" }}>
 
       {/* ── MOBILE LAYOUT ── */}
-      <div className="flex md:hidden" style={{ flex: 1, minHeight: 0, position: "relative", minHeight: "100dvh" }}>
+      <div className="flex md:hidden" style={{ position: "relative", height: "100dvh", width: "100%", overflow: "hidden" }}>
         {/* Full-screen photo background */}
         <div style={{ position: "absolute", inset: 0 }}>
           <SlidePanel mobile={true} mockSettings={mock} />
