@@ -191,7 +191,7 @@ export default function LandingPage() {
           opacity: i === visibleIndex ? (transitioning ? 0 : 1) : 0,
           transition: "opacity 0.5s ease",
         }}>
-          <div style={{ height: `${mockSettings.splitHeight}%`, position: "relative", overflow: "hidden", background: "#111", flexShrink: 0 }}>
+          <div style={{ height: `${mockSettings.splitHeight}%`, position: "relative", overflow: "hidden", background: "#000000", flexShrink: 0 }}>
             <img src={slide.mock} alt="mockup" style={{
               position: "absolute", top: "50%", left: "50%",
               transform: `translate(${mockSettings.x}%, ${mockSettings.y}%) scale(${mockSettings.scale})`,
@@ -204,10 +204,10 @@ export default function LandingPage() {
               MOCKUP DESIGN
             </div>
           </div>
-          <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#080808" }}>
+          <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#000000" }}>
             <img src={slide.real} alt="worn" style={{
               position: "absolute", inset: 0, width: "100%", height: "100%",
-              objectFit: "cover",
+              objectFit: "contain",
               transform: `translate(${reals[i].x}%, ${reals[i].y}%) scale(${reals[i].scale})`,
               filter: "brightness(0.85) contrast(1.05)", transformOrigin: "center center",
             }} />
