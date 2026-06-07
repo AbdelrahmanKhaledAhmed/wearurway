@@ -254,7 +254,7 @@ export default function LandingPage() {
               </svg>
             </button>
           </div>
-          <div style={{ position: "absolute", bottom: "-200px", left: 0, right: 0, height: "200px", pointerEvents: "none", background: "linear-gradient(to bottom, #000000 0%, #000000 20%, rgba(0,0,0,0.8) 50%, transparent 100%)" }} />
+          <div style={{ position: "absolute", bottom: "-160px", left: 0, right: 0, height: "160px", pointerEvents: "none", background: "linear-gradient(to bottom, #000000 0%, #000000 20%, rgba(0,0,0,0.8) 50%, transparent 100%)" }} />
         </div>
       </div>
 
