@@ -350,7 +350,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
   const [nativeSize,    setNativeSize]    = useState<{w:number;h:number}|null>(null);
   const [histSig,       setHistSig]       = useState(0);
   const [displaySrc,    setDisplaySrc]    = useState("");
-  const [toolMode,      setToolMode]      = useState<ToolMode>(null);
+  const [toolMode,      setToolMode]      = useState<ToolMode>("select");
   const [selectionMask, setSelectionMask] = useState<Uint8Array|null>(null);
   const [availArea,     setAvailArea]     = useState<{w:number;h:number}|null>(null);
   // sensitivity: 1 (very precise) → 100 (very wide). Default ≈ 40 matches old hardcoded values.
@@ -604,10 +604,15 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 
       const id=ctx.getImageData(0,0,c.width,c.height);
       const {colorTol,edgeTol}=tolerancesFromSensitivity(sens);
       const maskResult=fuzzySelectRegion(id,px,py,colorTol,edgeTol);
-      setSelectionMask(maskResult);
+      saveUndo();
+      const deleted=applyMaskDeletion(id,maskResult);
+      ctx.putImageData(deleted,0,0);
+      updateDisplay();
+      setSelectionMask(null);
+      lastSelectPointRef.current=null;
       setProcessing(false);
     },0);
-  },[tolerancesFromSensitivity]);
+  },[tolerancesFromSensitivity,saveUndo,updateDisplay]);
 
   const handleFuzzySelect = useCallback((imgX: number, imgY: number)=>{
     const c=canvasRef.current; if (!c) return;
