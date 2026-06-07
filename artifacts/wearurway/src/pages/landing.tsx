@@ -44,7 +44,6 @@ export default function LandingPage() {
       })
       .catch(() => {});
 
-    // Load from localStorage first (instant, no auth needed)
     try {
       const savedMock = localStorage.getItem("ww_landing_mock");
       const savedReals = localStorage.getItem("ww_landing_reals");
@@ -55,7 +54,6 @@ export default function LandingPage() {
       }
     } catch {}
 
-    // Also try server (will override localStorage if server has newer data)
     fetch("/api/landing-settings")
       .then((r) => r.json())
       .then((data: { mock?: MockSettings; reals?: RealSettings[] } | null) => {
@@ -68,18 +66,13 @@ export default function LandingPage() {
   const saveSettings = useCallback(async (mockData: MockSettings, realsData: RealSettings[]) => {
     setSaving(true);
     try {
-      // Save to localStorage so it persists without needing admin auth
       localStorage.setItem("ww_landing_mock", JSON.stringify(mockData));
       localStorage.setItem("ww_landing_reals", JSON.stringify(realsData));
-      // Also try server save if admin token exists
       const token = getAdminToken();
       if (token) {
         await fetch("/api/admin/landing-settings", {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
           body: JSON.stringify({ mock: mockData, reals: realsData }),
         });
       }
@@ -88,6 +81,7 @@ export default function LandingPage() {
       setSaving(false);
     }
   }, []);
+
   const goTo = useCallback((index: number) => {
     if (transitioning || index === current) return;
     setTransitioning(true);
@@ -114,14 +108,11 @@ export default function LandingPage() {
     });
 
   const toggleEditMode = () => {
-    if (editMode) {
-      saveSettings(mock, reals);
-    }
+    if (editMode) saveSettings(mock, reals);
     setEditMode(v => !v);
   };
 
   const navigateToProducts = () => navigate("/products");
-
   const r = reals[current];
 
   const btnStyle: React.CSSProperties = {
@@ -141,7 +132,7 @@ export default function LandingPage() {
   );
 
   const SlidePanel = ({ mobile, mockSettings }: { mobile: boolean; mockSettings: MockSettings }) => (
-    <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", display: "flex", flexDirection: "column", background: "#080808" }}>
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
       {slidesData.map((slide, i) => (
         <div key={i} style={{
           position: "absolute", inset: 0, display: "flex", flexDirection: "column",
@@ -161,12 +152,12 @@ export default function LandingPage() {
               MOCKUP DESIGN
             </div>
           </div>
-          <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "transparent" }}>
+          <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#080808" }}>
             <img src={slide.real} alt="worn" style={{
-              position: "absolute", top: "50%", left: "50%",
-              transform: `translate(-50%, -50%) translate(${reals[i].x}%, ${reals[i].y}%) scale(${reals[i].scale})`,
-              maxWidth: "none", maxHeight: "none", width: "100%", height: "100%",
-              objectFit: "cover", filter: "brightness(0.85) contrast(1.05)", transformOrigin: "center center",
+              position: "absolute", inset: 0, width: "100%", height: "100%",
+              objectFit: "cover",
+              transform: `translate(${reals[i].x}%, ${reals[i].y}%) scale(${reals[i].scale})`,
+              filter: "brightness(0.85) contrast(1.05)", transformOrigin: "center center",
             }} />
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "25px", background: "linear-gradient(to bottom, #080808, transparent)", zIndex: 2 }} />
             <div style={{ position: "absolute", top: "10px", right: "10px", zIndex: 3, fontFamily: "'Barlow', sans-serif", fontWeight: 600, fontSize: "0.42rem", letterSpacing: "0.18em", color: "rgba(255,255,255,0.45)", background: "rgba(0,0,0,0.5)", padding: "2px 7px", border: "1px solid rgba(255,255,255,0.12)" }}>
@@ -183,22 +174,21 @@ export default function LandingPage() {
           <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: `${mockSettings.shadowRight}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to left, #080808, transparent)" }} />
         </>
       )}
-      
+      {mobile && (
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "80px", zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808, transparent)" }} />
+      )}
     </div>
   );
 
   return (
-    <div className="relative w-full flex flex-col" style={{ background: "#080808", fontFamily: "'Barlow Condensed', sans-serif", overflowX: "hidden", overflowY: "hidden", height: "100dvh" }}>
+    <div style={{ position: "fixed", inset: 0, background: "#080808", fontFamily: "'Barlow Condensed', sans-serif", overflow: "hidden" }}>
 
       {/* ── MOBILE LAYOUT ── */}
-      <div className="flex md:hidden" style={{ position: "relative", height: "100dvh", width: "100%", overflow: "hidden" }}>
-        {/* Full-screen photo background */}
-        <div style={{ position: "absolute", inset: 0 }}>
-          <SlidePanel mobile={true} mockSettings={mock} />
-        </div>
+      <div className="flex md:hidden" style={{ position: "absolute", inset: 0 }}>
+        <SlidePanel mobile={true} mockSettings={mock} />
 
         {/* Bottom overlay: WEARURWAY + button */}
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 20, padding: "0 0 44px" }}>
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 20, padding: "0 0 44px", background: "linear-gradient(to top, rgba(8,8,8,0.85) 0%, transparent 100%)" }}>
           <h1 className="text-white leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(3.5rem, 22.5vw, 5.5rem)", letterSpacing: "-0.02em", textTransform: "uppercase", lineHeight: 0.88, width: "100%", textAlign: "left", paddingLeft: "16px" }}>
             WEARURWAY
           </h1>
@@ -221,8 +211,8 @@ export default function LandingPage() {
       </div>
 
       {/* ── DESKTOP LAYOUT ── */}
-      <div className="hidden md:flex relative" style={{ flex: 1, minHeight: 0, height: "100%" }}>
-        <div className="absolute z-0" style={{ right: 0, top: 0, width: "50%", height: "100%" }}>
+      <div className="hidden md:flex" style={{ position: "absolute", inset: 0 }}>
+        <div style={{ position: "absolute", right: 0, top: 0, width: "50%", height: "100%" }}>
           <SlidePanel mobile={false} mockSettings={mock} />
         </div>
         <div className="relative z-20 flex flex-col px-10 pt-4 w-full justify-center" style={{ alignItems: "flex-start" }}>
@@ -247,7 +237,6 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* EDIT PANEL (desktop only, visible when editMode active) */}
         {editMode && (
           <div className="hidden md:flex absolute z-30 flex-col gap-2" style={{ right: "51%", top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.93)", border: "1px solid rgba(255,255,255,0.15)", padding: "14px 16px", minWidth: "230px" }}>
             <p style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 700, fontSize: "0.55rem", letterSpacing: "0.2em", color: "rgba(255,255,255,0.85)" }}>SLIDE {current + 1}</p>
@@ -271,8 +260,6 @@ export default function LandingPage() {
           </div>
         )}
 
-        {/* EDIT PHOTOS button — only shown if enabled from admin panel */}
-        {/* EDIT PHOTOS button — desktop */}
         {showEditPhotosButton && (
           <button
             onClick={toggleEditMode}
@@ -284,7 +271,7 @@ export default function LandingPage() {
         )}
       </div>
 
-    {/* MOBILE EDIT PANEL */}
+      {/* MOBILE EDIT PANEL */}
       {showEditPhotosButton && editMode && (
         <div className="md:hidden fixed inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.7)" }}>
           <div className="w-full flex flex-col gap-2 p-4" style={{ background: "rgba(10,10,10,0.98)", border: "1px solid rgba(255,255,255,0.12)", maxHeight: "70vh", overflowY: "auto" }}>
