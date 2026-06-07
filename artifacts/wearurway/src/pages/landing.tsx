@@ -1,4 +1,3 @@
-THE CODE THAT DIDNT HAVE THE PROBLEM
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { getAdminToken } from "@/lib/admin-token";
