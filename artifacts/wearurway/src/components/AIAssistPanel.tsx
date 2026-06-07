@@ -194,38 +194,37 @@ export default function FuzzySelectPanel({
 
 
 
-        {/* Sensitivity slider — shown whenever Magic Select is active */}
+        {/* Selection strength — 3 simple presets instead of a raw slider */}
         {selectActive && (
           <div className="px-3 py-3 rounded-xl"
             style={{ backgroundColor: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.18)" }}>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(196,140,255,0.8)" }}>
-                Sensitivity
-              </p>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[9px]" style={{ color: "rgba(196,140,255,0.45)" }}>
-                  {sensitivity <= 25 ? "Precise" : sensitivity <= 60 ? "Balanced" : "Wide"}
-                </span>
-                <span className="text-[10px] font-mono font-bold" style={{ color: "rgba(196,140,255,0.65)" }}>
-                  {sensitivity}
-                </span>
-              </div>
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-2.5" style={{ color: "rgba(196,140,255,0.8)" }}>
+              How much to remove?
+            </p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {([
+                { label: "A little", desc: "Tight edges", value: 18 },
+                { label: "Normal", desc: "Best for most", value: 42 },
+                { label: "A lot", desc: "Wide areas", value: 78 },
+              ] as const).map(opt => (
+                <button
+                  key={opt.label}
+                  onClick={() => onSensitivity(opt.value)}
+                  className="flex flex-col items-center gap-0.5 py-2.5 px-1 rounded-xl transition-all"
+                  style={
+                    Math.abs(sensitivity - opt.value) < 20
+                      ? { background: "linear-gradient(135deg,rgba(168,85,247,0.35),rgba(124,58,237,0.25))", border: "1px solid rgba(168,85,247,0.6)", color: "#e2c9ff" }
+                      : { backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.4)" }
+                  }
+                >
+                  <span className="text-[11px] font-black">{opt.label}</span>
+                  <span className="text-[8px] opacity-70">{opt.desc}</span>
+                </button>
+              ))}
             </div>
-            <input
-              type="range" min={1} max={100} value={sensitivity}
-              onChange={e => onSensitivity(Number(e.target.value))}
-              className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-              style={{ accentColor: "#a855f7" }}
-            />
-            <div className="flex justify-between mt-1.5">
-              <span className="text-[8px]" style={{ color: "rgba(255,255,255,0.2)" }}>Narrow</span>
-              <span className="text-[8px]" style={{ color: "rgba(255,255,255,0.2)" }}>Wide</span>
-            </div>
-            {hasSelection && (
-              <p className="text-[9px] mt-2 text-center" style={{ color: "rgba(196,140,255,0.45)" }}>
-                Drag to refine selection live
-              </p>
-            )}
+            <p className="text-[9px] mt-2 text-center" style={{ color: "rgba(196,140,255,0.4)" }}>
+              Not happy? Tap Undo and try another option
+            </p>
           </div>
         )}
       </div>
