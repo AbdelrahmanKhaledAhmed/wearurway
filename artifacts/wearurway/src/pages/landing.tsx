@@ -143,7 +143,7 @@ export default function LandingPage() {
             <img src={slide.mock} alt="mockup" style={{
               position: "absolute", top: "50%", left: "50%",
               transform: `translate(${mockSettings.x}%, ${mockSettings.y}%) scale(${mockSettings.scale})`,
-              width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 52%",
+              width: "100%", height: "100%", objectFit: "contain", objectPosition: "50% 50%",
               filter: "brightness(0.9) contrast(1.05)", transformOrigin: "center center",
             }} />
             <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "40px", background: "linear-gradient(to bottom, transparent, #080808)", zIndex: 2 }} />
