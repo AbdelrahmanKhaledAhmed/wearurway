@@ -161,12 +161,12 @@ export default function LandingPage() {
               MOCKUP DESIGN
             </div>
           </div>
-          <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#080808" }}>
+          <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#111" }}>
             <img src={slide.real} alt="worn" style={{
               position: "absolute", top: "50%", left: "50%",
               transform: `translate(-50%, -50%) translate(${reals[i].x}%, ${reals[i].y}%) scale(${reals[i].scale})`,
-              maxWidth: "100%", maxHeight: "100%", width: "auto", height: "auto",
-              objectFit: "contain", filter: "brightness(0.85) contrast(1.05)", transformOrigin: "center center",
+              maxWidth: "none", maxHeight: "none", width: "100%", height: "100%",
+              objectFit: "cover", filter: "brightness(0.85) contrast(1.05)", transformOrigin: "center center",
             }} />
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "25px", background: "linear-gradient(to bottom, #080808, transparent)", zIndex: 2 }} />
             <div style={{ position: "absolute", top: "10px", right: "10px", zIndex: 3, fontFamily: "'Barlow', sans-serif", fontWeight: 600, fontSize: "0.42rem", letterSpacing: "0.18em", color: "rgba(255,255,255,0.45)", background: "rgba(0,0,0,0.5)", padding: "2px 7px", border: "1px solid rgba(255,255,255,0.12)" }}>
@@ -191,10 +191,10 @@ export default function LandingPage() {
   );
 
   return (
-    <div className="relative w-full flex flex-col" style={{ background: "#080808", fontFamily: "'Barlow Condensed', sans-serif", overflowX: "hidden", overflowY: "auto", height: "100dvh" }}>
+    <div className="relative w-full flex flex-col" style={{ background: "#080808", fontFamily: "'Barlow Condensed', sans-serif", overflowX: "hidden", overflowY: "hidden", height: "100dvh" }}>
 
       {/* ── MOBILE LAYOUT ── */}
-      <div className="flex md:hidden" style={{ flex: 1, minHeight: 0, position: "relative", minHeight: "calc(100dvh - 0px)" }}>
+      <div className="flex md:hidden" style={{ flex: 1, minHeight: 0, position: "relative", minHeight: "100dvh" }}>
         {/* Full-screen photo background */}
         <div style={{ position: "absolute", inset: 0 }}>
           <SlidePanel mobile={true} mockSettings={mock} />
