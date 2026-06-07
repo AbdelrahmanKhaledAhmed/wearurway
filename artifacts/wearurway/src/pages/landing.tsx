@@ -12,10 +12,10 @@ import MockImg2 from "@assets/mockup_2.webp";
 import MockImg3 from "@assets/mockup_3.webp";
 import MockImg4 from "@assets/mockup_4.webp";
 
-type MockSettings = { scale: number; y: number; x: number; splitHeight: number; shadowTop: number; shadowBottom: number; shadowLeft: number; shadowRight: number };
+type MockSettings = { scale: number; y: number; x: number; splitHeight: number; shadowTop: number; shadowBottom: number; shadowLeft: number; shadowRight: number; textY: number };
 type RealSettings = { scale: number; y: number; x: number };
 
-const DEFAULT_MOCK: MockSettings = { scale: 1.65, y: -48, x: -50, splitHeight: 42, shadowTop: 80, shadowBottom: 0, shadowLeft: 0, shadowRight: 60 };
+const DEFAULT_MOCK: MockSettings = { scale: 1.65, y: -48, x: -50, splitHeight: 42, shadowTop: 80, shadowBottom: 0, shadowLeft: 0, shadowRight: 60, textY: 50 };
 const DEFAULT_REAL: RealSettings = { scale: 1.0, y: 0, x: 0 };
 
 const slidesData = [
@@ -173,11 +173,16 @@ export default function LandingPage() {
         <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── REAL PHOTO (this slide) ──</p>
         <ControlRow label="Zoom" onMinus={() => updateReal(tab, "scale", -0.05)} onPlus={() => updateReal(tab, "scale", 0.05)} value={r.scale} />
         <ControlRow label="Up / Down" onMinus={() => updateReal(tab, "y", -2)} onPlus={() => updateReal(tab, "y", 2)} value={r.y} />
-        <ControlRow label="Left / Right" onMinus={() => updateReal(tab, "x", -2)} onPlus={() => updateReal(tab, "x", 2)} value={r.x} />
+        <ControlRow label="Left / Right" onMinus={() => updateReal(tab, "x", -2)} onPlus={() => updateReal(tab, "x", 2)} value={r.x} /><ControlRow label="Left / Right" onMinus={() => updateReal(tab, "x", -2)} onPlus={() => updateReal(tab, "x", 2)} value={r.x} />
+        {tab === "mobile" && (
+          <>
+            <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── TEXT POSITION ──</p>
+            <ControlRow label="Text Up/Down" onMinus={() => updateMock(tab, "textY", -2)} onPlus={() => updateMock(tab, "textY", 2)} value={mock.textY} />
+          </>
+        )}
       </>
     );
   };
-
   const SlidePanel = ({ mobile, mockSettings, reals }: { mobile: boolean; mockSettings: MockSettings; reals: RealSettings[] }) => (
     <div style={{ position: "absolute", inset: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
       {slidesData.map((slide, i) => (
@@ -225,19 +230,19 @@ export default function LandingPage() {
   );
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#080808", fontFamily: "'Barlow Condensed', sans-serif", overflow: "hidden" }}>
+    <div style={{ position: "fixed", inset: 0, background: "#000000", fontFamily: "'Barlow Condensed', sans-serif", overflow: "hidden" }}>
 
       {/* ── MOBILE LAYOUT ── */}
       <div className="flex md:hidden" style={{ position: "absolute", inset: 0 }}>
         <SlidePanel mobile={true} mockSettings={mockMobile} reals={realsMobile} />
-        <div style={{ position: "absolute", bottom: "50%", left: 0, right: 0, zIndex: 20, transform: "translateY(50%)", padding: "16px 0" }}>
-          <h1 className="text-white leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(2rem, 11vw, 3.5rem)", letterSpacing: "-0.02em", textTransform: "uppercase", lineHeight: 0.88, width: "100%", textAlign: "left", paddingLeft: "16px" }}>
+        <div style={{ position: "absolute", top: `${mockMobile.textY}%`, left: 0, right: 0, zIndex: 20, transform: "translateY(-50%)", padding: "16px 0" }}>
+          <h1 className="text-white leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(2rem, 11vw, 3.5rem)", letterSpacing: "-0.02em", textTransform: "uppercase", lineHeight: 0.88, width: "100%", textAlign: "center", paddingLeft: "0" }}>
             WEARURWAY
           </h1>
-          <p className="text-white mt-2" style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 300, fontSize: "0.6rem", letterSpacing: "0.22em", opacity: 0.6, paddingLeft: "16px" }}>
+          <p className="text-white mt-2" style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 300, fontSize: "0.6rem", letterSpacing: "0.22em", opacity: 0.6, paddingLeft: "0", textAlign: "center", width: "100%" }}>
             PREMIUM STREETWEAR. YOUR RULES.
           </p>
-          <div className="mt-4" style={{ paddingLeft: "16px" }}>
+          <div className="mt-4" style={{ paddingLeft: "0", display: "flex", justifyContent: "center" }}>
             <button
               className="flex items-center gap-3 text-white tracking-widest px-5 py-3 transition-all duration-300 hover:bg-white hover:text-black group"
               onClick={navigateToProducts}
