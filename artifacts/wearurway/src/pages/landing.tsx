@@ -15,7 +15,7 @@ import MockImg4 from "@assets/mockup_4.png";
 type MockSettings = { scale: number; y: number; x: number; splitHeight: number; shadowTop: number; shadowBottom: number; shadowLeft: number; shadowRight: number };
 type RealSettings = { scale: number; y: number; x: number };
 
-const DEFAULT_MOCK: MockSettings = { scale: 1.65, y: -48, x: -50, splitHeight: 42, shadowTop: 80, shadowBottom: 25, shadowLeft: 0, shadowRight: 60 };
+const DEFAULT_MOCK: MockSettings = { scale: 1.65, y: -48, x: -50, splitHeight: 42, shadowTop: 80, shadowBottom: 0, shadowLeft: 0, shadowRight: 60 };
 const DEFAULT_REAL: RealSettings = { scale: 1.0, y: 0, x: 0 };
 
 const slidesData = [
@@ -186,7 +186,7 @@ export default function LandingPage() {
       {mobile && (
         <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808 0%, transparent 8%, transparent 88%, #080808 100%)" }} />
       )}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "18px", zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, transparent, #080808)" }} />
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "4px", zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, transparent, #080808)" }} />
     </div>
   );
 
