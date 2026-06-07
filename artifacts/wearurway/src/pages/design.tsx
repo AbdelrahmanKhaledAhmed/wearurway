@@ -1685,7 +1685,7 @@ export default function Design() {
       <div
         className="relative w-full overflow-hidden shrink-0"
         style={{
-          height: `${Math.round((mockupSize * (4 / 3) + 16) * viewZoom)}px`,
+          height: `${Math.round((mockupSize * (4 / 3) - 80) * viewZoom)}px`,
           touchAction: "pan-y",
           backgroundImage:
             "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
