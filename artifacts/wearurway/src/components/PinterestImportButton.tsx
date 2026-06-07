@@ -192,24 +192,9 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
                 {/* Intro step */}
                 {step === "intro" && (
                   <div className="px-6 py-6">
-                    {/* Warning box */}
-                    <div className="mb-5 border border-[#f5c842]/40 bg-[#f5c842]/8 px-4 py-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#f5c842] mb-2">⚠️ Read before continuing</p>
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#f5c842] font-black text-xs">1</span>
-                          <p className="text-[11px] text-white/80">Browse Pinterest and find a design you love</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#f5c842] font-black text-xs">2</span>
-                          <p className="text-[11px] text-white/80"><strong className="text-white">Copy the image link</strong> — tap the image → copy link</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#f5c842] font-black text-xs">3</span>
-                          <p className="text-[11px] text-white/80"><strong className="text-white">Come back here</strong> and paste the link</p>
-                        </div>
-                      </div>
-                    </div>
+                    <p className="text-sm text-white/70 leading-relaxed mb-6">
+                      Open our curated Pinterest board, pick a design you love, then come back and paste the link.
+                    </p>
                     <div className="flex flex-col gap-3">
                       <motion.button
                         whileTap={{ scale: 0.97 }}
@@ -218,13 +203,13 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
                         style={{ backgroundColor: "#E60023", color: "#fff" }}
                       >
                         <PinterestIcon className="w-4 h-4" />
-                        Open Pinterest Board
+                        Browse Pinterest Designs
                       </motion.button>
                       <button
                         onClick={() => setStep("import")}
-                        className="w-full py-3.5 border border-[#f5c842]/50 font-black uppercase text-xs tracking-[0.2em] text-[#f5c842] hover:bg-[#f5c842]/10 transition-colors"
+                        className="w-full py-3.5 border border-white/15 font-bold uppercase text-xs tracking-[0.2em] text-white/50 hover:text-white hover:border-white/30 transition-colors"
                       >
-                        ✓ I have my link — paste it now
+                        I already have a link
                       </button>
                       <button onClick={handleClose} className="w-full py-2 text-[10px] text-white/25 hover:text-white/50 transition-colors uppercase tracking-widest">
                         Cancel
@@ -232,7 +217,7 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
                     </div>
                   </div>
                 )}
-
+                
                 {/* Import step */}
                 {step === "import" && (
                   <div className="px-6 py-6 space-y-5">
