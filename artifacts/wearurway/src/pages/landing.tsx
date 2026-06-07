@@ -48,7 +48,7 @@ export default function LandingPage() {
     try {
       const savedMock = localStorage.getItem("ww_landing_mock");
       const savedReals = localStorage.getItem("ww_landing_reals");
-      if (savedMock) setMock(JSON.parse(savedMock));
+      if (savedMock) setMock({ ...DEFAULT_MOCK, ...JSON.parse(savedMock) });
       if (savedReals) {
         const parsed = JSON.parse(savedReals);
         if (Array.isArray(parsed) && parsed.length === slidesData.length) setReals(parsed);
@@ -104,7 +104,7 @@ export default function LandingPage() {
   }, [goNext, editMode]);
 
   const updateMock = (key: keyof MockSettings, delta: number) =>
-    setMock(prev => ({ ...prev, [key]: +(prev[key] + delta).toFixed(2) }));
+    setMock(prev => ({ ...prev, [key]: +((Number(prev[key]) || 0) + delta).toFixed(2) }));
 
   const updateReal = (key: keyof RealSettings, delta: number) =>
     setReals(prev => {
