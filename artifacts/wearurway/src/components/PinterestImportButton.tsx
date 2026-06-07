@@ -194,7 +194,7 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
                   <div className="px-6 py-6">
                     <div className="mb-6 text-center">
                       <p className="text-base font-black text-white mb-2">⚠️ BEFORE YOU CONTINUE</p>
-                      <p className="text-sm font-black text-white/70">CHOOSE A DESIGN → COPY THE LINK → PASTE IT HERE</p>
+                      <p className="text-sm font-black text-white/70">PICK A DESIGN → COPY THE LINK → PASTE IT HERE</p>
                     </div>
                     <div className="flex flex-col gap-3">
                       <motion.button
