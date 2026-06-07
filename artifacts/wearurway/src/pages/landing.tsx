@@ -225,8 +225,8 @@ export default function LandingPage() {
       )}
       {mobile && (
         <>
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "80px", zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #000000, transparent)" }} />
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "80px", zIndex: 5, pointerEvents: "none", background: "linear-gradient(to top, #000000, transparent)" }} />
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "60px", zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #000000, transparent)" }} />
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "60px", zIndex: 5, pointerEvents: "none", background: "linear-gradient(to top, #000000, transparent)" }} />
         </>
       )}
     </div>
@@ -238,7 +238,7 @@ export default function LandingPage() {
       {/* ── MOBILE LAYOUT ── */}
       <div className="flex md:hidden" style={{ position: "absolute", inset: 0 }}>
         <SlidePanel mobile={true} mockSettings={mockMobile} reals={realsMobile} />
-        <div style={{ position: "absolute", top: `${mockMobile.textY}%`, left: 0, right: 0, zIndex: 20, transform: "translateY(-50%)", padding: "16px 0" }}>           <div style={{ position: "absolute", top: "-50px", left: 0, right: 0, height: "50px", pointerEvents: "none", background: "linear-gradient(to top, #000000 0%, #000000 20%, rgba(0,0,0,0.8) 50%, transparent 100%)" }} />
+        <div style={{ position: "absolute", top: `${mockMobile.textY}%`, left: 0, right: 0, zIndex: 20, transform: "translateY(-50%)", padding: "16px 0" }}>           <div style={{ position: "absolute", top: "-60px", left: 0, right: 0, height: "60px", pointerEvents: "none", background: "linear-gradient(to top, #000000 0%, #000000 20%, rgba(0,0,0,0.8) 50%, transparent 100%)" }} />
           <h1 className="leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(2rem, 11vw, 3.5rem)", letterSpacing: "-0.02em", textTransform: "uppercase", lineHeight: 0.88, width: "100%", textAlign: "center", paddingLeft: "0", color: "#ffffff", textShadow: "none" }}>
             WEARURWAY
           </h1>
