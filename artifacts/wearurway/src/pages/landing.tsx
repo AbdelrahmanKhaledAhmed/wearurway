@@ -149,6 +149,7 @@ export default function LandingPage() {
           transition: "opacity 0.5s ease",
         }}>
           <div style={{ height: `${mockSettings.splitHeight}%`, position: "relative", overflow: "hidden", background: "#111", flexShrink: 0 }}>
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "40px", zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, transparent, #080808)" }} />
             <img src={slide.mock} alt="mockup" style={{
               position: "absolute", top: "50%", left: "50%",
               transform: `translate(${mockSettings.x}%, ${mockSettings.y}%) scale(${mockSettings.scale})`,
@@ -184,17 +185,17 @@ export default function LandingPage() {
         </>
       )}
       {mobile && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808 0%, transparent 8%)" }} />
+        <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808 0%, transparent 12%, transparent 50%, rgba(8,8,8,0.5) 75%, #080808 100%)" }} />
       )}
       
     </div>
   );
 
   return (
-    <div className="relative w-full flex flex-col" style={{ background: "#080808", fontFamily: "'Barlow Condensed', sans-serif", overflowX: "hidden", overflowY: "hidden", height: "100dvh" }}>
+    <div className="relative w-full h-full flex flex-col" style={{ background: "#080808", fontFamily: "'Barlow Condensed', sans-serif", overflowX: "hidden", overflowY: "auto" }}>
 
       {/* ── MOBILE LAYOUT ── */}
-      <div className="flex md:hidden" style={{ flex: 1, minHeight: 0, position: "relative", minHeight: "100dvh" }}>
+      <div className="flex md:hidden" style={{ position: "relative", height: "100dvh", width: "100%" }}>
         {/* Full-screen photo background */}
         <div style={{ position: "absolute", inset: 0 }}>
           <SlidePanel mobile={true} mockSettings={mock} />
