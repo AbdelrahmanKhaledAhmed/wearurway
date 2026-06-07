@@ -230,8 +230,8 @@ export default function LandingPage() {
       {/* ── MOBILE LAYOUT ── */}
       <div className="flex md:hidden" style={{ position: "absolute", inset: 0 }}>
         <SlidePanel mobile={true} mockSettings={mockMobile} reals={realsMobile} />
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 20, padding: "0 0 44px", background: "linear-gradient(to top, rgba(8,8,8,0.85) 0%, transparent 100%)" }}>
-          <h1 className="text-white leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(3.5rem, 22.5vw, 5.5rem)", letterSpacing: "-0.02em", textTransform: "uppercase", lineHeight: 0.88, width: "100%", textAlign: "left", paddingLeft: "16px" }}>
+        <div style={{ position: "absolute", bottom: "50%", left: 0, right: 0, zIndex: 20, transform: "translateY(50%)", padding: "16px 0" }}>
+          <h1 className="text-white leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(2rem, 11vw, 3.5rem)", letterSpacing: "-0.02em", textTransform: "uppercase", lineHeight: 0.88, width: "100%", textAlign: "left", paddingLeft: "16px" }}>
             WEARURWAY
           </h1>
           <p className="text-white mt-2" style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 300, fontSize: "0.6rem", letterSpacing: "0.22em", opacity: 0.6, paddingLeft: "16px" }}>
