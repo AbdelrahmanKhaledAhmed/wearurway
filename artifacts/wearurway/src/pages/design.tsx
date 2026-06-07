@@ -1677,7 +1677,7 @@ export default function Design() {
     {/* ════════════════════════════════════════════
         MOBILE LAYOUT  (smaller than md)
         ════════════════════════════════════════════ */}
-    <div className="flex flex-col md:hidden min-h-screen bg-background" style={{ overflowX: "hidden", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+    <div className="flex flex-col md:hidden min-h-screen bg-background no-scrollbar">
       {/* top padding for navbar */}
       <div className="h-16 shrink-0" />
 
