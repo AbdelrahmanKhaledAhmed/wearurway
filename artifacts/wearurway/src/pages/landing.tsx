@@ -140,7 +140,7 @@ export default function LandingPage() {
     </div>
   );
 
-  const SlidePanel = ({ mobile }: { mobile: boolean }) => (
+  const SlidePanel = ({ mobile, mockSettings }: { mobile: boolean; mockSettings: MockSettings }) => (
     <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
       {slidesData.map((slide, i) => (
         <div key={i} style={{
@@ -148,10 +148,10 @@ export default function LandingPage() {
           opacity: i === visibleIndex ? (transitioning ? 0 : 1) : 0,
           transition: "opacity 0.5s ease",
         }}>
-          <div style={{ height: `${mock.splitHeight}%`, position: "relative", overflow: "hidden", background: "#111", flexShrink: 0 }}>
+          <div style={{ height: `${mockSettings.splitHeight}%`, position: "relative", overflow: "hidden", background: "#111", flexShrink: 0 }}>
             <img src={slide.mock} alt="mockup" style={{
               position: "absolute", top: "50%", left: "50%",
-              transform: `translate(${mock.x}%, ${mock.y}%) scale(${mock.scale})`,
+              transform: `translate(${mockSettings.x}%, ${mockSettings.y}%) scale(${mockSettings.scale})`,
               width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 52%",
               filter: "brightness(0.9) contrast(1.05)", transformOrigin: "center center",
             }} />
@@ -178,9 +178,9 @@ export default function LandingPage() {
       {!mobile && (
         <>
           <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to right, #080808 0%, #080808 4%, rgba(8,8,8,0.85) 18%, rgba(8,8,8,0.3) 38%, transparent 65%)" }} />
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: `${mock.shadowTop}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to bottom, #080808, transparent)" }} />
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: `${mock.shadowBottom}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to top, #080808, transparent)" }} />
-          <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: `${mock.shadowRight}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to left, #080808, transparent)" }} />
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: `${mockSettings.shadowTop}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to bottom, #080808, transparent)" }} />
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: `${mockSettings.shadowBottom}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to top, #080808, transparent)" }} />
+          <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: `${mockSettings.shadowRight}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to left, #080808, transparent)" }} />
         </>
       )}
       {mobile && (
@@ -197,7 +197,7 @@ export default function LandingPage() {
       <div className="flex md:hidden" style={{ flex: 1, minHeight: 0, position: "relative", minHeight: "calc(100dvh - 0px)" }}>
         {/* Full-screen photo background */}
         <div style={{ position: "absolute", inset: 0 }}>
-          <SlidePanel mobile={true} />
+          <SlidePanel mobile={true} mockSettings={mock} />
         </div>
 
         {/* Bottom overlay: WEARURWAY + button */}
@@ -226,7 +226,7 @@ export default function LandingPage() {
       {/* ── DESKTOP LAYOUT ── */}
       <div className="hidden md:flex relative" style={{ flex: 1, minHeight: 0, height: "100%" }}>
         <div className="absolute z-0" style={{ right: 0, top: 0, width: "50%", height: "100%" }}>
-          <SlidePanel mobile={false} />
+          <SlidePanel mobile={false} mockSettings={mock} />
         </div>
         <div className="relative z-20 flex flex-col px-10 pt-4 w-full justify-center" style={{ alignItems: "flex-start" }}>
           <div className="mb-6" />
