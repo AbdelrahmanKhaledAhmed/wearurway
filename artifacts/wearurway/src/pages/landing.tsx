@@ -236,7 +236,7 @@ export default function LandingPage() {
       <div className="flex md:hidden" style={{ position: "absolute", inset: 0 }}>
         <SlidePanel mobile={true} mockSettings={mockMobile} reals={realsMobile} />
         <div style={{ position: "absolute", top: `${mockMobile.textY}%`, left: 0, right: 0, zIndex: 20, transform: "translateY(-50%)", padding: "16px 0" }}>
-          <h1 className="leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(2rem, 11vw, 3.5rem)", letterSpacing: "-0.02em", textTransform: "uppercase", lineHeight: 0.88, width: "100%", textAlign: "center", paddingLeft: "0", color: "#e0e0e0" }}>
+          <h1 className="leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(2rem, 11vw, 3.5rem)", letterSpacing: "-0.02em", textTransform: "uppercase", lineHeight: 0.88, width: "100%", textAlign: "center", paddingLeft: "0", color: "#cccccc", WebkitFontSmoothing: "antialiased", textShadow: "none", filter: "none" }}>
             WEARURWAY
           </h1>
           <p className="text-white mt-2" style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 300, fontSize: "0.6rem", letterSpacing: "0.22em", opacity: 0.6, paddingLeft: "0", textAlign: "center", width: "100%" }}>
