@@ -212,9 +212,6 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
                       >
                         I already have a link
                       </button>
-                      <button onClick={handleClose} className="w-full py-2 text-[10px] text-white/25 hover:text-white/50 transition-colors uppercase tracking-widest">
-                        Cancel
-                      </button>
                     </div>
                   </div>
                 )}
