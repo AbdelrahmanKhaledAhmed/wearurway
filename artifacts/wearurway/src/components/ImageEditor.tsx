@@ -299,10 +299,11 @@ const RedoIcon = () => (
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1 }: Props) {
+export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1, showBgHint=false }: Props) {
   const [currentFile, setCurrentFile] = useState<File>(file);
   useEffect(()=>{ setCurrentFile(file); },[file]);
-  const [showHelpWizard, setShowHelpWizard] = useState(false);   const [showBgOnboarding, setShowBgOnboarding] = useState(showBgHint);
+  const [showHelpWizard, setShowHelpWizard] = useState(false);
+  const [showBgOnboarding, setShowBgOnboarding] = useState(showBgHint);
   const { data: orderSettings } = useGetOrderSettings();
   const contactWhatsappHref = `https://wa.me/20${(orderSettings?.contactPhone || orderSettings?.instaPayPhone || "01069383482").replace(/^0/, "")}`;
   const canvasRef        = useRef<HTMLCanvasElement>(null);
