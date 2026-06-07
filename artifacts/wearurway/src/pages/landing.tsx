@@ -183,9 +183,6 @@ export default function LandingPage() {
           <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: `${mockSettings.shadowRight}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to left, #080808, transparent)" }} />
         </>
       )}
-      {mobile && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808 0%, transparent 15%)" }} />
-      )}
       
     </div>
   );
