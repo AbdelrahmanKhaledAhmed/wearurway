@@ -86,7 +86,7 @@ export default function LandingPage() {
   const goTo = useCallback((index: number) => {
     if (transitioning || index === current) return;
     setTransitioning(true);
-    setTimeout(() => { setCurrent(index); setVisibleIndex(index); setTransitioning(false); }, 400);
+    setTimeout(() => { setCurrent(index); setVisibleIndex(index); setTransitioning(false); }, 50);
   }, [transitioning, current]);
 
   const goNext = useCallback(() => goTo((current + 1) % slidesData.length), [current, goTo]);
@@ -94,7 +94,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (editMode) return;
-    const t = setInterval(goNext, 5000);
+    const t = setInterval(goNext, 3500);
     return () => clearInterval(t);
   }, [goNext, editMode]);
 
@@ -189,7 +189,7 @@ export default function LandingPage() {
         <div key={i} style={{
           position: "absolute", inset: 0, display: "flex", flexDirection: "column",
           opacity: i === visibleIndex ? (transitioning ? 0 : 1) : 0,
-          transition: "opacity 0.5s ease",
+          transition: "opacity 0.8s ease-in-out",
         }}>
           <div style={{ height: `${mockSettings.splitHeight}%`, position: "relative", overflow: "hidden", background: "#000000", flexShrink: 0 }}>
             <img src={slide.mock} alt="mockup" style={{
