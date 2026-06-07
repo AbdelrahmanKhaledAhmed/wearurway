@@ -141,7 +141,7 @@ export default function LandingPage() {
   );
 
   const SlidePanel = ({ mobile, mockSettings }: { mobile: boolean; mockSettings: MockSettings }) => (
-    <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", display: "flex", flexDirection: "column", background: "#080808" }}>
       {slidesData.map((slide, i) => (
         <div key={i} style={{
           position: "absolute", inset: 0, display: "flex", flexDirection: "column",
@@ -161,7 +161,7 @@ export default function LandingPage() {
               MOCKUP DESIGN
             </div>
           </div>
-          <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#080808" }}>
+          <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "transparent" }}>
             <img src={slide.real} alt="worn" style={{
               position: "absolute", top: "50%", left: "50%",
               transform: `translate(-50%, -50%) translate(${reals[i].x}%, ${reals[i].y}%) scale(${reals[i].scale})`,
@@ -184,7 +184,7 @@ export default function LandingPage() {
         </>
       )}
       {mobile && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808 0%, transparent 8%, transparent 100%)" }} />
+        <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808 0%, transparent 15%)" }} />
       )}
       
     </div>
