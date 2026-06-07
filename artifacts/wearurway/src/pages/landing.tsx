@@ -160,9 +160,7 @@ export default function LandingPage() {
               filter: "brightness(0.85) contrast(1.05)", transformOrigin: "center center",
             }} />
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "25px", background: "linear-gradient(to bottom, #080808, transparent)", zIndex: 2 }} />
-            <div style={{ position: "absolute", top: "10px", right: "10px", zIndex: 3, fontFamily: "'Barlow', sans-serif", fontWeight: 600, fontSize: "0.42rem", letterSpacing: "0.18em", color: "rgba(255,255,255,0.45)", background: "rgba(0,0,0,0.5)", padding: "2px 7px", border: "1px solid rgba(255,255,255,0.12)" }}>
-              IN THE WILD
-            </div>
+            
           </div>
         </div>
       ))}
