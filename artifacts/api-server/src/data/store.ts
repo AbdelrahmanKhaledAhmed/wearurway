@@ -215,6 +215,7 @@ export interface Store {
   orders: Record<string, OrderRecord>;
   orderSettings: OrderSettings;
   adminSessions?: string[];
+  landingSettings?: any;
 }
 
 const DEFAULT_STORE: Store = {
