@@ -71,4 +71,4 @@ router.get("/admin/me", (req, res) => {
   res.json(data);
 });
 
-export default router;
+router.get("/landing-settings", (_req, res) => {   res.json(getStore().landingSettings ?? null); });  router.put("/admin/landing-settings", (req, res) => {   if (!isAdminAuthenticated(req as Parameters<typeof isAdminAuthenticated>[0])) {     res.status(401).json({ error: "Not authenticated" });     return;   }   updateStore((store) => {     store.landingSettings = req.body;   });   res.json({ success: true }); });  export default router;
