@@ -173,7 +173,7 @@ export default function LandingPage() {
         <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── REAL PHOTO (this slide) ──</p>
         <ControlRow label="Zoom" onMinus={() => updateReal(tab, "scale", -0.05)} onPlus={() => updateReal(tab, "scale", 0.05)} value={r.scale} />
         <ControlRow label="Up / Down" onMinus={() => updateReal(tab, "y", -2)} onPlus={() => updateReal(tab, "y", 2)} value={r.y} />
-        <ControlRow label="Left / Right" onMinus={() => updateReal(tab, "x", -2)} onPlus={() => updateReal(tab, "x", 2)} value={r.x} /><ControlRow label="Left / Right" onMinus={() => updateReal(tab, "x", -2)} onPlus={() => updateReal(tab, "x", 2)} value={r.x} />
+        <ControlRow label="Left / Right" onMinus={() => updateReal(tab, "x", -2)} onPlus={() => updateReal(tab, "x", 2)} value={r.x} />
         {tab === "mobile" && (
           <>
             <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── TEXT POSITION ──</p>
@@ -236,7 +236,7 @@ export default function LandingPage() {
       <div className="flex md:hidden" style={{ position: "absolute", inset: 0 }}>
         <SlidePanel mobile={true} mockSettings={mockMobile} reals={realsMobile} />
         <div style={{ position: "absolute", top: `${mockMobile.textY}%`, left: 0, right: 0, zIndex: 20, transform: "translateY(-50%)", padding: "16px 0" }}>
-          <h1 className="leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(2rem, 11vw, 3.5rem)", letterSpacing: "-0.02em", textTransform: "uppercase", lineHeight: 0.88, width: "100%", textAlign: "center", paddingLeft: "0", color: "#bbbbbb", WebkitFontSmoothing: "antialiased", MozOsxFontSmoothing: "grayscale", textShadow: "none", filter: "none", WebkitTextStroke: "0px" }}>
+          <h1 className="leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(2rem, 11vw, 3.5rem)", letterSpacing: "-0.02em", textTransform: "uppercase", lineHeight: 0.88, width: "100%", textAlign: "center", paddingLeft: "0", color: "#ffffff", textShadow: "none" }}>
             WEARURWAY
           </h1>
           <p className="text-white mt-2" style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 300, fontSize: "0.6rem", letterSpacing: "0.22em", opacity: 0.6, paddingLeft: "0", textAlign: "center", width: "100%" }}>
@@ -254,7 +254,7 @@ export default function LandingPage() {
               </svg>
             </button>
           </div>
-          <div style={{ position: "absolute", bottom: "-120px", left: 0, right: 0, height: "120px", pointerEvents: "none", background: "linear-gradient(to bottom, #000000 0%, transparent 100%)" }} />
+          
         </div>
       </div>
 
