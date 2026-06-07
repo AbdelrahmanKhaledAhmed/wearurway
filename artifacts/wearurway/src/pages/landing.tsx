@@ -37,6 +37,11 @@ export default function LandingPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    // Preload all images instantly
+    [...[RealImg1,RealImg2,RealImg3,RealImg4,MockImg1,MockImg2,MockImg3,MockImg4]].forEach(src => {
+      const img = new Image(); img.src = src;
+    });
+
     fetch("/api/order-settings")
       .then((r) => r.json())
       .then((data: { showEditPhotosButton?: boolean }) => {
