@@ -1087,6 +1087,7 @@ export default function Design() {
         file={editorFile}
         onConfirm={handleEditorConfirm}
         qualityScale={getEditorQualityScale()}
+        showBgHint={!!newUploadLayerId}
         onCancel={() => {
           if (newUploadLayerId) {
             setLayers(prev => {
