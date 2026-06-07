@@ -161,7 +161,7 @@ export default function LandingPage() {
               MOCKUP DESIGN
             </div>
           </div>
-          <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#111" }}>
+          <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#080808" }}>
             <img src={slide.real} alt="worn" style={{
               position: "absolute", top: "50%", left: "50%",
               transform: `translate(-50%, -50%) translate(${reals[i].x}%, ${reals[i].y}%) scale(${reals[i].scale})`,
