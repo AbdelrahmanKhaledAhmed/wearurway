@@ -173,7 +173,7 @@ export default function LandingPage() {
         <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── REAL PHOTO (this slide) ──</p>
         <ControlRow label="Zoom" onMinus={() => updateReal(tab, "scale", -0.05)} onPlus={() => updateReal(tab, "scale", 0.05)} value={r.scale} />
         <ControlRow label="Up / Down" onMinus={() => updateReal(tab, "y", -2)} onPlus={() => updateReal(tab, "y", 2)} value={r.y} />
-        <ControlRow label="Left / Right" onMinus={() => updateReal(tab, "x", -2)} onPlus={() => updateReal(tab, "x", 2)} value={r.x} /><ControlRow label="Left / Right" onMinus={() => updateReal(tab, "x", -2)} onPlus={() => updateReal(tab, "x", 2)} value={r.x} />
+        <ControlRow label="Left / Right" onMinus={() => updateReal(tab, "x", -2)} onPlus={() => updateReal(tab, "x", 2)} value={r.x} />
         {tab === "mobile" && (
           <>
             <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── TEXT POSITION ──</p>
@@ -218,13 +218,13 @@ export default function LandingPage() {
       {!mobile && (
         <>
           <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none", background: "linear-gradient(to right, #000000 0%, #000000 4%, rgba(0,0,0,0.85) 18%, rgba(0,0,0,0.3) 45%, transparent 70%)" }} />
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: `${mockSettings.shadowTop}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to bottom, #080808, transparent)" }} />
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: `${mockSettings.shadowTop}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to bottom, #000000, transparent)" }} />
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: `${mockSettings.shadowBottom}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to top, #080808, transparent)" }} />
           <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: `${mockSettings.shadowRight}px`, zIndex: 6, pointerEvents: "none", background: "linear-gradient(to left, #080808, transparent)" }} />
         </>
       )}
       {mobile && (
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "80px", zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #080808, transparent)" }} />
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "80px", zIndex: 5, pointerEvents: "none", background: "linear-gradient(to bottom, #000000, transparent)" }} />
       )}
     </div>
   );
