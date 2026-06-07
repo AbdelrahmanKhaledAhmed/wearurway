@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -46,46 +45,6 @@ function Router() {
   );
 }
 
-function MobileDesktopSuggestion() {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.innerWidth >= 768) return;
-    try {
-      if (localStorage.getItem("ww_mobile_suggestion_seen") === "1") return;
-    } catch {}
-    setVisible(true);
-  }, []);
-
-  const dismiss = () => {
-    setVisible(false);
-    try { localStorage.setItem("ww_mobile_suggestion_seen", "1"); } catch {}
-  };
-
-  if (!visible) return null;
-
-  return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-background border border-border p-8 space-y-5 shadow-2xl text-center">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground mb-2">Heads Up</p>
-          <h2 className="text-xl font-black uppercase tracking-wide">Better on Desktop</h2>
-        </div>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          For the best design experience, we recommend using a laptop or desktop. You can still use all features on mobile though!
-        </p>
-        <button
-          onClick={dismiss}
-          className="w-full py-3.5 font-black uppercase text-sm tracking-[0.2em] transition-all active:scale-[0.98]"
-          style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
-        >
-          Continue on Mobile
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function App() {
   return (
@@ -96,7 +55,6 @@ function App() {
             <Router />
           </WouterRouter>
           <Toaster />
-          <MobileDesktopSuggestion />
         </TooltipProvider>
       </CustomizerProvider>
     </QueryClientProvider>
