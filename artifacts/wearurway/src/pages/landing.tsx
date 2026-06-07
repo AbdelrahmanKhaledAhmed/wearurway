@@ -252,9 +252,6 @@ export default function LandingPage() {
               style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 600, letterSpacing: "0.18em", border: "1.5px solid rgba(255,255,255,0.6)", background: "transparent", fontSize: "0.6rem" }}
             >
               START CUSTOMIZING
-              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-300 group-hover:translate-x-1">
-                <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-              </svg>
             </button>
           </div>
           <div style={{ position: "absolute", bottom: "-160px", left: 0, right: 0, height: "160px", pointerEvents: "none", background: "linear-gradient(to bottom, #000000 0%, #000000 20%, rgba(0,0,0,0.8) 50%, transparent 100%)" }} />
@@ -281,9 +278,6 @@ export default function LandingPage() {
               style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 600, letterSpacing: "0.2em", border: "1.5px solid rgba(255,255,255,0.6)", background: "transparent" }}
             >
               START CUSTOMIZING
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-300 group-hover:translate-x-1">
-                <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-              </svg>
             </button>
           </div>
         </div>
