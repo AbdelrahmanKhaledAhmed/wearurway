@@ -192,9 +192,10 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
                 {/* Intro step */}
                 {step === "intro" && (
                   <div className="px-6 py-6">
-                    <p className="text-sm text-white/70 leading-relaxed mb-6">
-                      Open our curated Pinterest board, pick a design you love, then come back and paste the link.
-                    </p>
+                    <div className="mb-6 text-center">
+                      <p className="text-base font-black text-white mb-2">⚠️ BEFORE YOU CONTINUE</p>
+                      <p className="text-sm font-black text-white/70">CHOOSE A DESIGN → COPY THE LINK → PASTE IT HERE</p>
+                    </div>
                     <div className="flex flex-col gap-3">
                       <motion.button
                         whileTap={{ scale: 0.97 }}
