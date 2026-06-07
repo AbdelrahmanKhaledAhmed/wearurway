@@ -2,15 +2,15 @@ import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { getAdminToken } from "@/lib/admin-token";
 
-import RealImg1 from "@assets/photo_1.png";
-import RealImg2 from "@assets/photo_2.png";
-import RealImg3 from "@assets/photo_3.png";
-import RealImg4 from "@assets/photo_4.png";
+import RealImg1 from "@assets/photo_1.webp";
+import RealImg2 from "@assets/photo_2.webp";
+import RealImg3 from "@assets/photo_3.webp";
+import RealImg4 from "@assets/photo_4.webp";
 
-import MockImg1 from "@assets/mockup_1.png";
-import MockImg2 from "@assets/mockup_2.png";
-import MockImg3 from "@assets/mockup_3.png";
-import MockImg4 from "@assets/mockup_4.png";
+import MockImg1 from "@assets/mockup_1.webp";
+import MockImg2 from "@assets/mockup_2.webp";
+import MockImg3 from "@assets/mockup_3.webp";
+import MockImg4 from "@assets/mockup_4.webp";
 
 type MockSettings = { scale: number; y: number; x: number; splitHeight: number; shadowTop: number; shadowBottom: number; shadowLeft: number; shadowRight: number };
 type RealSettings = { scale: number; y: number; x: number };
