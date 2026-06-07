@@ -31,14 +31,19 @@ export default function LandingPage() {
   const [transitioning, setTransitioning] = useState(false);
   const [visibleIndex, setVisibleIndex] = useState(0);
   const [editMode, setEditMode] = useState(false);
-  const [mock, setMock] = useState<MockSettings>({ ...DEFAULT_MOCK });
-  const [reals, setReals] = useState<RealSettings[]>(slidesData.map(() => ({ ...DEFAULT_REAL })));
+  const [editTab, setEditTab] = useState<"desktop" | "mobile">("desktop");
+
+  // Separate settings for desktop and mobile
+  const [mockDesktop, setMockDesktop] = useState<MockSettings>({ ...DEFAULT_MOCK });
+  const [mockMobile, setMockMobile] = useState<MockSettings>({ ...DEFAULT_MOCK });
+  const [realsDesktop, setRealsDesktop] = useState<RealSettings[]>(slidesData.map(() => ({ ...DEFAULT_REAL })));
+  const [realsMobile, setRealsMobile] = useState<RealSettings[]>(slidesData.map(() => ({ ...DEFAULT_REAL })));
+
   const [showEditPhotosButton, setShowEditPhotosButton] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Preload all images instantly
-    [...[RealImg1,RealImg2,RealImg3,RealImg4,MockImg1,MockImg2,MockImg3,MockImg4]].forEach(src => {
+    [RealImg1,RealImg2,RealImg3,RealImg4,MockImg1,MockImg2,MockImg3,MockImg4].forEach(src => {
       const img = new Image(); img.src = src;
     });
 
@@ -49,36 +54,27 @@ export default function LandingPage() {
       })
       .catch(() => {});
 
-    try {
-      const savedMock = localStorage.getItem("ww_landing_mock");
-      const savedReals = localStorage.getItem("ww_landing_reals");
-      if (savedMock) setMock({ ...DEFAULT_MOCK, ...JSON.parse(savedMock) });
-      if (savedReals) {
-        const parsed = JSON.parse(savedReals);
-        if (Array.isArray(parsed) && parsed.length === slidesData.length) setReals(parsed);
-      }
-    } catch {}
-
     fetch("/api/landing-settings")
       .then((r) => r.json())
-      .then((data: { mock?: MockSettings; reals?: RealSettings[] } | null) => {
-        if (data?.mock) setMock(data.mock);
-        if (data?.reals && data.reals.length === slidesData.length) setReals(data.reals);
+      .then((data: any) => {
+        if (!data) return;
+        if (data.mockDesktop) setMockDesktop(data.mockDesktop);
+        if (data.mockMobile) setMockMobile(data.mockMobile);
+        if (data.realsDesktop && data.realsDesktop.length === slidesData.length) setRealsDesktop(data.realsDesktop);
+        if (data.realsMobile && data.realsMobile.length === slidesData.length) setRealsMobile(data.realsMobile);
       })
       .catch(() => {});
   }, []);
 
-  const saveSettings = useCallback(async (mockData: MockSettings, realsData: RealSettings[]) => {
+  const saveSettings = useCallback(async (md: MockSettings, mm: MockSettings, rd: RealSettings[], rm: RealSettings[]) => {
     setSaving(true);
     try {
-      localStorage.setItem("ww_landing_mock", JSON.stringify(mockData));
-      localStorage.setItem("ww_landing_reals", JSON.stringify(realsData));
       const token = getAdminToken();
       if (token) {
         await fetch("/api/admin/landing-settings", {
           method: "PUT",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-          body: JSON.stringify({ mock: mockData, reals: realsData }),
+          body: JSON.stringify({ mockDesktop: md, mockMobile: mm, realsDesktop: rd, realsMobile: rm }),
         });
       }
     } catch {
@@ -102,23 +98,36 @@ export default function LandingPage() {
     return () => clearInterval(t);
   }, [goNext, editMode]);
 
-  const updateMock = (key: keyof MockSettings, delta: number) =>
-    setMock(prev => ({ ...prev, [key]: +((Number(prev[key]) || 0) + delta).toFixed(2) }));
+  const updateMock = (tab: "desktop" | "mobile", key: keyof MockSettings, delta: number) => {
+    if (tab === "desktop") setMockDesktop(prev => ({ ...prev, [key]: +((Number(prev[key]) || 0) + delta).toFixed(2) }));
+    else setMockMobile(prev => ({ ...prev, [key]: +((Number(prev[key]) || 0) + delta).toFixed(2) }));
+  };
 
-  const updateReal = (key: keyof RealSettings, delta: number) =>
-    setReals(prev => {
-      const next = [...prev];
-      next[current] = { ...next[current], [key]: +(next[current][key] + delta).toFixed(2) };
-      return next;
-    });
+  const updateReal = (tab: "desktop" | "mobile", key: keyof RealSettings, delta: number) => {
+    if (tab === "desktop") {
+      setRealsDesktop(prev => {
+        const next = [...prev];
+        next[current] = { ...next[current], [key]: +(next[current][key] + delta).toFixed(2) };
+        return next;
+      });
+    } else {
+      setRealsMobile(prev => {
+        const next = [...prev];
+        next[current] = { ...next[current], [key]: +(next[current][key] + delta).toFixed(2) };
+        return next;
+      });
+    }
+  };
 
   const toggleEditMode = () => {
-    if (editMode) saveSettings(mock, reals);
+    if (editMode) saveSettings(mockDesktop, mockMobile, realsDesktop, realsMobile);
     setEditMode(v => !v);
   };
 
   const navigateToProducts = () => navigate("/products");
-  const r = reals[current];
+
+  const rDesktop = realsDesktop[current];
+  const rMobile = realsMobile[current];
 
   const btnStyle: React.CSSProperties = {
     width: "22px", height: "22px", border: "1px solid rgba(255,255,255,0.3)",
@@ -136,7 +145,40 @@ export default function LandingPage() {
     </div>
   );
 
-  const SlidePanel = ({ mobile, mockSettings }: { mobile: boolean; mockSettings: MockSettings }) => (
+  const tabBtnStyle = (active: boolean): React.CSSProperties => ({
+    flex: 1, padding: "4px 0", fontFamily: "'Barlow', sans-serif", fontWeight: 700,
+    fontSize: "0.5rem", letterSpacing: "0.15em", cursor: "pointer", border: "none",
+    background: active ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.07)",
+    color: active ? "#080808" : "rgba(255,255,255,0.5)",
+  });
+
+  const EditControls = ({ tab }: { tab: "desktop" | "mobile" }) => {
+    const mock = tab === "desktop" ? mockDesktop : mockMobile;
+    const r = tab === "desktop" ? rDesktop : rMobile;
+    return (
+      <>
+        <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── MOCKUP (all slides) ──</p>
+        <ControlRow label="Zoom" onMinus={() => updateMock(tab, "scale", -0.05)} onPlus={() => updateMock(tab, "scale", 0.05)} value={mock.scale} />
+        <ControlRow label="Up / Down" onMinus={() => updateMock(tab, "y", -2)} onPlus={() => updateMock(tab, "y", 2)} value={mock.y} />
+        <ControlRow label="Left / Right" onMinus={() => updateMock(tab, "x", -2)} onPlus={() => updateMock(tab, "x", 2)} value={mock.x} />
+        <ControlRow label="Height %" onMinus={() => updateMock(tab, "splitHeight", -2)} onPlus={() => updateMock(tab, "splitHeight", 2)} value={mock.splitHeight} />
+        {tab === "desktop" && (
+          <>
+            <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── SHADOWS (edges) ──</p>
+            <ControlRow label="Top Shadow" onMinus={() => updateMock(tab, "shadowTop", -5)} onPlus={() => updateMock(tab, "shadowTop", 5)} value={mock.shadowTop} />
+            <ControlRow label="Bottom Shadow" onMinus={() => updateMock(tab, "shadowBottom", -5)} onPlus={() => updateMock(tab, "shadowBottom", 5)} value={mock.shadowBottom} />
+            <ControlRow label="Right Shadow" onMinus={() => updateMock(tab, "shadowRight", -5)} onPlus={() => updateMock(tab, "shadowRight", 5)} value={mock.shadowRight} />
+          </>
+        )}
+        <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── REAL PHOTO (this slide) ──</p>
+        <ControlRow label="Zoom" onMinus={() => updateReal(tab, "scale", -0.05)} onPlus={() => updateReal(tab, "scale", 0.05)} value={r.scale} />
+        <ControlRow label="Up / Down" onMinus={() => updateReal(tab, "y", -2)} onPlus={() => updateReal(tab, "y", 2)} value={r.y} />
+        <ControlRow label="Left / Right" onMinus={() => updateReal(tab, "x", -2)} onPlus={() => updateReal(tab, "x", 2)} value={r.x} />
+      </>
+    );
+  };
+
+  const SlidePanel = ({ mobile, mockSettings, reals }: { mobile: boolean; mockSettings: MockSettings; reals: RealSettings[] }) => (
     <div style={{ position: "absolute", inset: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
       {slidesData.map((slide, i) => (
         <div key={i} style={{
@@ -165,7 +207,6 @@ export default function LandingPage() {
               filter: "brightness(0.85) contrast(1.05)", transformOrigin: "center center",
             }} />
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "25px", background: "linear-gradient(to bottom, #080808, transparent)", zIndex: 2 }} />
-            
           </div>
         </div>
       ))}
@@ -188,9 +229,7 @@ export default function LandingPage() {
 
       {/* ── MOBILE LAYOUT ── */}
       <div className="flex md:hidden" style={{ position: "absolute", inset: 0 }}>
-        <SlidePanel mobile={true} mockSettings={mock} />
-
-        {/* Bottom overlay: WEARURWAY + button */}
+        <SlidePanel mobile={true} mockSettings={mockMobile} reals={realsMobile} />
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 20, padding: "0 0 44px", background: "linear-gradient(to top, rgba(8,8,8,0.85) 0%, transparent 100%)" }}>
           <h1 className="text-white leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: "clamp(3.5rem, 22.5vw, 5.5rem)", letterSpacing: "-0.02em", textTransform: "uppercase", lineHeight: 0.88, width: "100%", textAlign: "left", paddingLeft: "16px" }}>
             WEARURWAY
@@ -216,7 +255,7 @@ export default function LandingPage() {
       {/* ── DESKTOP LAYOUT ── */}
       <div className="hidden md:flex" style={{ position: "absolute", inset: 0 }}>
         <div style={{ position: "absolute", right: 0, top: 0, width: "50%", height: "100%" }}>
-          <SlidePanel mobile={false} mockSettings={mock} />
+          <SlidePanel mobile={false} mockSettings={mockDesktop} reals={realsDesktop} />
         </div>
         <div className="relative z-20 flex flex-col px-10 pt-4 w-full justify-center" style={{ alignItems: "flex-start" }}>
           <div className="mb-6" />
@@ -241,21 +280,13 @@ export default function LandingPage() {
         </div>
 
         {editMode && (
-          <div className="hidden md:flex absolute z-30 flex-col gap-2" style={{ right: "51%", top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.93)", border: "1px solid rgba(255,255,255,0.15)", padding: "14px 16px", minWidth: "230px" }}>
+          <div className="hidden md:flex absolute z-30 flex-col gap-2" style={{ right: "51%", top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.93)", border: "1px solid rgba(255,255,255,0.15)", padding: "14px 16px", minWidth: "230px", maxHeight: "80vh", overflowY: "auto" }}>
             <p style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 700, fontSize: "0.55rem", letterSpacing: "0.2em", color: "rgba(255,255,255,0.85)" }}>SLIDE {current + 1}</p>
-            <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── MOCKUP (all slides) ──</p>
-            <ControlRow label="Zoom" onMinus={() => updateMock("scale", -0.05)} onPlus={() => updateMock("scale", 0.05)} value={mock.scale} />
-            <ControlRow label="Up / Down" onMinus={() => updateMock("y", -2)} onPlus={() => updateMock("y", 2)} value={mock.y} />
-            <ControlRow label="Left / Right" onMinus={() => updateMock("x", -2)} onPlus={() => updateMock("x", 2)} value={mock.x} />
-            <ControlRow label="Height %" onMinus={() => updateMock("splitHeight", -2)} onPlus={() => updateMock("splitHeight", 2)} value={mock.splitHeight} />
-            <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── SHADOWS (edges) ──</p>
-            <ControlRow label="Top Shadow" onMinus={() => updateMock("shadowTop", -5)} onPlus={() => updateMock("shadowTop", 5)} value={mock.shadowTop} />
-            <ControlRow label="Bottom Shadow" onMinus={() => updateMock("shadowBottom", -5)} onPlus={() => updateMock("shadowBottom", 5)} value={mock.shadowBottom} />
-            <ControlRow label="Right Shadow" onMinus={() => updateMock("shadowRight", -5)} onPlus={() => updateMock("shadowRight", 5)} value={mock.shadowRight} />
-            <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── REAL PHOTO (this slide) ──</p>
-            <ControlRow label="Zoom" onMinus={() => updateReal("scale", -0.05)} onPlus={() => updateReal("scale", 0.05)} value={r.scale} />
-            <ControlRow label="Up / Down" onMinus={() => updateReal("y", -2)} onPlus={() => updateReal("y", 2)} value={r.y} />
-            <ControlRow label="Left / Right" onMinus={() => updateReal("x", -2)} onPlus={() => updateReal("x", 2)} value={r.x} />
+            <div style={{ display: "flex", gap: "4px", marginBottom: "4px" }}>
+              <button onClick={() => setEditTab("desktop")} style={tabBtnStyle(editTab === "desktop")}>DESKTOP</button>
+              <button onClick={() => setEditTab("mobile")} style={tabBtnStyle(editTab === "mobile")}>MOBILE</button>
+            </div>
+            <EditControls tab={editTab} />
             <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "7px", marginTop: "4px", display: "flex", gap: "8px" }}>
               <button onClick={goPrev} style={{ ...btnStyle, width: "auto", padding: "0 8px", fontSize: "0.48rem", letterSpacing: "0.1em" }}>◀ PREV</button>
               <button onClick={goNext} style={{ ...btnStyle, width: "auto", padding: "0 8px", fontSize: "0.48rem", letterSpacing: "0.1em" }}>NEXT ▶</button>
@@ -284,15 +315,11 @@ export default function LandingPage() {
                 {saving ? "SAVING…" : "DONE"}
               </button>
             </div>
-            <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── MOCKUP (all slides) ──</p>
-            <ControlRow label="Zoom"         onMinus={() => updateMock("scale", -0.05)} onPlus={() => updateMock("scale", 0.05)} value={mock.scale} />
-            <ControlRow label="Up / Down"    onMinus={() => updateMock("y", -2)}        onPlus={() => updateMock("y", 2)}        value={mock.y} />
-            <ControlRow label="Left / Right" onMinus={() => updateMock("x", -2)}        onPlus={() => updateMock("x", 2)}        value={mock.x} />
-            <ControlRow label="Height %"     onMinus={() => updateMock("splitHeight", -2)} onPlus={() => updateMock("splitHeight", 2)} value={mock.splitHeight} />
-            <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── REAL PHOTO (this slide) ──</p>
-            <ControlRow label="Zoom"         onMinus={() => updateReal("scale", -0.05)} onPlus={() => updateReal("scale", 0.05)} value={r.scale} />
-            <ControlRow label="Up / Down"    onMinus={() => updateReal("y", -2)}        onPlus={() => updateReal("y", 2)}        value={r.y} />
-            <ControlRow label="Left / Right" onMinus={() => updateReal("x", -2)}        onPlus={() => updateReal("x", 2)}        value={r.x} />
+            <div style={{ display: "flex", gap: "4px", marginBottom: "4px" }}>
+              <button onClick={() => setEditTab("desktop")} style={tabBtnStyle(editTab === "desktop")}>DESKTOP</button>
+              <button onClick={() => setEditTab("mobile")} style={tabBtnStyle(editTab === "mobile")}>MOBILE</button>
+            </div>
+            <EditControls tab={editTab} />
             <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "7px", marginTop: "4px", display: "flex", gap: "8px" }}>
               <button onClick={goPrev} style={{ ...btnStyle, flex: 1, width: "auto", padding: "0 8px", fontSize: "0.48rem", letterSpacing: "0.1em" }}>◀ PREV</button>
               <button onClick={goNext} style={{ ...btnStyle, flex: 1, width: "auto", padding: "0 8px", fontSize: "0.48rem", letterSpacing: "0.1em" }}>NEXT ▶</button>
