@@ -173,7 +173,7 @@ export default function LandingPage() {
         <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── REAL PHOTO (this slide) ──</p>
         <ControlRow label="Zoom" onMinus={() => updateReal(tab, "scale", -0.05)} onPlus={() => updateReal(tab, "scale", 0.05)} value={r.scale} />
         <ControlRow label="Up / Down" onMinus={() => updateReal(tab, "y", -2)} onPlus={() => updateReal(tab, "y", 2)} value={r.y} />
-        <ControlRow label="Left / Right" onMinus={() => updateReal(tab, "x", -2)} onPlus={() => updateReal(tab, "x", 2)} value={r.x} />
+        <ControlRow label="Left / Right" onMinus={() => updateReal(tab, "x", -2)} onPlus={() => updateReal(tab, "x", 2)} value={r.x} /><ControlRow label="Left / Right" onMinus={() => updateReal(tab, "x", -2)} onPlus={() => updateReal(tab, "x", 2)} value={r.x} />
         {tab === "mobile" && (
           <>
             <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: "0.48rem", color: "rgba(255,255,255,0.38)", letterSpacing: "0.1em" }}>── TEXT POSITION ──</p>
@@ -242,7 +242,7 @@ export default function LandingPage() {
           <p className="text-white mt-2" style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 300, fontSize: "0.6rem", letterSpacing: "0.22em", opacity: 0.6, paddingLeft: "0", textAlign: "center", width: "100%" }}>
             PREMIUM STREETWEAR. YOUR RULES.
           </p>
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: "-150px", zIndex: -1, background: "linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.7) 60%, transparent 100%)", pointerEvents: "none" }} />           <div className="mt-4" style={{ paddingLeft: "0", display: "flex", justifyContent: "center" }}>
+          <div className="mt-4" style={{ paddingLeft: "0", display: "flex", justifyContent: "center" }}>
             <button
               className="flex items-center gap-3 text-white tracking-widest px-5 py-3 transition-all duration-300 hover:bg-white hover:text-black group"
               onClick={navigateToProducts}
@@ -254,7 +254,7 @@ export default function LandingPage() {
               </svg>
             </button>
           </div>
-          
+          <div style={{ position: "absolute", bottom: "-120px", left: 0, right: 0, height: "120px", pointerEvents: "none", background: "linear-gradient(to bottom, #000000 0%, transparent 100%)" }} />
         </div>
       </div>
 
