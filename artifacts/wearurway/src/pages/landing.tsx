@@ -86,7 +86,7 @@ export default function LandingPage() {
   const goTo = useCallback((index: number) => {
     if (transitioning || index === current) return;
     setTransitioning(true);
-    setTimeout(() => { setCurrent(index); setVisibleIndex(index); setTransitioning(false); }, 50);
+    setTimeout(() => { setVisibleIndex(index); }, 50); setTimeout(() => { setCurrent(index); setTransitioning(false); }, 850);
   }, [transitioning, current]);
 
   const goNext = useCallback(() => goTo((current + 1) % slidesData.length), [current, goTo]);
@@ -188,7 +188,7 @@ export default function LandingPage() {
       {slidesData.map((slide, i) => (
         <div key={i} style={{
           position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-          opacity: i === visibleIndex ? (transitioning ? 0 : 1) : 0,
+          opacity: i === visibleIndex ? 1 : i === current && transitioning ? 1 : 0,
           transition: "opacity 0.8s ease-in-out",
         }}>
           <div style={{ height: `${mockSettings.splitHeight}%`, position: "relative", overflow: "hidden", background: "#000000", flexShrink: 0 }}>
