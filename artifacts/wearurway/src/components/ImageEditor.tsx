@@ -306,6 +306,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   //   "pinch"  — two or more fingers were involved; block select for entire session
   const gestureSessionRef  = useRef<"idle"|"tap"|"pinch">("idle");
   const tapStartPosRef     = useRef<{x:number;y:number}|null>(null);
+  const pinchHappenedRef   = useRef(false);
 
   const [bgPreview,     setBgPreview]     = useState<BgPreview>("checker");
   const [processing,    setProcessing]    = useState(false);
@@ -680,6 +681,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
       const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
       pinchEditorRef.current={dist:Math.sqrt(dx*dx+dy*dy),midX,midY};
+      pinchHappenedRef.current=true;
       return;
     }
 
@@ -748,6 +750,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       // Fire select only if this was a clean single-finger tap session
       if (
         gestureSessionRef.current==="tap" &&
+        !pinchHappenedRef.current &&
         toolMode==="select" &&
         tapStartPosRef.current &&
         e.changedTouches.length===1
@@ -767,6 +770,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       isMoving.current=false;
       moveStartRef.current=null;
       pinchEditorRef.current=null;
+      pinchHappenedRef.current=false;
     }
   },[toolMode,getImageCoords,handleFuzzySelect]);
 
