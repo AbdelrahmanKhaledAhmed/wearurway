@@ -501,7 +501,11 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     e.preventDefault();
     const el=areaRef.current; if (!el) return;
     const rect=el.getBoundingClientRect();
-    applyZoom(zoomRef.current*(e.deltaY<0?1.12:1/1.12),
+    const isTrackpad=Math.abs(e.deltaY)<50;
+    const factor=isTrackpad
+      ? 1+(-e.deltaY*0.003)
+      : e.deltaY<0?1.12:1/1.12;
+    applyZoom(zoomRef.current*factor,
       (e.clientX-rect.left)/rect.width,(e.clientY-rect.top)/rect.height);
   },[applyZoom]);
 
@@ -1047,6 +1051,36 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       <span>Normal</span>
       <span>A lot</span>
     </div>
+  </div>
+
+  {/* Shortcuts — desktop only */}
+  <div className="hidden md:flex flex-col gap-2 px-5 py-5 mt-auto border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground mb-1">
+      Shortcuts
+    </span>
+    {[
+      { keys: ["Click"],        label: "Remove area"   },
+      { keys: ["Scroll"],       label: "Zoom in / out" },
+      { keys: ["Right drag"],   label: "Pan"           },
+      { keys: ["Ctrl", "Z"],    label: "Undo"          },
+      { keys: ["Ctrl", "Y"],    label: "Redo"          },
+      { keys: ["Esc"],          label: "Clear selection" },
+    ].map(({ keys, label }) => (
+      <div key={label} className="flex items-center justify-between gap-2">
+        <span className="text-[10px] text-muted-foreground">{label}</span>
+        <div className="flex items-center gap-1">
+          {keys.map(k => (
+            <kbd
+              key={k}
+              className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide border border-border text-muted-foreground"
+              style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+            >
+              {k}
+            </kbd>
+          ))}
+        </div>
+      </div>
+    ))}
   </div>
 </div>
 
