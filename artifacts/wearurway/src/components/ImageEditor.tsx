@@ -850,16 +850,16 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       <div className="flex items-center justify-between px-3 md:px-5 h-14 border-b shrink-0" style={{borderColor:"rgba(255,255,255,0.08)"}}>
         <div className="flex items-center gap-2 md:gap-4">
           <div className="hidden md:flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor:"#a855f7"}}/>
+            <div className="w-1.5 h-1.5" style={{backgroundColor:"#f5c842"}}/>
             <span className="text-[11px] font-black uppercase tracking-[0.25em] text-white">Image Editor</span>
           </div>
           <div className="flex items-center gap-0.5 md:gap-1">
             <button onClick={doUndo} disabled={!canUndo} title="Undo (Ctrl+Z)"
-              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 rounded text-white/50 hover:text-white hover:bg-white/8 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest">
+              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/10 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest">
               <UndoIcon/> <span className="hidden md:inline">Undo</span>
             </button>
             <button onClick={doRedo} disabled={!canRedo} title="Redo (Ctrl+Y)"
-              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 rounded text-white/50 hover:text-white hover:bg-white/8 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest">
+              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/10 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest">
               <span className="hidden md:inline">Redo</span> <RedoIcon/>
             </button>
           </div>
@@ -890,20 +890,20 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
               </button>
               <button
                 onClick={handleClearSelection}
-                className="px-2 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide active:scale-95 transition-all"
-                style={{backgroundColor:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.55)"}}>
+                className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide active:scale-95 transition-all border border-border text-muted-foreground hover:border-foreground"
+                style={{}}>
                 ×&nbsp;Clear
               </button>
             </div>
           )}
           <button onClick={onCancel}
-            className="px-3 md:px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest text-white/40 hover:text-white/70 hover:bg-white/8 transition-all">
+            className="px-3 md:px-4 py-2 text-[11px] font-bold uppercase tracking-widest border border-border text-muted-foreground hover:text-foreground hover:border-foreground transition-all">
             Cancel
           </button>
           <button onClick={handleConfirm}
-            className="px-4 md:px-5 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
-            style={{background:"linear-gradient(135deg,#a855f7,#7c3aed)",color:"#fff"}}>
-            Apply →
+            className="px-4 md:px-5 py-2 text-[11px] font-black uppercase tracking-widest transition-all hover:opacity-90 active:scale-95"
+            style={{backgroundColor:"#f5c842",color:"#0d0d0d"}}>
+            Apply
           </button>
         </div>
       </div>
@@ -974,11 +974,11 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
                 <div className="flex gap-1.5">
                   {[0,1,2].map(i=>(
                     <div key={i} className="w-2.5 h-2.5 rounded-full animate-bounce"
-                      style={{backgroundColor:"#a855f7",animationDelay:`${i*0.15}s`}}/>
+                      style={{backgroundColor:"#f5c842",animationDelay:`${i*0.15}s`}}/>
                   ))}
                 </div>
                 <span className="text-[11px] font-bold uppercase tracking-[0.2em]"
-                  style={{color:"rgba(196,140,255,0.9)"}}>Applying…</span>
+                  style={{color:"rgba(255,255,255,0.7)"}}>Applying…</span>
               </div>
             </div>
           )}
@@ -989,13 +989,13 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
 
         <div
   className="flex md:flex w-full md:w-72 border-t md:border-t-0 md:border-l flex-col shrink-0"
-  style={{ borderColor: "rgba(168,85,247,0.2)", backgroundColor: "#141414" }}
+  style={{ borderColor: "rgba(255,255,255,0.08)", backgroundColor: "#141414" }}
 >
   {/* Need Help button */}
   <button
   onClick={() => setShowHelpWizard(true)}
   className="flex md:hidden items-center gap-3 px-4 py-3 w-full text-left transition-opacity hover:opacity-90 active:opacity-75"  // ← add md:hidden
-  style={{ backgroundColor: "#a855f7", color: "#fff" }}
+  style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
 >
     <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 flex-shrink-0">
       <path d="M12 0C5.373 0 0 5.373 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.632-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0z" />
@@ -1008,7 +1008,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
 
   {/* Sensitivity slider */}
   <div className="flex flex-col gap-3 px-5 py-5">
-    <span className="text-[10px] font-black uppercase tracking-[0.25em]" style={{ color: "rgba(255,255,255,0.35)" }}>
+    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground">
       How much to remove
     </span>
     <input
@@ -1017,10 +1017,10 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       max={100}
       value={sensitivity}
       onChange={e => setSensitivity(Number(e.target.value))}
-      className="w-full accent-purple-500"
-      style={{ accentColor: "#a855f7" }}
+      className="w-full"
+      style={{ accentColor: "#f5c842" }}
     />
-    <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.35)" }}>
+    <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
       <span>A little</span>
       <span>Normal</span>
       <span>A lot</span>
@@ -1035,12 +1035,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
           style={{ backgroundColor: "rgba(0,0,0,0.82)", backdropFilter: "blur(8px)" }}
         >
           <div
-            className="w-full max-w-sm rounded-3xl p-7 text-center"
-            style={{
-              background: "linear-gradient(135deg,rgba(20,10,40,0.99),rgba(10,5,25,0.99))",
-              border: "1px solid rgba(168,85,247,0.5)",
-              boxShadow: "0 24px 64px rgba(124,58,237,0.5)",
-            }}
+            className="w-full max-w-sm bg-background border border-border p-7 text-center shadow-2xl"
+            style={{}}
           >
             <h2 className="text-[20px] font-black text-white mb-3">
               Tap the background to remove it
@@ -1050,8 +1046,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
             </p>
             <button
               onClick={() => setShowBgOnboarding(false)}
-              className="w-full py-4 rounded-2xl text-[13px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
-              style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff" }}
+              className="w-full py-4 text-[13px] font-black uppercase tracking-widest transition-all hover:opacity-90 active:scale-[0.98]"
+              style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
             >
               Got it
             </button>
@@ -1066,15 +1062,11 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
           onClick={() => setShowHelpWizard(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl p-6 text-center"
-            style={{
-              background: "linear-gradient(135deg,rgba(30,15,50,0.98),rgba(15,5,30,0.98))",
-              border: "1px solid rgba(168,85,247,0.4)",
-              boxShadow: "0 20px 60px rgba(124,58,237,0.4)",
-            }}
+            className="w-full max-w-md bg-background border border-border p-6 text-center shadow-2xl"
+            style={{}}
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-3" style={{ color: "#c48cff" }}>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-3 text-muted-foreground">
               Need Help?
             </p>
             <p className="text-[15px] leading-relaxed mb-6" style={{ color: "rgba(255,255,255,0.95)" }}>
@@ -1085,18 +1077,17 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setShowHelpWizard(false)}
-              className="inline-block w-full px-6 py-3 rounded-xl font-bold text-sm tracking-[0.15em] uppercase transition-all hover:scale-[1.02] active:scale-[0.99]"
+              className="inline-block w-full px-6 py-3 font-bold text-sm tracking-[0.15em] uppercase transition-all hover:opacity-90 active:scale-[0.99]"
               style={{
-                background: "linear-gradient(135deg,rgba(168,85,247,1),rgba(124,58,237,1))",
-                color: "#fff",
-                boxShadow: "0 8px 24px rgba(124,58,237,0.5)",
+                backgroundColor: "#f5c842",
+                color: "#0d0d0d",
               }}
             >
               Contact Us
             </a>
             <button
               onClick={() => setShowHelpWizard(false)}
-              className="mt-4 text-[11px] tracking-[0.2em] uppercase text-white/40 hover:text-white underline underline-offset-4 transition-colors"
+              className="mt-4 text-[11px] tracking-[0.2em] uppercase text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
             >
               Close
             </button>
