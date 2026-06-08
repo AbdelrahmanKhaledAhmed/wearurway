@@ -749,6 +749,19 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   },[applyZoom]);
 
   const onTouchEndEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
+    // 2→1 finger: one finger lifted during a pinch — hand off to single-finger pan immediately
+    if (e.touches.length === 1 && gestureSessionRef.current === "pinch") {
+      const touch = e.touches[0];
+      pinchEditorRef.current = null;
+      isMoving.current = true;
+      moveStartRef.current = {
+        pointerX: touch.clientX,
+        pointerY: touch.clientY,
+        panX: panRef.current.x,
+        panY: panRef.current.y,
+      };
+      return;
+    }
     // Only act when ALL fingers are fully off the screen
     if (e.touches.length===0) {
       // Fire select only if this was a clean single-finger tap session
