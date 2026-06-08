@@ -307,6 +307,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   const gestureSessionRef  = useRef<"idle"|"tap"|"pinch">("idle");
   const tapStartPosRef     = useRef<{x:number;y:number}|null>(null);
   const pinchHappenedRef   = useRef(false);
+  const lastPinchEndTimeRef = useRef<number>(0);
 
   const [bgPreview,     setBgPreview]     = useState<BgPreview>("checker");
   const [processing,    setProcessing]    = useState(false);
@@ -688,7 +689,9 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     if (e.touches.length===1) {
       // Only register a tap-start if session is truly idle (no pinch contamination)
       if (gestureSessionRef.current==="pinch") {
-        // Still in pinch session (second finger just lifted) — ignore this touch
+        return;
+      }
+      if (Date.now() - lastPinchEndTimeRef.current < 350) {
         return;
       }
       const touch=e.touches[0];
@@ -766,6 +769,9 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
         }
       }
       // Reset everything — session is fully over
+      if (pinchHappenedRef.current) {
+        lastPinchEndTimeRef.current = Date.now();
+      }
       gestureSessionRef.current="idle";
       tapStartPosRef.current=null;
       isMoving.current=false;
