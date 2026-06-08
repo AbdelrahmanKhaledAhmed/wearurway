@@ -101,7 +101,7 @@ async function fetchViaWsrv(imageUrl: string): Promise<Buffer> {
     const { buffer } = await fetchBuffer(wsrvUrl, {
       "User-Agent": BROWSER_UA,
       Accept: "image/*,*/*;q=0.8",
-    }, 30000);
+    }, 15000);
     return buffer;
   } catch { /* fall through to alternatives */ }
 
@@ -114,7 +114,7 @@ async function fetchViaWsrv(imageUrl: string): Promise<Buffer> {
       const { buffer } = await fetchBuffer(wsrvFallback, {
         "User-Agent": BROWSER_UA,
         Accept: "image/*,*/*;q=0.8",
-      }, 25000);
+      }, 12000);
       return buffer;
     } catch { /* fall through */ }
   }
@@ -127,7 +127,7 @@ async function fetchViaWsrv(imageUrl: string): Promise<Buffer> {
     "sec-fetch-dest": "image",
     "sec-fetch-mode": "no-cors",
     "sec-fetch-site": "cross-site",
-  }, 25000);
+  }, 12000);
   return buffer;
 }
 
@@ -142,7 +142,7 @@ async function fetchViaOEmbed(pinUrl: string): Promise<string | null> {
       "User-Agent": BROWSER_UA,
       Accept: "application/json",
       "Accept-Language": "en-US,en;q=0.9",
-    }, 12000);
+    }, 8000);
     const json = JSON.parse(buffer.toString("utf-8")) as Record<string, unknown>;
     const thumb = typeof json.thumbnail_url === "string" ? json.thumbnail_url : null;
     if (thumb && thumb.includes("pinimg.com")) return upgradeToOriginals(thumb);
@@ -153,26 +153,29 @@ async function fetchViaOEmbed(pinUrl: string): Promise<string | null> {
 // ── Pinterest pin page scrape ─────────────────────────────────────────────────
 
 async function scrapePinPage(pinUrl: string): Promise<string | null> {
-  // Strategy 1: oEmbed API — most reliable, works even when HTML is JS-rendered
-  const oembed = await fetchViaOEmbed(pinUrl);
-  if (oembed) return oembed;
+  // Strategy 1 + 2: oEmbed API and AMP page run in parallel — take whichever wins
+  const [oembed, ampResult] = await Promise.allSettled([
+    fetchViaOEmbed(pinUrl),
+    (async () => {
+      const ampUrl = pinUrl.replace(/\/?$/, "?amp=1");
+      const { buffer: ampBuf } = await fetchBuffer(ampUrl, {
+        "User-Agent": BROWSER_UA,
+        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      }, 8000);
+      const ampHtml = ampBuf.toString("utf-8");
+      const ampUrls = extractPinImgUrls(ampHtml);
+      if (ampUrls.length > 0) return ampUrls[0];
+      const ogAmp =
+        ampHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1] ??
+        ampHtml.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)?.[1];
+      if (ogAmp) return upgradeToOriginals(ogAmp);
+      return null;
+    })(),
+  ]);
 
-  // Strategy 2: AMP page — much simpler HTML, more likely to contain image data
-  try {
-    const ampUrl = pinUrl.replace(/\/?$/, "?amp=1");
-    const { buffer: ampBuf } = await fetchBuffer(ampUrl, {
-      "User-Agent": BROWSER_UA,
-      Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-    }, 12000);
-    const ampHtml = ampBuf.toString("utf-8");
-    const ampUrls = extractPinImgUrls(ampHtml);
-    if (ampUrls.length > 0) return ampUrls[0];
-    const ogAmp =
-      ampHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1] ??
-      ampHtml.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)?.[1];
-    if (ogAmp) return upgradeToOriginals(ogAmp);
-  } catch { /* fall through */ }
+  if (oembed.status === "fulfilled" && oembed.value) return oembed.value;
+  if (ampResult.status === "fulfilled" && ampResult.value) return ampResult.value;
 
   // Strategy 3: Full HTML scrape fallback
   try {
