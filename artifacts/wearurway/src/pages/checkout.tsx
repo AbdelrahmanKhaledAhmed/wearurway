@@ -539,7 +539,7 @@ export default function Checkout() {
                 Preparing Your Order
               </h3>
               <p className="text-sm text-white/70 leading-relaxed">
-                We're sending your order to us. Please keep this page open until you see the success screen, then you can safely close it — your order will be processed automatically from there.
+                We're sending your order — this usually takes a few seconds. You'll see a confirmation screen as soon as we receive it.
               </p>
             </motion.div>
           </motion.div>
