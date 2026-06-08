@@ -25,8 +25,6 @@ interface CanvasSnapshot {
 
 interface AlphaBounds { x: number; y: number; width: number; height: number }
 
-// ─── Pixel helpers ──────────────────────────────────────────────────────────
-
 function getColorAt(d: Uint8ClampedArray, x: number, y: number, w: number): [number,number,number,number] {
   const i=(y*w+x)*4; return [d[i],d[i+1],d[i+2],d[i+3]];
 }
@@ -57,19 +55,15 @@ function fuzzySelectRegion(id: ImageData, sx: number, sy: number, colorTol: numb
   const seed=getColorAt(d,sx,sy,w);
   const mask=new Uint8Array(w*h);
   if (seed[3]===0) return mask;
-
   const processed=new Uint8Array(w*h);
   const queue: number[]=[];
   const parentColor=new Uint8Array(w*h*4);
-
   const startIdx=sy*w+sx;
   processed[startIdx]=1;
   queue.push(startIdx);
   parentColor[startIdx*4]=seed[0]; parentColor[startIdx*4+1]=seed[1];
   parentColor[startIdx*4+2]=seed[2]; parentColor[startIdx*4+3]=seed[3];
-
   const dirs=[1,0,-1,0,0,1,0,-1,1,1,-1,1,1,-1,-1,-1];
-
   while (queue.length) {
     const idx=queue.pop()!;
     const x=idx%w, y=Math.floor(idx/w);
@@ -152,14 +146,10 @@ function trimTransparency(src: HTMLCanvasElement): {canvas:HTMLCanvasElement;bou
   return {canvas:out,bounds};
 }
 
-// Separable horizontal/vertical Gaussian blur (sigma≈1.0) for unsharp mask.
-// Kernel is small and runs only on RGB so transparent edges stay smooth.
 function gaussianBlurRGB(src: Uint8ClampedArray, w: number, h: number): Uint8ClampedArray {
-  // 5-tap kernel, sigma≈1.0 — matches the radius of a gentle unsharp mask.
   const K=[0.06136,0.24477,0.38774,0.24477,0.06136];
   const tmp=new Float32Array(w*h*4);
   const out=new Uint8ClampedArray(src.length);
-  // Horizontal
   for (let y=0;y<h;y++) {
     for (let x=0;x<w;x++) {
       let r=0,g=0,b=0;
@@ -172,7 +162,6 @@ function gaussianBlurRGB(src: Uint8ClampedArray, w: number, h: number): Uint8Cla
       tmp[o]=r; tmp[o+1]=g; tmp[o+2]=b; tmp[o+3]=src[o+3];
     }
   }
-  // Vertical
   for (let y=0;y<h;y++) {
     for (let x=0;x<w;x++) {
       let r=0,g=0,b=0;
@@ -188,9 +177,6 @@ function gaussianBlurRGB(src: Uint8ClampedArray, w: number, h: number): Uint8Cla
   return out;
 }
 
-// Gentle unsharp mask: out = src + amount * (src - blurred), thresholded.
-// Only RGB is touched — alpha is preserved exactly so anti-aliased edges
-// don't get crushed into hard "map contour" lines.
 function unsharpMask(id: ImageData, amount=0.35, threshold=4): ImageData {
   const src=id.data, w=id.width, h=id.height;
   const blurred=gaussianBlurRGB(src,w,h);
@@ -203,14 +189,10 @@ function unsharpMask(id: ImageData, amount=0.35, threshold=4): ImageData {
       const v=src[i+c]+amount*diff;
       dst[i+c]=v<0?0:v>255?255:v;
     }
-    // alpha intentionally left untouched
   }
   return new ImageData(dst,w,h);
 }
 
-// High-quality upscale using the browser's native resize (Lanczos-class in
-// Chromium) via createImageBitmap. Falls back to a stepwise bilinear scale
-// if createImageBitmap with resize options is unavailable.
 async function highQualityUpscale(
   src: HTMLCanvasElement, targetW: number, targetH: number
 ): Promise<HTMLCanvasElement> {
@@ -229,7 +211,6 @@ async function highQualityUpscale(
     bitmap.close();
     return out;
   } catch {
-    // Fallback: stepwise doubling with high-quality smoothing.
     let cur=src;
     while (cur.width*2<=targetW && cur.height*2<=targetH) {
       const next=document.createElement("canvas");
@@ -252,10 +233,6 @@ async function highQualityUpscale(
 }
 
 async function enhanceCanvas(src: HTMLCanvasElement, qualityScale=1): Promise<HTMLCanvasElement> {
-  // Auto-pick the most aggressive sensible scale.
-  // Targets ~4096px on the long side (print-grade); never downscales; capped to
-  // avoid runaway memory on already-large images.
-  // MAX_SIDE is capped to 4096 for mobile canvas limits (many devices reject larger).
   const TARGET_LONG=4096, MAX_SIDE=4096, MAX_AUTO_SCALE=8;
   const longSide=Math.max(src.width,src.height);
   const autoScale=Math.min(MAX_AUTO_SCALE,Math.max(1,TARGET_LONG/longSide));
@@ -266,16 +243,11 @@ async function enhanceCanvas(src: HTMLCanvasElement, qualityScale=1): Promise<HT
   );
   const targetW=Math.max(1,Math.round(src.width*scale));
   const targetH=Math.max(1,Math.round(src.height*scale));
-
   const upscaled=scale>1?await highQualityUpscale(src,targetW,targetH):src;
-
   const out=document.createElement("canvas");
   out.width=upscaled.width; out.height=upscaled.height;
   const ctx=out.getContext("2d"); if (!ctx) return upscaled;
   ctx.drawImage(upscaled,0,0);
-
-  // Single gentle unsharp mask pass for crispness without ringing or
-  // contour-line artifacts. Alpha is preserved so soft edges stay soft.
   const id=ctx.getImageData(0,0,out.width,out.height);
   ctx.putImageData(unsharpMask(id,0.35,4),0,0);
   return out;
@@ -297,8 +269,6 @@ const RedoIcon = () => (
   </svg>
 );
 
-// ─── Component ──────────────────────────────────────────────────────────────
-
 export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1, showBgHint=false }: Props) {
   const [currentFile, setCurrentFile] = useState<File>(file);
   useEffect(()=>{ setCurrentFile(file); },[file]);
@@ -311,39 +281,32 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   const imgRef           = useRef<HTMLImageElement>(null);
   const areaRef          = useRef<HTMLDivElement>(null);
 
-  // ── Pan state ───────────────────────────────────────────────────────────────
   const isMoving         = useRef(false);
   const moveStartRef     = useRef<{pointerX:number;pointerY:number;panX:number;panY:number}|null>(null);
   const pinchEditorRef   = useRef<{dist:number;midX:number;midY:number}|null>(null);
 
-  // ── History ─────────────────────────────────────────────────────────────────
   const undoRef          = useRef<CanvasSnapshot[]>([]);
   const redoRef          = useRef<CanvasSnapshot[]>([]);
   const trimRef          = useRef<ImageEditResult|null>(null);
-
-  // ── Live recolor preview state ──────────────────────────────────────────────
-  // Snapshot of the canvas pixels taken on the first preview, so each color
-  // tweak can restore-then-recolor without stacking edits or undo entries.
   const recolorBaseRef   = useRef<ImageData|null>(null);
-
-  // ── Refs for stale-closure-safe reads ───────────────────────────────────────
   const panRef           = useRef({x:0,y:0});
   const zoomRef          = useRef(1);
   const displayDimsRef   = useRef<{w:number;h:number}|null>(null);
-
-  // ── Marching ants ───────────────────────────────────────────────────────────
   const rafDisplayRef    = useRef<number|null>(null);
   const baseOverlayRef   = useRef<Uint8ClampedArray|null>(null);
   const borderPixelsRef  = useRef<{idx:number;x:number;y:number}[]>([]);
   const animFrameRef     = useRef<number|null>(null);
-
-  // ── Sensitivity / last click (for live re-selection on slider drag) ─────────
-  // Stores the last image-pixel coordinate the user clicked for fuzzy select,
-  // so we can re-run the selection whenever the sensitivity slider changes.
   const lastSelectPointRef  = useRef<{px:number;py:number}|null>(null);
   const selectDebounceRef   = useRef<ReturnType<typeof setTimeout>|null>(null);
 
-  // ── React state ─────────────────────────────────────────────────────────────
+  // ── Touch gesture refs ───────────────────────────────────────────────────────
+  // gestureSessionRef tracks the state of the current touch session:
+  //   "idle"   — no fingers down, ready for a clean tap
+  //   "tap"    — exactly one finger down, no pinch yet
+  //   "pinch"  — two or more fingers were involved; block select for entire session
+  const gestureSessionRef  = useRef<"idle"|"tap"|"pinch">("idle");
+  const tapStartPosRef     = useRef<{x:number;y:number}|null>(null);
+
   const [bgPreview,     setBgPreview]     = useState<BgPreview>("checker");
   const [processing,    setProcessing]    = useState(false);
   const [loaded,        setLoaded]        = useState(false);
@@ -355,14 +318,11 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   const [toolMode,      setToolMode]      = useState<ToolMode>("select");
   const [selectionMask, setSelectionMask] = useState<Uint8Array|null>(null);
   const [availArea,     setAvailArea]     = useState<{w:number;h:number}|null>(null);
-  // sensitivity: 1 (very precise) → 100 (very wide). Default ≈ 40 matches old hardcoded values.
   const [sensitivity,   setSensitivity]   = useState(40);
   void histSig;
 
   useEffect(()=>{ panRef.current=pan; },[pan]);
   useEffect(()=>{ zoomRef.current=zoom; },[zoom]);
-
-  // ── Measure available area ──────────────────────────────────────────────────
 
   useEffect(()=>{
     const el=areaRef.current; if (!el) return;
@@ -380,8 +340,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     return {w:Math.round(nativeSize.w*scale),h:Math.round(nativeSize.h*scale)};
   },[availArea,nativeSize]);
   useEffect(()=>{ displayDimsRef.current=displayDims; },[displayDims]);
-
-  // ── Marching ants ───────────────────────────────────────────────────────────
 
   useEffect(()=>{
     if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current=null; }
@@ -431,8 +389,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     return ()=>{ if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
   },[selectionMask]);
 
-  // ── Display ─────────────────────────────────────────────────────────────────
-
   const updateDisplay = useCallback(()=>{
     const c=canvasRef.current; if (!c) return;
     setDisplaySrc(c.toDataURL("image/png"));
@@ -443,8 +399,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     rafDisplayRef.current=requestAnimationFrame(()=>{ rafDisplayRef.current=null; updateDisplay(); });
   },[updateDisplay]);
   void scheduleDisplay;
-
-  // ── Load ────────────────────────────────────────────────────────────────────
 
   useEffect(()=>{
     const url=URL.createObjectURL(currentFile);
@@ -462,8 +416,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     img.src=url;
     return ()=>URL.revokeObjectURL(url);
   },[currentFile,updateDisplay]);
-
-  // ── Undo / Redo ─────────────────────────────────────────────────────────────
 
   const saveUndo = useCallback(()=>{
     const c=canvasRef.current; if (!c) return;
@@ -488,8 +440,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   const doUndo = useCallback(()=>{
     const snap=undoRef.current.pop(); if (!snap) return;
     const c=canvasRef.current; if (!c) return;
-    // Discard any pending recolor preview without restoring (the snap will
-    // overwrite the canvas anyway).
     recolorBaseRef.current=null;
     redoRef.current=[...redoRef.current,{width:c.width,height:c.height,data:c.getContext("2d")!.getImageData(0,0,c.width,c.height),trim:trimRef.current}];
     restoreSnap(snap); setHistSig(h=>h+1);
@@ -505,42 +455,23 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     setSelectionMask(null);
   },[restoreSnap]);
 
-  // ── Global keyboard shortcuts ───────────────────────────────────────────────
-  // Registered in CAPTURE phase ({capture:true}) so the handler fires before
-  // any focused element (slider, button, input) can swallow the event.
-  // e.key is normalised to lowercase for layout-independence.
-
   useEffect(()=>{
     const h=(e: KeyboardEvent)=>{
       const key=e.key.toLowerCase();
-      // Ctrl+Z → undo
       if ((e.ctrlKey||e.metaKey)&&!e.shiftKey&&key==="z") {
-        e.preventDefault();
-        e.stopPropagation();
-        doUndo();
-        return;
+        e.preventDefault(); e.stopPropagation(); doUndo(); return;
       }
-      // Ctrl+Y → redo
       if ((e.ctrlKey||e.metaKey)&&!e.shiftKey&&key==="y") {
-        e.preventDefault();
-        e.stopPropagation();
-        doRedo();
-        return;
+        e.preventDefault(); e.stopPropagation(); doRedo(); return;
       }
-      // Ctrl+Shift+Z → redo (alternate)
       if ((e.ctrlKey||e.metaKey)&&e.shiftKey&&key==="z") {
-        e.preventDefault();
-        e.stopPropagation();
-        doRedo();
-        return;
+        e.preventDefault(); e.stopPropagation(); doRedo(); return;
       }
       if (e.key==="Escape") setSelectionMask(null);
     };
     window.addEventListener("keydown",h,{capture:true});
     return ()=>window.removeEventListener("keydown",h,{capture:true});
   },[doUndo,doRedo]);
-
-  // ── Zoom ────────────────────────────────────────────────────────────────────
 
   const applyZoom = useCallback((newZ: number, fx=0.5, fy=0.5)=>{
     const el=areaRef.current; if (!el) return;
@@ -564,8 +495,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       (e.clientX-rect.left)/rect.width,(e.clientY-rect.top)/rect.height);
   },[applyZoom]);
 
-  // ── Coordinate mapping (for fuzzy select) ───────────────────────────────────
-
   const getImageCoords = useCallback((clientX: number, clientY: number): {imgX:number;imgY:number}|null=>{
     if (!nativeSize||!imgRef.current) return null;
     const rect=imgRef.current.getBoundingClientRect();
@@ -576,23 +505,14 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     };
   },[nativeSize]);
 
-  // ── Sensitivity → tolerance mapping ────────────────────────────────────────
-  // sensitivity 1  → colorTol≈6,  edgeTol≈17  (very tight)
-  // sensitivity 40 → colorTol≈55, edgeTol≈77  (matches old hardcoded values)
-  // sensitivity 100→ colorTol≈130, edgeTol≈170 (very wide)
   const tolerancesFromSensitivity = useCallback((s: number)=>{
     const t=s/100;
     return {colorTol:Math.round(5+t*125), edgeTol:Math.round(15+t*155)};
   },[]);
 
-  // ── Fuzzy select ─────────────────────────────────────────────────────────────
-
   const runFuzzySelect = useCallback((px: number, py: number, sens: number)=>{
     const c=canvasRef.current; if (!c) return;
     const ctx=c.getContext("2d"); if (!ctx) return;
-    // If there is a pending recolor preview, COMMIT it before making a new
-    // selection so the user doesn't lose their work by clicking the canvas.
-    // The previewed pixels stay applied and a single undo entry is saved.
     if (recolorBaseRef.current) {
       undoRef.current=[...undoRef.current.slice(-19),{
         width:c.width,height:c.height,data:recolorBaseRef.current,trim:trimRef.current,
@@ -624,12 +544,9 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     runFuzzySelect(px,py,sensitivity);
   },[sensitivity,runFuzzySelect]);
 
-  // Re-run selection live whenever sensitivity changes, as long as the user
-  // has already clicked (i.e. there is a stored last-click point).
   useEffect(()=>{
     const pt=lastSelectPointRef.current;
     if (!pt) return;
-    // Debounce so rapid slider drags don't flood the pixel loop
     if (selectDebounceRef.current) clearTimeout(selectDebounceRef.current);
     selectDebounceRef.current=setTimeout(()=>{
       selectDebounceRef.current=null;
@@ -639,13 +556,10 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[sensitivity]);
 
-  // ── Selection actions ────────────────────────────────────────────────────────
-
   const handleDelete = useCallback(()=>{
     if (!selectionMask) return;
     const c=canvasRef.current; if (!c) return;
     const ctx=c.getContext("2d"); if (!ctx) return;
-    // Drop any in-progress recolor preview before deleting pixels.
     if (recolorBaseRef.current) {
       ctx.putImageData(recolorBaseRef.current,0,0);
       recolorBaseRef.current=null;
@@ -662,9 +576,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     },0);
   },[selectionMask,saveUndo,updateDisplay]);
 
-  // Live recolor preview — restores from the original snapshot and re-applies
-  // the recolor with each new color, so dragging the picker updates the canvas
-  // in real time without piling on undo entries.
   const handlePreviewColor = useCallback((color: string)=>{
     if (!selectionMask) return;
     const c=canvasRef.current; if (!c) return;
@@ -678,8 +589,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     updateDisplay();
   },[selectionMask,updateDisplay]);
 
-  // Cancel any pending preview by restoring the snapshot taken before the
-  // first preview color was applied.
   const cancelColorPreview = useCallback(()=>{
     if (!recolorBaseRef.current) return;
     const c=canvasRef.current; if (!c) return;
@@ -693,16 +602,12 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     if (!selectionMask) return;
     const c=canvasRef.current; if (!c) return;
     const ctx=c.getContext("2d"); if (!ctx) return;
-    // Snapshot the pre-preview pixels so undo can restore the original.
-    const baseSnapshot=recolorBaseRef.current
-      ?? ctx.getImageData(0,0,c.width,c.height);
-    // Push the original to the undo stack (so Ctrl+Z reverts the recolor).
+    const baseSnapshot=recolorBaseRef.current ?? ctx.getImageData(0,0,c.width,c.height);
     undoRef.current=[...undoRef.current.slice(-19),{
       width:c.width,height:c.height,data:baseSnapshot,trim:trimRef.current,
     }];
     redoRef.current=[];
     setHistSig(h=>h+1);
-    // Apply the final color from the original baseline.
     const result=applyMaskRecolor(baseSnapshot,selectionMask,color);
     ctx.putImageData(result,0,0);
     recolorBaseRef.current=null;
@@ -716,27 +621,19 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     lastSelectPointRef.current=null;
   },[cancelColorPreview]);
 
-  // ── Mouse events ────────────────────────────────────────────────────────────
-
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLElement>)=>{
     if (!loaded||!nativeSize) return;
-
-    // Right-click (button 2) always pans, regardless of the active tool — lets
-    // the user hold right-click to move while in Magic Select etc.
     if (e.button===2) {
       e.preventDefault();
       isMoving.current=true;
       moveStartRef.current={pointerX:e.clientX,pointerY:e.clientY,panX:panRef.current.x,panY:panRef.current.y};
       return;
     }
-
     if (toolMode==="select") {
       const pt=getImageCoords(e.clientX,e.clientY);
       if (pt) handleFuzzySelect(pt.imgX,pt.imgY);
       return;
     }
-
-    // Default: left-click also pans
     isMoving.current=true;
     moveStartRef.current={pointerX:e.clientX,pointerY:e.clientY,panX:panRef.current.x,panY:panRef.current.y};
   },[loaded,nativeSize,toolMode,getImageCoords,handleFuzzySelect]);
@@ -755,34 +652,27 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
 
   const onMouseLeave = useCallback(()=>{ onMouseUp(); },[onMouseUp]);
 
-  // Suppress the browser context menu on the canvas area so right-click is
-  // free to be used as a pan gesture.
   const onContextMenu = useCallback((e: React.MouseEvent<HTMLElement>)=>{
     e.preventDefault();
   },[]);
 
-  // ── Touch events (pan + pinch-zoom) ─────────────────────────────────────────
-
-  const touchStartPosRef  = useRef<{x:number;y:number}|null>(null);
-  const pinchOccurredRef  = useRef(false);
-  const pinchMovedRef     = useRef(false);
+  // ── Touch events ────────────────────────────────────────────────────────────
+  // Uses a gesture session state machine:
+  //   "idle"  → no fingers on screen
+  //   "tap"   → exactly 1 finger, no pinch yet this session
+  //   "pinch" → 2+ fingers touched at any point this session; select is BLOCKED
+  //
+  // The session only resets to "idle" when ALL fingers leave the screen.
+  // This prevents the first-finger-down after a pinch from being recorded
+  // as a new tap start before the session fully ends.
 
   const onTouchStartEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
     if (!loaded||!nativeSize) return;
-    if (e.touches.length===1) {
-      const touch=e.touches[0];
-      if (toolMode==="select") {
-        if (pinchOccurredRef.current || pinchMovedRef.current) return;
-        touchStartPosRef.current={x:touch.clientX,y:touch.clientY};
-        isMoving.current=true;
-        moveStartRef.current={pointerX:touch.clientX,pointerY:touch.clientY,panX:panRef.current.x,panY:panRef.current.y};
-        return;
-      }
-      isMoving.current=true;
-      moveStartRef.current={pointerX:touch.clientX,pointerY:touch.clientY,panX:panRef.current.x,panY:panRef.current.y};
-   } else if (e.touches.length>=2) {
-      pinchOccurredRef.current=true;
-      touchStartPosRef.current=null;
+
+    if (e.touches.length>=2) {
+      // Two or more fingers — mark this entire session as a pinch
+      gestureSessionRef.current="pinch";
+      tapStartPosRef.current=null;
       isMoving.current=false;
       moveStartRef.current=null;
       const dx=e.touches[0].clientX-e.touches[1].clientX;
@@ -790,8 +680,24 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
       const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
       pinchEditorRef.current={dist:Math.sqrt(dx*dx+dy*dy),midX,midY};
+      return;
     }
-  },[loaded,nativeSize,toolMode,getImageCoords,handleFuzzySelect]);
+
+    if (e.touches.length===1) {
+      // Only register a tap-start if session is truly idle (no pinch contamination)
+      if (gestureSessionRef.current==="pinch") {
+        // Still in pinch session (second finger just lifted) — ignore this touch
+        return;
+      }
+      const touch=e.touches[0];
+      gestureSessionRef.current="tap";
+      if (toolMode==="select") {
+        tapStartPosRef.current={x:touch.clientX,y:touch.clientY};
+      }
+      isMoving.current=true;
+      moveStartRef.current={pointerX:touch.clientX,pointerY:touch.clientY,panX:panRef.current.x,panY:panRef.current.y};
+    }
+  },[loaded,nativeSize,toolMode]);
 
   const onTouchMoveEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
     e.preventDefault();
@@ -800,7 +706,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       const s=moveStartRef.current;
       setPan({x:s.panX+touch.clientX-s.pointerX,y:s.panY+touch.clientY-s.pointerY});
     } else if (e.touches.length===2 && pinchEditorRef.current!==null) {
-      pinchMovedRef.current=true;
       const dx=e.touches[0].clientX-e.touches[1].clientX;
       const dy=e.touches[0].clientY-e.touches[1].clientY;
       const newDist=Math.sqrt(dx*dx+dy*dy);
@@ -822,28 +727,31 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   },[applyZoom]);
 
   const onTouchEndEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
+    // Only act when ALL fingers are fully off the screen
     if (e.touches.length===0) {
-      // Only fire select if: no pinch was started AND no pinch move happened
-      if (toolMode==="select" && touchStartPosRef.current && !pinchOccurredRef.current && !pinchMovedRef.current) {
+      // Fire select only if this was a clean single-finger tap session
+      if (
+        gestureSessionRef.current==="tap" &&
+        toolMode==="select" &&
+        tapStartPosRef.current
+      ) {
         const touch=e.changedTouches[0];
-        const dx=touch.clientX-touchStartPosRef.current.x;
-        const dy=touch.clientY-touchStartPosRef.current.y;
+        const dx=touch.clientX-tapStartPosRef.current.x;
+        const dy=touch.clientY-tapStartPosRef.current.y;
         const dist=Math.sqrt(dx*dx+dy*dy);
         if (dist<12) {
           const pt=getImageCoords(touch.clientX,touch.clientY);
           if (pt) handleFuzzySelect(pt.imgX,pt.imgY);
         }
       }
-      touchStartPosRef.current=null;
-      pinchOccurredRef.current=false;
-      pinchMovedRef.current=false;
+      // Reset everything — session is fully over
+      gestureSessionRef.current="idle";
+      tapStartPosRef.current=null;
       isMoving.current=false;
       moveStartRef.current=null;
       pinchEditorRef.current=null;
     }
   },[toolMode,getImageCoords,handleFuzzySelect]);
-
-  // ── Confirm ─────────────────────────────────────────────────────────────────
 
   const handleConfirm = useCallback(()=>{
     const c=canvasRef.current; if (!c) return;
@@ -852,8 +760,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       ?{originalWidth:c.width,originalHeight:c.height,x:bounds.x,y:bounds.y,width:bounds.width,height:bounds.height}
       :{originalWidth:c.width,originalHeight:c.height,x:0,y:0,width:c.width,height:c.height};
     setProcessing(true);
-    // Yield to the browser so the "Applying…" overlay paints before the
-    // CPU-heavy upscale + sharpen passes lock the main thread.
     setTimeout(async ()=>{
       try {
         const trimmed=trimTransparency(c).canvas;
@@ -863,7 +769,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
             setProcessing(false);
             onConfirm(b,trimRef.current!);
           } else {
-            // Fallback: toBlob failed (canvas too large on mobile) — retry at original size
             trimmed.toBlob(b2=>{
               setProcessing(false);
               if (b2) onConfirm(b2,trimRef.current!);
@@ -872,15 +777,12 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
         },"image/png");
       } catch {
         setProcessing(false);
-        // Final fallback: use raw canvas directly
         c.toBlob(b=>{
           if (b) onConfirm(b,trimRef.current!);
         },"image/png");
       }
     },30);
   },[qualityScale,onConfirm]);
-
-  // ── Derived display values ───────────────────────────────────────────────────
 
   const canTransform=zoom!==1||pan.x!==0||pan.y!==0?`matrix(${zoom},0,0,${zoom},${pan.x},${pan.y})`:undefined;
   const canUndo=undoRef.current.length>0;
@@ -901,12 +803,9 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     });
   },[]);
 
-  // ── Render ──────────────────────────────────────────────────────────────────
-
   return (
     <div className="fixed inset-0 z-[100] flex flex-col" style={{backgroundColor:"#141414"}}>
 
-      {/* ── Top bar ── */}
       <div className="flex items-center justify-between px-3 md:px-5 h-14 border-b shrink-0" style={{borderColor:"rgba(255,255,255,0.08)"}}>
         <div className="flex items-center gap-2 md:gap-4">
           <div className="hidden md:flex items-center gap-1.5">
@@ -936,7 +835,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
             ))}
             <span className="text-[10px] text-white/30 ml-1 uppercase tracking-widest">BG</span>
           </div>
-          {/* Mobile: Remove Selected + Clear — shown in top bar when selection exists */}
           {selectionMask && (
             <div className="md:hidden flex items-center gap-1">
               <button
@@ -969,10 +867,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
         </div>
       </div>
 
-      {/* ── Body ── */}
       <div className="flex flex-1 min-h-0 flex-col md:flex-row">
 
-        {/* ── Canvas area ── */}
         <div
           ref={areaRef}
           className="flex-1 flex items-center justify-center relative overflow-hidden select-none min-h-0"
@@ -1079,12 +975,9 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
             </div>
           )}
 
-
           <canvas ref={canvasRef} style={{display:"none"}}/>
         </div>
 
-        {/* ── Tool panel ── */}
-        {/* On mobile: collapsible bottom sheet toggle */}
         <div className="flex md:flex w-full md:w-80 border-t md:border-t-0 md:border-l flex-col shrink-0 max-h-64 md:max-h-none overflow-y-auto" style={{borderColor:"rgba(168,85,247,0.2)"}}>
           <FuzzySelectPanel
             toolMode={toolMode}
@@ -1100,7 +993,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
             onDownloadImage={() => {
               const c = canvasRef.current;
               if (!c) return;
-              // Use jpeg for mobile gallery saving (iOS/Android save jpeg to Photos, png goes to Files)
               const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
               const mimeType = isMobile ? "image/jpeg" : "image/png";
               const ext = isMobile ? "jpg" : "png";
