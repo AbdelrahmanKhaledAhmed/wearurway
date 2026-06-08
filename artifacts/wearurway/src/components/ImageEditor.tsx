@@ -308,6 +308,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   const tapStartPosRef     = useRef<{x:number;y:number}|null>(null);
   const pinchHappenedRef   = useRef(false);
   const lastPinchEndTimeRef = useRef<number>(0);
+  const lastTouchTimeRef = useRef<number>(0);
 
   const [bgPreview,     setBgPreview]     = useState<BgPreview>("checker");
   const [processing,    setProcessing]    = useState(false);
@@ -624,6 +625,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   },[cancelColorPreview]);
 
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLElement>)=>{
+    if (Date.now() - lastTouchTimeRef.current < 500) return;
     if (!loaded||!nativeSize) return;
     if (e.button===2) {
       e.preventDefault();
@@ -772,6 +774,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       if (pinchHappenedRef.current) {
         lastPinchEndTimeRef.current = Date.now();
       }
+      lastTouchTimeRef.current = Date.now();
       gestureSessionRef.current="idle";
       tapStartPosRef.current=null;
       isMoving.current=false;
