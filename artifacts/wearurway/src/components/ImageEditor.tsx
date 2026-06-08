@@ -1107,7 +1107,12 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
                 style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff" }}
               >
                 Got it
-              </button>           </div>         </div>       )}        {showHelpWizard && (
+              </button>
+          </div>
+        </div>
+      )}
+
+      {showHelpWizard && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4"
           style={{ backgroundColor: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
