@@ -503,7 +503,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     const rect=el.getBoundingClientRect();
     const isTrackpad=Math.abs(e.deltaY)<50;
     const factor=isTrackpad
-      ? 1+(-e.deltaY*0.003)
+      ? 1+(-e.deltaY*0.008)
       : e.deltaY<0?1.12:1/1.12;
     applyZoom(zoomRef.current*factor,
       (e.clientX-rect.left)/rect.width,(e.clientY-rect.top)/rect.height);
@@ -1008,7 +1008,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
             </svg>
             <span className="text-[11px] font-semibold leading-snug">
               Can't remove the background?{" "}
-              <span className="font-black">Contact us and we'll do it for you.</span>
+              <span className="font-black">Click here to contact us for help.</span>
             </span>
           </button>
         </div>
@@ -1028,7 +1028,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     </svg>
     <span className="text-[11px] font-semibold leading-snug">
       Can't remove the background?{" "}
-      <span className="font-black">Contact us and we'll do it for you.</span>
+      <span className="font-black">Click here to contact us for help.</span>
     </span>
   </button>
 
@@ -1096,7 +1096,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
             style={{}}
           >
             <h2 className="text-[20px] font-black text-white mb-3">
-              Tap the background to remove it
+              Tap on background to remove it
             </h2>
             <p className="text-[12px] mb-6" style={{ color: "rgba(255,255,255,0.5)" }}>
               Tap multiple times to remove more areas. Use Undo to go back.
