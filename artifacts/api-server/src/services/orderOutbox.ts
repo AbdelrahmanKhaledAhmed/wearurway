@@ -1,4 +1,4 @@
-import { getStore, updateStore, type OrderFileRecord } from "../data/store.js";
+import { getStore, updateStore, type OrderFileRecord } from "../data/store.js"; import config from "../config.js";
 import { uploadBuffer } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
 import { renderDesignFiles, type DesignJobInput } from "./designRenderer.js";
@@ -339,7 +339,24 @@ async function sendTelegramMessage(orderId: string, payload: NotificationPayload
   const sizeDetails = `${payload.size?.name ?? "-"} (${payload.size?.realWidth ?? "-"} x ${payload.size?.realHeight ?? "-"} cm)`;
   const trimmedFeedback = payload.feedback?.trim();
 
-  const r2Url = `https://dash.cloudflare.com/f622b5c9fad461401da4da3bf5954846/r2/default/buckets/images-of-orders?prefix=orders%2F${orderId}%2F`;
+  const record = readRecord(orderId);
+  const uploadedFiles = record?.files ?? [];
+  const publicBase = config.r2.publicUrl?.replace(/\/+$/, "") ?? "";
+  const fileLinks = uploadedFiles.length > 0
+    ? uploadedFiles
+        .map((fileName) => {
+          const encodedPath = `orders/${orderId}/${fileName}`
+            .split("/")
+            .map(encodeURIComponent)
+            .join("/");
+          const url = publicBase
+            ? `${publicBase}/${encodedPath}`
+            : `/api/storage/${encodedPath}`;
+          return `• <a href="${url}">${fileName}</a>`;
+        })
+        .join("\n")
+    : "No files uploaded yet";
+
   const preview_filler = "⠀".repeat(50);
   const pad = (label: string, width: number) => 
   label + "⠀".repeat(Math.max(1, width - label.length)); 
@@ -367,7 +384,8 @@ async function sendTelegramMessage(orderId: string, payload: NotificationPayload
   `${pad("Payment:", 10)}${paymentMethod}`,
   "",
   ...(trimmedFeedback ? [`<b>FEEDBACK</b>`, trimmedFeedback, ""] : []),
-  `<a href="${r2Url}">View Order Images</a>`,
+  "<b>FILES</b>",
+  fileLinks,
 ].join("\n");
 
   const response = await fetch(
