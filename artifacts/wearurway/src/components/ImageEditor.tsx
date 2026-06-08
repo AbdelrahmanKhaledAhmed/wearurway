@@ -764,12 +764,14 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   // ── Touch events (pan + pinch-zoom) ─────────────────────────────────────────
 
   const touchStartPosRef = useRef<{x:number;y:number}|null>(null);
+  const pinchOccurredRef = useRef(false);
 
   const onTouchStartEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
     if (!loaded||!nativeSize) return;
     if (e.touches.length===1) {
       const touch=e.touches[0];
       if (toolMode==="select") {
+        if (pinchOccurredRef.current) return;
         touchStartPosRef.current={x:touch.clientX,y:touch.clientY};
         isMoving.current=true;
         moveStartRef.current={pointerX:touch.clientX,pointerY:touch.clientY,panX:panRef.current.x,panY:panRef.current.y};
@@ -817,8 +819,6 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     }
   },[applyZoom]);
 
-  const pinchOccurredRef = useRef(false);
-
   const onTouchEndEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
     if (toolMode==="select" && touchStartPosRef.current && !pinchOccurredRef.current) {
       const touch=e.changedTouches[0];
@@ -830,11 +830,13 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
         if (pt) handleFuzzySelect(pt.imgX,pt.imgY);
       }
     }
-    touchStartPosRef.current=null;
-    pinchOccurredRef.current=false;
-    isMoving.current=false;
-    moveStartRef.current=null;
-    pinchEditorRef.current=null;
+    if (e.touches.length===0) {
+      touchStartPosRef.current=null;
+      pinchOccurredRef.current=false;
+      isMoving.current=false;
+      moveStartRef.current=null;
+      pinchEditorRef.current=null;
+    }
   },[toolMode,getImageCoords,handleFuzzySelect]);
 
   // ── Confirm ─────────────────────────────────────────────────────────────────
