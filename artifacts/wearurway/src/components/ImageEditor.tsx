@@ -1096,7 +1096,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
             style={{}}
           >
             <h2 className="text-[20px] font-black text-white mb-3">
-              Tap on background to remove it
+              Tap on background to remove
             </h2>
             <p className="text-[12px] mb-6" style={{ color: "rgba(255,255,255,0.5)" }}>
               Tap multiple times to remove more areas. Use Undo to go back.
