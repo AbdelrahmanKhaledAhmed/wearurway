@@ -1095,19 +1095,32 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
         </div>
       </div>
 
-      <h2 className="text-[20px] font-black text-white mb-3">
-                Tap the background to remove it
-              </h2>
-              <p className="text-[12px] mb-6" style={{ color: "rgba(255,255,255,0.5)" }}>
-                Tap multiple times to remove more areas. Use Undo to go back.
-              </p>
-              <button
-                onClick={() => setShowBgOnboarding(false)}
-                className="w-full py-4 rounded-2xl text-[13px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
-                style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff" }}
-              >
-                Got it
-              </button>
+      {showBgOnboarding && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.82)", backdropFilter: "blur(8px)" }}
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl p-7 text-center"
+            style={{
+              background: "linear-gradient(135deg,rgba(20,10,40,0.99),rgba(10,5,25,0.99))",
+              border: "1px solid rgba(168,85,247,0.5)",
+              boxShadow: "0 24px 64px rgba(124,58,237,0.5)",
+            }}
+          >
+            <h2 className="text-[20px] font-black text-white mb-3">
+              Tap the background to remove it
+            </h2>
+            <p className="text-[12px] mb-6" style={{ color: "rgba(255,255,255,0.5)" }}>
+              Tap multiple times to remove more areas. Use Undo to go back.
+            </p>
+            <button
+              onClick={() => setShowBgOnboarding(false)}
+              className="w-full py-4 rounded-2xl text-[13px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff" }}
+            >
+              Got it
+            </button>
           </div>
         </div>
       )}
