@@ -820,17 +820,18 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   },[applyZoom]);
 
   const onTouchEndEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
-    if (toolMode==="select" && touchStartPosRef.current && !pinchOccurredRef.current) {
-      const touch=e.changedTouches[0];
-      const dx=touch.clientX-touchStartPosRef.current.x;
-      const dy=touch.clientY-touchStartPosRef.current.y;
-      const dist=Math.sqrt(dx*dx+dy*dy);
-      if (dist<8) {
-        const pt=getImageCoords(touch.clientX,touch.clientY);
-        if (pt) handleFuzzySelect(pt.imgX,pt.imgY);
-      }
-    }
     if (e.touches.length===0) {
+      // All fingers lifted — safe to fire select only if no pinch occurred
+      if (toolMode==="select" && touchStartPosRef.current && !pinchOccurredRef.current) {
+        const touch=e.changedTouches[0];
+        const dx=touch.clientX-touchStartPosRef.current.x;
+        const dy=touch.clientY-touchStartPosRef.current.y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if (dist<8) {
+          const pt=getImageCoords(touch.clientX,touch.clientY);
+          if (pt) handleFuzzySelect(pt.imgX,pt.imgY);
+        }
+      }
       touchStartPosRef.current=null;
       pinchOccurredRef.current=false;
       isMoving.current=false;
