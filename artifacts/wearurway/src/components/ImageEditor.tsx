@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import FuzzySelectPanel from "./AIAssistPanel";
 import { useGetOrderSettings } from "@workspace/api-client-react";
 
 type BgPreview = "checker" | "white" | "black";
@@ -984,70 +983,51 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
             </div>
           )}
 
-          {loaded && !processing && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowHelpWizard(true); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              onMouseUp={(e) => e.stopPropagation()}
-              onMouseMove={(e) => e.stopPropagation()}
-              className="absolute bottom-0 left-0 right-0 z-20 w-full flex items-center gap-3 px-4 py-3 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity text-left"
-              style={{ backgroundColor: "#a855f7", color: "#fff" }}
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 flex-shrink-0" aria-hidden="true">
-                <path d="M12 0C5.373 0 0 5.373 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.632-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0z" />
-              </svg>
-              <span className="text-[11px] font-semibold leading-snug">
-                Need help?{" "}
-                <span className="font-black">We'll turn your photo into exactly what you imagine.</span>
-              </span>
-            </button>
-          )}
-
-          {toolMode==="select" && !selectionMask && loaded && !processing && (
-            <div className="absolute bottom-5 left-1/2 -translate-x-1/2 pointer-events-none">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-bold"
-                style={{backgroundColor:"rgba(0,0,0,0.7)",border:"1px solid rgba(168,85,247,0.4)",color:"rgba(196,140,255,0.9)",backdropFilter:"blur(8px)"}}>
-                <span style={{color:"#a855f7"}}>✦</span> Click anywhere on your image to select
-              </div>
-            </div>
-          )}
 
           <canvas ref={canvasRef} style={{display:"none"}}/>
         </div>
 
-        <div className="flex md:flex w-full md:w-80 border-t md:border-t-0 md:border-l flex-col shrink-0 max-h-64 md:max-h-none overflow-y-auto" style={{borderColor:"rgba(168,85,247,0.2)"}}>
-          <FuzzySelectPanel
-            toolMode={toolMode}
-            hasSelection={!!selectionMask}
-            onSetToolMode={handleSetToolMode}
-            onDelete={handleDelete}
-            onChangeColor={handleChangeColor}
-            onPreviewColor={handlePreviewColor}
-            onCancelColorPreview={cancelColorPreview}
-            onClearSelection={handleClearSelection}
-            sensitivity={sensitivity}
-            onSensitivity={setSensitivity}
-            onDownloadImage={() => {
-              const c = canvasRef.current;
-              if (!c) return;
-              const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-              const mimeType = isMobile ? "image/jpeg" : "image/png";
-              const ext = isMobile ? "jpg" : "png";
-              c.toBlob(blob => {
-                if (!blob) return;
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `design.${ext}`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                setTimeout(() => URL.revokeObjectURL(url), 500);
-              }, mimeType, 0.95);
-            }}
-          />
-        </div>
-      </div>
+        <div
+  className="flex md:flex w-full md:w-72 border-t md:border-t-0 md:border-l flex-col shrink-0"
+  style={{ borderColor: "rgba(168,85,247,0.2)", backgroundColor: "#141414" }}
+>
+  {/* Need Help button */}
+  <button
+    onClick={() => setShowHelpWizard(true)}
+    className="flex items-center gap-3 px-4 py-3 w-full text-left transition-opacity hover:opacity-90 active:opacity-75"
+    style={{ backgroundColor: "#a855f7", color: "#fff" }}
+  >
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 flex-shrink-0">
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.632-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0z" />
+    </svg>
+    <span className="text-[11px] font-semibold leading-snug">
+      Need help?{" "}
+      <span className="font-black">We'll turn your photo into exactly what you imagine.</span>
+    </span>
+  </button>
+
+  {/* Sensitivity slider */}
+  <div className="flex flex-col gap-3 px-5 py-5">
+    <span className="text-[10px] font-black uppercase tracking-[0.25em]" style={{ color: "rgba(255,255,255,0.35)" }}>
+      How much to remove
+    </span>
+    <input
+      type="range"
+      min={0}
+      max={100}
+      value={sensitivity}
+      onChange={e => setSensitivity(Number(e.target.value))}
+      className="w-full accent-purple-500"
+      style={{ accentColor: "#a855f7" }}
+    />
+    <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.35)" }}>
+      <span>A little</span>
+      <span>Normal</span>
+      <span>A lot</span>
+    </div>
+  </div>
+</div>
+      </div>  {/* ← closes "flex flex-1 min-h-0 flex-col md:flex-row" */}
 
       {showBgOnboarding && (
         <div
