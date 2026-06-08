@@ -1656,8 +1656,11 @@ export default function Design() {
       <div
         className="relative w-full overflow-hidden shrink-0"
         style={{
-          height: "150vw",
+          height: "100vw",
           touchAction: "pan-y",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
           backgroundImage:
             "linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%)",
           backgroundSize: "24px 24px",
@@ -1683,7 +1686,7 @@ export default function Design() {
         </div>
 
         {/* Mockup + layers */}
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
           <div
             className="relative"
             style={{
@@ -1691,6 +1694,7 @@ export default function Design() {
               aspectRatio: "3/4",
               transform: `translateY(${mockupOffsetY}px) scale(${viewZoom})`,
               transformOrigin: "center center",
+              flexShrink: 0,
             }}
           >
             <AnimatePresence mode="wait">
