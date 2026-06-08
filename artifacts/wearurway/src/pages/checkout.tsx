@@ -23,17 +23,13 @@ interface FormState {
   lastName: string;
   phone: string;
   city: string;
-  area: string;
-  street: string;
-  building: string;
-  floor: string;
-  apartment: string;
+  governorate: string;
+  address: string;
 }
 
 const EMPTY_FORM: FormState = {
   firstName: "", lastName: "", phone: "",
-  city: "", area: "", street: "", building: "",
-  floor: "", apartment: "",
+  city: "", governorate: "", address: "",
 };
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -102,12 +98,9 @@ export default function Checkout() {
     } else if (!/^01[0125]\d{8}$/.test(phoneDigits)) {
       errs.phone = "Enter a valid Egyptian number (11 digits, e.g. 01012345678)";
     }
-    if (!form.city.trim())      errs.city      = "Required";
-    if (!form.area.trim())      errs.area      = "Required";
-    if (!form.street.trim())    errs.street    = "Required";
-    if (!form.building.trim())  errs.building  = "Required";
-    if (!form.floor.trim())     errs.floor     = "Required";
-    if (!form.apartment.trim()) errs.apartment = "Required";
+    if (!form.city.trim())        errs.city        = "Required";
+    if (!form.governorate.trim()) errs.governorate = "Required";
+    if (!form.address.trim())     errs.address     = "Required";
     if (payment === "instapay" && !proofFile) errs.proof = "Please upload payment proof";
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -151,7 +144,7 @@ export default function Checkout() {
       const customer: QueuedOrderCustomer = {
         name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
         phone: form.phone.replace(/\D/g, ""),
-        address: `Building ${form.building.trim()}, Floor ${form.floor.trim()}, Apt ${form.apartment.trim()}, ${form.street.trim()}, ${form.area.trim()}, ${form.city.trim()}`,
+        address: `${form.address.trim()}, ${form.city.trim()}, ${form.governorate.trim()}`,
         product: selectedProduct?.name ?? undefined,
         fit: selectedFit?.name ?? undefined,
         size: {
@@ -361,16 +354,11 @@ export default function Checkout() {
                 <Field label="Phone Number" value={form.phone} onChange={setField("phone")} error={errors.phone} type="tel" />
               </div>
               <div className="grid grid-cols-2 gap-4 mt-4">
-                <Field label="City"            value={form.city}     onChange={setField("city")}     error={errors.city} />
-                <Field label="Area / District"  value={form.area}     onChange={setField("area")}     error={errors.area} />
+                <Field label="City"        value={form.city}        onChange={setField("city")}        error={errors.city} />
+                <Field label="Governorate" value={form.governorate} onChange={setField("governorate")} error={errors.governorate} />
               </div>
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <Field label="Street Address"  value={form.street}   onChange={setField("street")}   error={errors.street} />
-                <Field label="Building Number" value={form.building} onChange={setField("building")} error={errors.building} />
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <Field label="Floor"           value={form.floor}     onChange={setField("floor")}     error={errors.floor} />
-                <Field label="Apartment Number" value={form.apartment} onChange={setField("apartment")} error={errors.apartment} />
+              <div className="mt-4">
+                <Field label="Address" value={form.address} onChange={setField("address")} error={errors.address} />
               </div>
             </section>
 
