@@ -763,15 +763,16 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
 
   // ── Touch events (pan + pinch-zoom) ─────────────────────────────────────────
 
-  const touchStartPosRef = useRef<{x:number;y:number}|null>(null);
-  const pinchOccurredRef = useRef(false);
+  const touchStartPosRef  = useRef<{x:number;y:number}|null>(null);
+  const pinchOccurredRef  = useRef(false);
+  const pinchMovedRef     = useRef(false);
 
   const onTouchStartEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
     if (!loaded||!nativeSize) return;
     if (e.touches.length===1) {
       const touch=e.touches[0];
       if (toolMode==="select") {
-        if (pinchOccurredRef.current) return;
+        if (pinchOccurredRef.current || pinchMovedRef.current) return;
         touchStartPosRef.current={x:touch.clientX,y:touch.clientY};
         isMoving.current=true;
         moveStartRef.current={pointerX:touch.clientX,pointerY:touch.clientY,panX:panRef.current.x,panY:panRef.current.y};
@@ -799,6 +800,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       const s=moveStartRef.current;
       setPan({x:s.panX+touch.clientX-s.pointerX,y:s.panY+touch.clientY-s.pointerY});
     } else if (e.touches.length===2 && pinchEditorRef.current!==null) {
+      pinchMovedRef.current=true;
       const dx=e.touches[0].clientX-e.touches[1].clientX;
       const dy=e.touches[0].clientY-e.touches[1].clientY;
       const newDist=Math.sqrt(dx*dx+dy*dy);
@@ -821,8 +823,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
 
   const onTouchEndEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
     if (e.touches.length===0) {
-      // All fingers lifted — safe to fire select only if no pinch occurred
-      if (toolMode==="select" && touchStartPosRef.current && !pinchOccurredRef.current) {
+      // Only fire select if: no pinch was started AND no pinch move happened
+      if (toolMode==="select" && touchStartPosRef.current && !pinchOccurredRef.current && !pinchMovedRef.current) {
         const touch=e.changedTouches[0];
         const dx=touch.clientX-touchStartPosRef.current.x;
         const dy=touch.clientY-touchStartPosRef.current.y;
@@ -834,6 +836,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       }
       touchStartPosRef.current=null;
       pinchOccurredRef.current=false;
+      pinchMovedRef.current=false;
       isMoving.current=false;
       moveStartRef.current=null;
       pinchEditorRef.current=null;
