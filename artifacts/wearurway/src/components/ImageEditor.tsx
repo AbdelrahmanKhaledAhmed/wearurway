@@ -710,6 +710,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       gestureSessionRef.current="pinch";
       tapStartPosRef.current=null;
       pinchEditorRef.current=null;
+      pinchHappenedRef.current=true;
       const dx=e.touches[0].clientX-e.touches[1].clientX;
       const dy=e.touches[0].clientY-e.touches[1].clientY;
       const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
