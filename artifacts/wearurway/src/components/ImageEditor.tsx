@@ -763,13 +763,16 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
 
   // ── Touch events (pan + pinch-zoom) ─────────────────────────────────────────
 
+  const touchStartPosRef = useRef<{x:number;y:number}|null>(null);
+
   const onTouchStartEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
     if (!loaded||!nativeSize) return;
     if (e.touches.length===1) {
       const touch=e.touches[0];
       if (toolMode==="select") {
-        const pt=getImageCoords(touch.clientX,touch.clientY);
-        if (pt) handleFuzzySelect(pt.imgX,pt.imgY);
+        touchStartPosRef.current={x:touch.clientX,y:touch.clientY};
+        isMoving.current=true;
+        moveStartRef.current={pointerX:touch.clientX,pointerY:touch.clientY,panX:panRef.current.x,panY:panRef.current.y};
         return;
       }
       isMoving.current=true;
@@ -812,11 +815,23 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     }
   },[applyZoom]);
 
-  const onTouchEndEditor = useCallback(()=>{
+  const onTouchEndEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
+    if (toolMode==="select" && touchStartPosRef.current) {
+      const touch=e.changedTouches[0];
+      const dx=touch.clientX-touchStartPosRef.current.x;
+      const dy=touch.clientY-touchStartPosRef.current.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if (dist<8) {
+        // Tap — run fuzzy select
+        const pt=getImageCoords(touch.clientX,touch.clientY);
+        if (pt) handleFuzzySelect(pt.imgX,pt.imgY);
+      }
+      touchStartPosRef.current=null;
+    }
     isMoving.current=false;
     moveStartRef.current=null;
     pinchEditorRef.current=null;
-  },[]);
+  },[toolMode,getImageCoords,handleFuzzySelect]);
 
   // ── Confirm ─────────────────────────────────────────────────────────────────
 
