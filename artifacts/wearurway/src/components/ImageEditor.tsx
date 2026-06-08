@@ -1044,8 +1044,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     </div>
   </div>
 </div>
-      </div>  {/* ← closes "flex flex-1 min-h-0 flex-col md:flex-row" */}
 
+      </div>
       {showBgOnboarding && (
         <div
           className="fixed inset-0 z-[110] flex items-center justify-center p-4"
