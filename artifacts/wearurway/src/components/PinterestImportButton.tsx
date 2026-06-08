@@ -193,22 +193,52 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
                 {step === "intro" && (
                   <div className="px-6 py-6">
                     <div className="mb-6 text-center">
-                      <p className="text-base font-black text-white mb-2">⚠️ BEFORE YOU CONTINUE ⚠️</p>
+                      <p className="text-base font-black text-white mb-2">BEFORE YOU CONTINUE</p>
                       <p className="text-sm font-black text-white/70">PICK DESIGN → COPY LINK → PASTE HERE</p>
                     </div>
+
+                    <label className="flex items-center justify-center gap-2.5 cursor-pointer mb-5 select-none">
+                      <div
+                        onClick={() => setIntroChecked(c => !c)}
+                        className="w-4 h-4 border flex items-center justify-center flex-shrink-0 transition-all"
+                        style={{
+                          borderColor: introChecked ? "#f5c842" : "rgba(255,255,255,0.25)",
+                          backgroundColor: introChecked ? "#f5c842" : "transparent",
+                        }}
+                      >
+                        {introChecked && (
+                          <svg viewBox="0 0 10 8" fill="none" className="w-2.5 h-2.5">
+                            <path d="M1 4l3 3 5-6" stroke="#0d0d0d" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
+                      <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.5)" }}>
+                        I understand, let's go
+                      </span>
+                    </label>
+
                     <div className="flex flex-col gap-3">
                       <motion.button
                         whileTap={{ scale: 0.97 }}
-                        onClick={handleOpenPinterest}
-                        className="w-full flex items-center justify-center gap-2.5 py-3.5 font-black uppercase text-xs tracking-[0.2em] transition-opacity hover:opacity-90"
-                        style={{ backgroundColor: "#E60023", color: "#fff" }}
+                        onClick={() => { if (introChecked) handleOpenPinterest(); }}
+                        className="w-full flex items-center justify-center gap-2.5 py-3.5 font-black uppercase text-xs tracking-[0.2em] transition-opacity"
+                        style={{
+                          backgroundColor: introChecked ? "#E60023" : "rgba(255,255,255,0.08)",
+                          color: introChecked ? "#fff" : "rgba(255,255,255,0.2)",
+                          cursor: introChecked ? "pointer" : "not-allowed",
+                        }}
                       >
                         <PinterestIcon className="w-4 h-4" />
                         Browse Pinterest Designs
                       </motion.button>
                       <button
-                        onClick={() => setStep("import")}
-                        className="w-full py-3.5 border border-white/15 font-bold uppercase text-xs tracking-[0.2em] text-white/50 hover:text-white hover:border-white/30 transition-colors"
+                        onClick={() => { if (introChecked) setStep("import"); }}
+                        className="w-full py-3.5 border font-bold uppercase text-xs tracking-[0.2em] transition-colors"
+                        style={{
+                          borderColor: introChecked ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.08)",
+                          color: introChecked ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.2)",
+                          cursor: introChecked ? "pointer" : "not-allowed",
+                        }}
                       >
                         I already have a link
                       </button>
