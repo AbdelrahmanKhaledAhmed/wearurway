@@ -272,7 +272,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   const [currentFile, setCurrentFile] = useState<File>(file);
   useEffect(()=>{ setCurrentFile(file); },[file]);
   const [showHelpWizard, setShowHelpWizard] = useState(false);
-  const [showBgOnboarding, setShowBgOnboarding] = useState(showBgHint);
+  const [showBgOnboarding, setShowBgOnboarding] = useState(showBgHint);   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const { data: orderSettings } = useGetOrderSettings();
   const contactWhatsappHref = `https://wa.me/20${(orderSettings?.contactPhone || orderSettings?.instaPayPhone || "01069383482").replace(/^0/, "")}`;
   const canvasRef        = useRef<HTMLCanvasElement>(null);
@@ -1101,10 +1101,33 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
             <p className="text-[12px] mb-6" style={{ color: "rgba(255,255,255,0.5)" }}>
               Tap multiple times to remove more areas. Use Undo to go back.
             </p>
+            <label className="flex items-center justify-center gap-2.5 cursor-pointer mb-5 select-none group">
+              <div
+                onClick={() => setOnboardingChecked(c => !c)}
+                className="w-4 h-4 border flex items-center justify-center flex-shrink-0 transition-all"
+                style={{
+                  borderColor: onboardingChecked ? "#f5c842" : "rgba(255,255,255,0.25)",
+                  backgroundColor: onboardingChecked ? "#f5c842" : "transparent",
+                }}
+              >
+                {onboardingChecked && (
+                  <svg viewBox="0 0 10 8" fill="none" className="w-2.5 h-2.5">
+                    <path d="M1 4l3 3 5-6" stroke="#0d0d0d" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </div>
+              <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.5)" }}>
+                I understand, let's go
+              </span>
+            </label>
             <button
-              onClick={() => setShowBgOnboarding(false)}
-              className="w-full py-4 text-[13px] font-black uppercase tracking-widest transition-all hover:opacity-90 active:scale-[0.98]"
-              style={{ backgroundColor: "#f5c842", color: "#0d0d0d" }}
+              onClick={() => { if (onboardingChecked) setShowBgOnboarding(false); }}
+              className="w-full py-4 text-[13px] font-black uppercase tracking-widest transition-all active:scale-[0.98]"
+              style={{
+                backgroundColor: onboardingChecked ? "#f5c842" : "rgba(255,255,255,0.08)",
+                color: onboardingChecked ? "#0d0d0d" : "rgba(255,255,255,0.2)",
+                cursor: onboardingChecked ? "pointer" : "not-allowed",
+              }}
             >
               Got it
             </button>
