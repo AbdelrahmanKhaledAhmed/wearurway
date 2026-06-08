@@ -135,64 +135,6 @@ export default function FuzzySelectPanel({
       {/* ── Tool toggles ── */}
       <div className="px-4 pt-4 flex flex-col gap-2.5 shrink-0">
 
-        {/* Magic Select */}
-        <button
-          onClick={() => onSetToolMode("select")}
-          className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl transition-all"
-          style={selectActive
-            ? { background: "linear-gradient(135deg,rgba(168,85,247,0.22),rgba(124,58,237,0.22))", border: "1px solid rgba(168,85,247,0.5)", color: "#e2c9ff" }
-            : { backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.45)" }
-          }
-        >
-          <div className="flex items-center gap-2.5">
-            <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${selectActive ? "opacity-100" : "opacity-40"}`}
-              style={{ backgroundColor: selectActive ? "rgba(168,85,247,0.3)" : "rgba(255,255,255,0.07)" }}>
-              <WandIcon />
-            </div>
-            <div className="text-left">
-              <p className={`text-[11px] font-bold ${selectActive ? "text-white" : "text-white/45"}`}>Magic Select</p>
-              <p className="text-[9px] mt-0.5" style={{ color: selectActive ? "rgba(196,140,255,0.65)" : "rgba(255,255,255,0.22)" }}>
-                {selectActive ? "Click image to select area" : "Click to activate"}
-              </p>
-            </div>
-          </div>
-          <div className="shrink-0 w-9 h-5 rounded-full relative transition-all"
-            style={{ backgroundColor: selectActive ? "#a855f7" : "rgba(255,255,255,0.1)" }}>
-            <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
-              style={{ left: selectActive ? "calc(100% - 1.125rem)" : "0.125rem" }} />
-          </div>
-        </button>
-
-        {/* Background Remover (external tool) */}
-        <button
-          onClick={handleOpenBgRemover}
-          className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99]"
-          style={{
-            background: "linear-gradient(135deg,rgba(168,85,247,0.18),rgba(124,58,237,0.18))",
-            border: "1px solid rgba(168,85,247,0.4)",
-            color: "#e2c9ff",
-          }}
-          data-testid="button-background-remover"
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: "rgba(168,85,247,0.3)" }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}>
-                <path d="M21 15a2 2 0 0 1-2 2H5l-4 4V5a2 2 0 0 1 2-2h11" />
-                <path d="M16 3h5v5" />
-                <path d="m21 3-9 9" />
-              </svg>
-            </div>
-            <div className="text-left">
-              <p className="text-[11px] font-bold text-white">Background Remover</p>
-              <p className="text-[9px] mt-0.5" style={{ color: "rgba(196,140,255,0.65)" }}>
-                Downloads to device
-              </p>
-            </div>
-          </div>
-        </button>
-
-
 
         {/* Selection strength — 3 simple presets instead of a raw slider */}
         {selectActive && (
