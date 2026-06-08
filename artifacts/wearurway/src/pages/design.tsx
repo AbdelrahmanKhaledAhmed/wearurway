@@ -1656,7 +1656,7 @@ export default function Design() {
       <div
         className="relative w-full overflow-hidden shrink-0"
         style={{
-          height: "100vw",
+          height: "150vw",
           touchAction: "pan-y",
           display: "flex",
           alignItems: "center",
