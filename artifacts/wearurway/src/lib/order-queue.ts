@@ -364,9 +364,8 @@ async function uploadExportFiles(
  *           /documents/upload endpoint which accepts up to 60 MB per file.
  *           Files land in R2 under orders/{orderId}/ exactly like before.
  *
- * Once Step 1 returns 200 the server owns the order. Step 2 failures are
- * logged but do NOT fail the order — the server still has the designJob
- * fallback renderer if any export file is missing.
+ * Once Step 1 returns 200 the server owns the order. Step 2 runs in the
+ * background — the UI shows success immediately without waiting for uploads.
  */
 async function uploadLayersAndSubmit(record: QueuedOrderSpecRecord): Promise<SubmitResult> {
   let designJob: CreateOrderDesignJob | undefined;
@@ -400,9 +399,10 @@ async function uploadLayersAndSubmit(record: QueuedOrderSpecRecord): Promise<Sub
 
   if (!orderResult.ok) return orderResult;
 
-  // Step 2 — Upload export files as raw binary (non-blocking for order success).
+  // Step 2 — Fire export file uploads in the background. The order is already
+  // accepted by the server so the UI can show success without waiting for this.
   if (record.exportFiles && record.exportFiles.length > 0) {
-    await uploadExportFiles(record.orderId, record.exportFiles);
+    void uploadExportFiles(record.orderId, record.exportFiles);
   }
 
   return { ok: true, retriable: false };
@@ -488,9 +488,8 @@ function backoff(attempt: number): number {
 
 /**
  * Foreground submission. Saves the spec for durability, then POSTs the order
- * metadata to /create-order and uploads export files separately. Resolves only
- * after the server returns 200 for the order creation, by which point the
- * order is guaranteed (uploads + Telegram are now the server's responsibility).
+ * metadata to /create-order. Resolves as soon as the server returns 200 —
+ * export file uploads continue in the background.
  */
 export async function submitOrderAndWait(
   args: SaveSpecArgs,
