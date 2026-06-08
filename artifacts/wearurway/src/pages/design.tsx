@@ -499,17 +499,18 @@ export default function Design() {
     e.preventDefault();
     const clipRect = clipAreaRef.current?.getBoundingClientRect();
     if (!clipRect) return;
-    // clipRect reflects the CSS-scaled bounds, so divide by viewZoom to get
-    // the anchor in canvas (unscaled) coordinates.
     const z = viewZoomRef.current || 1;
     const anchorX = (e.clientX - clipRect.left) / z;
     const anchorY = (e.clientY - clipRect.top) / z;
+    const isTrackpad = Math.abs(e.deltaY) < 50;
+    const factor = isTrackpad
+      ? 1 + (-e.deltaY * 0.008)
+      : e.deltaY < 0 ? 1 + ZOOM_STEP_SCROLL : 1 - ZOOM_STEP_SCROLL;
     setSelectedLayerId(prev => {
       if (!prev) return prev;
       setLayers(layers =>
         layers.map(l => {
           if (l.id !== prev) return l;
-          const factor = e.deltaY < 0 ? 1 + ZOOM_STEP_SCROLL : 1 - ZOOM_STEP_SCROLL;
           return scaleLayerAtPoint(l, factor, anchorX, anchorY);
         })
       );
