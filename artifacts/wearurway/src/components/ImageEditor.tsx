@@ -779,7 +779,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       }
       isMoving.current=true;
       moveStartRef.current={pointerX:touch.clientX,pointerY:touch.clientY,panX:panRef.current.x,panY:panRef.current.y};
-   } else if (e.touches.length===2) {
+   } else if (e.touches.length>=2) {
       pinchOccurredRef.current=true;
       touchStartPosRef.current=null;
       isMoving.current=false;
@@ -827,7 +827,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
         const dx=touch.clientX-touchStartPosRef.current.x;
         const dy=touch.clientY-touchStartPosRef.current.y;
         const dist=Math.sqrt(dx*dx+dy*dy);
-        if (dist<8) {
+        if (dist<12) {
           const pt=getImageCoords(touch.clientX,touch.clientY);
           if (pt) handleFuzzySelect(pt.imgX,pt.imgY);
         }
