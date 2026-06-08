@@ -693,12 +693,10 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       if (gestureSessionRef.current==="pinch") {
         return;
       }
-      if (Date.now() - lastPinchEndTimeRef.current < 350) {
-        return;
-      }
       const touch=e.touches[0];
       gestureSessionRef.current="tap";
-      if (toolMode==="select") {
+      const inPinchCooldown = Date.now() - lastPinchEndTimeRef.current < 350;
+      if (toolMode==="select" && !inPinchCooldown) {
         tapStartPosRef.current={x:touch.clientX,y:touch.clientY};
       }
       isMoving.current=true;
