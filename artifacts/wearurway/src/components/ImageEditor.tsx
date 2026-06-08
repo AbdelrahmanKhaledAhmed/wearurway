@@ -749,7 +749,8 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
       if (
         gestureSessionRef.current==="tap" &&
         toolMode==="select" &&
-        tapStartPosRef.current
+        tapStartPosRef.current &&
+        e.changedTouches.length===1
       ) {
         const touch=e.changedTouches[0];
         const dx=touch.clientX-tapStartPosRef.current.x;
