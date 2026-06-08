@@ -701,6 +701,22 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
 
   const onTouchMoveEditor = useCallback((e: React.TouchEvent<HTMLElement>)=>{
     e.preventDefault();
+    
+    // If we suddenly have 2+ touches and were in "tap" mode, transition to "pinch"
+    // (some browsers don't fire touchstart when the 2nd finger is added during a move)
+    if (e.touches.length>=2 && gestureSessionRef.current==="tap") {
+      gestureSessionRef.current="pinch";
+      tapStartPosRef.current=null;
+      pinchEditorRef.current=null;
+      const dx=e.touches[0].clientX-e.touches[1].clientX;
+      const dy=e.touches[0].clientY-e.touches[1].clientY;
+      const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      pinchEditorRef.current={dist:Math.sqrt(dx*dx+dy*dy),midX,midY};
+      isMoving.current=false;
+      moveStartRef.current=null;
+    }
+    
     if (e.touches.length===1 && isMoving.current && moveStartRef.current) {
       const touch=e.touches[0];
       const s=moveStartRef.current;
