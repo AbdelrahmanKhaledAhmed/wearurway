@@ -179,12 +179,14 @@ export default function Checkout() {
       setSubmitting(false);
 
       // Meta Pixel Purchase event
-      if (typeof window !== 'undefined' && (window as any).fbq) {
-        (window as any).fbq('track', 'Purchase', {
-          value: total,
-          currency: 'EGP',
-        });
-      }
+      setTimeout(() => {
+        if (typeof window !== 'undefined' && (window as any).fbq) {
+          (window as any).fbq('track', 'Purchase', {
+            value: total,
+            currency: 'EGP',
+          });
+        }
+      }, 500);
 
       setSubmitted(true);
     } catch (error) {
