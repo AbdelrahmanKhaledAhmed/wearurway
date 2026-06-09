@@ -15,7 +15,6 @@ if (typeof window !== 'undefined' && (window as any).fbq) {
 
 void registerOrderServiceWorker();
 void flushQueuedOrders();
-
 if (typeof window !== "undefined") {
   window.addEventListener("online", () => {
     void flushQueuedOrders();
