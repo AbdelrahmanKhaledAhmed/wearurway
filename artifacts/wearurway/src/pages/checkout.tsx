@@ -177,6 +177,15 @@ export default function Checkout() {
 
       setOrderId(newOrderId);
       setSubmitting(false);
+
+      // Meta Pixel Purchase event
+      if (typeof window !== 'undefined' && (window as any).fbq) {
+        (window as any).fbq('track', 'Purchase', {
+          value: total,
+          currency: 'EGP',
+        });
+      }
+
       setSubmitted(true);
     } catch (error) {
       setSubmitError(
