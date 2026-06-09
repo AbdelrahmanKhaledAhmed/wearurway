@@ -8,6 +8,11 @@ import {
 
 createRoot(document.getElementById("root")!).render(<App />);
 
+// Meta Pixel PageView
+if (typeof window !== 'undefined' && (window as any).fbq) {
+  (window as any).fbq('track', 'PageView');
+}
+
 void registerOrderServiceWorker();
 void flushQueuedOrders();
 
