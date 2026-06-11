@@ -132,7 +132,7 @@ export default function PinterestImportButton({ onImageReady, disabled, inline }
         >
           <PinterestIcon className="w-4 h-4 flex-shrink-0" />
           <span className="text-[11px] font-semibold leading-snug">
-            Don't have a design? <span className="font-black">We'll help you find one.</span>
+            Don't have a design? <span className="font-black">Click here and we'll help you find one.</span>
           </span>
         </button>
       ) : (
