@@ -310,12 +310,9 @@ export default function OrderReviewModal({
   // Strip imageUrl from layers before saving to sessionStorage —
   // the full base64 data is too large for sessionStorage quota.
   // The export files in IndexedDB are the source of truth for the server.
-  const stripUrl = (layers: DesignLayer[]) =>
-    layers.map(l => ({ ...l, imageUrl: "" }));
-
   const designJob = {
-    frontLayers: stripUrl(fl),
-    backLayers: stripUrl(bl),
+    frontLayers: fl,
+    backLayers: bl,
     mockupSize: ms,
     frontMockupImage: m?.front?.image,
     backMockupImage:  m?.back?.image,
