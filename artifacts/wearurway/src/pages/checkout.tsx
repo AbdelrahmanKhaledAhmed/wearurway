@@ -116,10 +116,16 @@ export default function Checkout() {
     setSubmitError("");
     setSubmitting(true);
     try {
-      const designJobText = sessionStorage.getItem("ww_checkout_design_job");
-      const designJob = designJobText
-        ? (JSON.parse(designJobText) as CreateOrderDesignJob)
-        : undefined;
+      let designJob: CreateOrderDesignJob | undefined;
+      try {
+        const { loadCheckoutDesignJob } = await import("@/lib/design-export");
+        const stored = await loadCheckoutDesignJob();
+        if (stored && Object.keys(stored).length > 0) {
+          designJob = stored as CreateOrderDesignJob;
+        }
+      } catch (err) {
+        console.warn("[checkout] could not load designJob:", err);
+      }
 
       const paymentProof =
         payment === "instapay" && proofFile
@@ -172,7 +178,10 @@ export default function Checkout() {
       sessionStorage.removeItem("ww_checkout_front");
       sessionStorage.removeItem("ww_checkout_back");
       sessionStorage.removeItem("ww_checkout_price");
-      sessionStorage.removeItem("ww_checkout_design_job");
+      try {
+        const { saveCheckoutDesignJob } = await import("@/lib/design-export");
+        await saveCheckoutDesignJob({});
+      } catch {}
       localStorage.removeItem("ww_order_source");
       void clearCheckoutExportFiles().catch(() => {});
 
