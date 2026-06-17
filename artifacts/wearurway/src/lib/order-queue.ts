@@ -253,7 +253,7 @@ interface SubmitResult {
 /** True for any URL the server cannot fetch on its own (browser-only blobs). */
 function needsServerHosting(url: string | undefined): boolean {
   if (!url) return false;
-  return url.startsWith("blob:");
+  return url.startsWith("blob:") || url.startsWith("data:");
 }
 
 /**
@@ -262,11 +262,22 @@ function needsServerHosting(url: string | undefined): boolean {
  * the server can fetch directly during render.
  */
 async function uploadLayerBlob(blobUrl: string): Promise<string> {
-  const blobRes = await fetch(blobUrl);
-  if (!blobRes.ok) {
-    throw new Error(`Could not read layer blob (HTTP ${blobRes.status})`);
+  let blob: Blob;
+  if (blobUrl.startsWith("data:")) {
+    const [header, base64] = blobUrl.split(",");
+    const mimeMatch = header.match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : "image/png";
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    blob = new Blob([bytes], { type: mime });
+  } else {
+    const blobRes = await fetch(blobUrl);
+    if (!blobRes.ok) {
+      throw new Error(`Could not read layer blob (HTTP ${blobRes.status})`);
+    }
+    blob = await blobRes.blob();
   }
-  const blob = await blobRes.blob();
   const form = new FormData();
   form.append("file", blob, "layer.png");
   const res = await fetch("/api/shared-layers", { method: "POST", body: form });
