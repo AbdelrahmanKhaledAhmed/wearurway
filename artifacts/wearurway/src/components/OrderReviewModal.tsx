@@ -338,6 +338,7 @@ export default function OrderReviewModal({
     onClose();
   } catch (err) {
     console.error("[order-review] checkout failed:", err);
+    console.error("[order-review] error details:", JSON.stringify(err));
     setPrepareError("Could not open checkout. Please try again.");
   } finally {
     setConfirming(false);
