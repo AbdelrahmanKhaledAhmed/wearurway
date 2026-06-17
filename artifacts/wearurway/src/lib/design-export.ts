@@ -326,10 +326,6 @@ export async function generateDesignExportFiles({
       DESIGN_EXPORT_SCALE, MOCKUP_EXPORT_SCALE,
     );
 
-    if (designCanvas) {
-      const dataUrl = await canvasToDataUrl(designCanvas);
-      if (dataUrl) files.push({ fileName: designFileName, dataUrl });
-    }
     if (mockupCanvas) {
       const dataUrl = await canvasToDataUrl(mockupCanvas);
       if (dataUrl) files.push({ fileName: mockupFileName, dataUrl });
