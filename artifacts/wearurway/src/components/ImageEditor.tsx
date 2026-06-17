@@ -232,7 +232,10 @@ async function highQualityUpscale(
 }
 
 async function enhanceCanvas(src: HTMLCanvasElement, qualityScale=1): Promise<HTMLCanvasElement> {
-  const TARGET_LONG=4096, MAX_SIDE=4096, MAX_AUTO_SCALE=8;
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const TARGET_LONG = isMobile ? 2048 : 4096;
+  const MAX_SIDE = isMobile ? 2048 : 4096;
+  const MAX_AUTO_SCALE = isMobile ? 4 : 8;
   const longSide=Math.max(src.width,src.height);
   const autoScale=Math.min(MAX_AUTO_SCALE,Math.max(1,TARGET_LONG/longSide));
   const scale=Math.min(
