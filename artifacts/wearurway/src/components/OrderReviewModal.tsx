@@ -331,8 +331,8 @@ export default function OrderReviewModal({
     }
 
     try {
-      const { saveCheckoutDesignJob } = await import("@/lib/design-export");
-      await saveCheckoutDesignJob(designJob);
+      const designExport = await import("@/lib/design-export");
+      await designExport.saveCheckoutDesignJob(designJob);
     } catch (err) {
       console.warn("[order-review] could not save designJob:", err);
     }
