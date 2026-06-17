@@ -106,7 +106,8 @@ function featherMask(mask: Uint8Array, w: number, h: number, passes: number): Fl
 
 function applyMaskDeletion(id: ImageData, mask: Uint8Array): ImageData {
   const out=new ImageData(new Uint8ClampedArray(id.data),id.width,id.height);
-  const feathered=featherMask(mask,id.width,id.height,4);
+  const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const feathered=featherMask(mask,id.width,id.height,isMobile?2:4);
   for (let i=0;i<feathered.length;i++) {
     if (feathered[i]>0) out.data[i*4+3]=Math.max(0,Math.round(out.data[i*4+3]*(1-feathered[i])));
   }
@@ -410,10 +411,15 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     const img=new Image();
     img.onload=()=>{
       const c=canvasRef.current; if (!c) return;
-      c.width=img.naturalWidth; c.height=img.naturalHeight;
+      const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const MAX_CANVAS=isMobile?2048:6000;
+      const longSide=Math.max(img.naturalWidth,img.naturalHeight);
+      const canvasScale=longSide>MAX_CANVAS?MAX_CANVAS/longSide:1;
+      c.width=Math.round(img.naturalWidth*canvasScale);
+      c.height=Math.round(img.naturalHeight*canvasScale);
       const ctx=c.getContext("2d")!;
       ctx.clearRect(0,0,c.width,c.height);
-      ctx.drawImage(img,0,0);
+      ctx.drawImage(img,0,0,c.width,c.height);
       setNativeSize({w:c.width,h:c.height});
       setLoaded(true);
       updateDisplay();
@@ -541,7 +547,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     setProcessing(true);
     setTimeout(()=>{
       const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      const MAX_PROCESS=isMobile?1200:3000;
+      const MAX_PROCESS=isMobile?800:3000;
       const origW=c.width, origH=c.height;
       const longSide=Math.max(origW,origH);
       const scale=longSide>MAX_PROCESS?MAX_PROCESS/longSide:1;
