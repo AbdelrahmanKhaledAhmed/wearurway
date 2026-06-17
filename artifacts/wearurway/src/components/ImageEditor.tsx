@@ -540,11 +540,46 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     }
     setProcessing(true);
     setTimeout(()=>{
-      const id=ctx.getImageData(0,0,c.width,c.height);
+      const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const MAX_PROCESS=isMobile?1200:3000;
+      const origW=c.width, origH=c.height;
+      const longSide=Math.max(origW,origH);
+      const scale=longSide>MAX_PROCESS?MAX_PROCESS/longSide:1;
+
+      let id: ImageData;
+      let processW=origW, processH=origH;
+
+      if (scale<1) {
+        processW=Math.round(origW*scale);
+        processH=Math.round(origH*scale);
+        const tmp=document.createElement("canvas");
+        tmp.width=processW; tmp.height=processH;
+        const tctx=tmp.getContext("2d")!;
+        tctx.drawImage(c,0,0,processW,processH);
+        id=tctx.getImageData(0,0,processW,processH);
+      } else {
+        id=ctx.getImageData(0,0,origW,origH);
+      }
+
+      const scaledPx=Math.round(px*scale);
+      const scaledPy=Math.round(py*scale);
       const {colorTol,edgeTol}=tolerancesFromSensitivity(sens);
-      const maskResult=fuzzySelectRegion(id,px,py,colorTol,edgeTol);
+      const maskResult=fuzzySelectRegion(id,scaledPx,scaledPy,colorTol,edgeTol);
+
+      // If we downscaled, upscale the mask back to original size
+      let finalMask=maskResult;
+      if (scale<1) {
+        finalMask=new Uint8Array(origW*origH);
+        for (let y=0;y<origH;y++) for (let x=0;x<origW;x++) {
+          const sx=Math.min(processW-1,Math.round(x*scale));
+          const sy=Math.min(processH-1,Math.round(y*scale));
+          finalMask[y*origW+x]=maskResult[sy*processW+sx];
+        }
+        id=ctx.getImageData(0,0,origW,origH);
+      }
+
       saveUndo();
-      const deleted=applyMaskDeletion(id,maskResult);
+      const deleted=applyMaskDeletion(id,finalMask);
       ctx.putImageData(deleted,0,0);
       updateDisplay();
       setSelectionMask(null);
