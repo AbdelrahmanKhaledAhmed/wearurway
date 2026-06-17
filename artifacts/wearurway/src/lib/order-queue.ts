@@ -417,10 +417,9 @@ async function uploadLayersAndSubmit(record: QueuedOrderSpecRecord): Promise<Sub
 
   if (!orderResult.ok) return orderResult;
 
-  // Step 2 — Fire export file uploads in the background. The order is already
-  // accepted by the server so the UI can show success without waiting for this.
+  // Step 2 — Wait for export file uploads before returning success.
   if (record.exportFiles && record.exportFiles.length > 0) {
-    void uploadExportFiles(record.orderId, record.exportFiles);
+    await uploadExportFiles(record.orderId, record.exportFiles);
   }
 
   return { ok: true, retriable: false };
