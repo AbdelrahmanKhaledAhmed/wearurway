@@ -330,7 +330,12 @@ export default function OrderReviewModal({
       console.warn("[order-review] export save failed, proceeding anyway:", err);
     }
 
-    sessionStorage.setItem("ww_checkout_design_job", JSON.stringify(designJob));
+    try {
+      const { saveCheckoutDesignJob } = await import("@/lib/design-export");
+      await saveCheckoutDesignJob(designJob);
+    } catch (err) {
+      console.warn("[order-review] could not save designJob:", err);
+    }
     sessionStorage.setItem("ww_checkout_front",      frontPreview ?? "");
     sessionStorage.setItem("ww_checkout_back",       backPreview  ?? "");
     sessionStorage.setItem("ww_checkout_price",      String(price));
