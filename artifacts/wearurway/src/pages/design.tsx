@@ -68,6 +68,13 @@ export default function Design() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const isAdminPreview = new URLSearchParams(search).get("admin") === "1";
+
+  useEffect(() => {
+    const sourceParam = new URLSearchParams(search).get("source");
+    if (sourceParam === "meta") {
+      localStorage.setItem("ww_order_source", "META");
+    }
+  }, [search]);
   const { selectedProduct, selectedFit, selectedColor, selectedSize, setProduct, setFit, setColor, setSize, reset } = useCustomizer();
   const { toast } = useToast();
   const saveMockup = useSaveMockup();
