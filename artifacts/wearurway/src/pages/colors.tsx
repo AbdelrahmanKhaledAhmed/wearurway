@@ -22,9 +22,10 @@ export default function Colors() {
     }
   }, [fitId, selectedFit, setLocation]);
 
+  const sourceParam = params.get("source");
   const handleSelect = (color: any) => {
     setColor(color);
-    setLocation(`/design?fit=${fitId}&color=${color.id}`);
+    setLocation(`/design?fit=${fitId}&color=${color.id}${sourceParam ? `&source=${sourceParam}` : ""}`);
   };
 
   return (
