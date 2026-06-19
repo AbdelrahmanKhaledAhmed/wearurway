@@ -305,8 +305,6 @@ async function uploadLayerBlob(blobUrl: string): Promise<string> {
 async function hydrateDesignJob(
   job: CreateOrderDesignJob,
 ): Promise<CreateOrderDesignJob> {
-  console.log("[hydrate] frontLayers:", job.frontLayers.length, "backLayers:", job.backLayers.length);
-  console.log("[hydrate] sample url:", job.frontLayers[0]?.imageUrl?.slice(0, 50));
   const cache = new Map<string, Promise<string>>();
   const resolve = async (layer: CreateOrderDesignLayer): Promise<CreateOrderDesignLayer> => {
     if (!needsServerHosting(layer.imageUrl)) return layer;
