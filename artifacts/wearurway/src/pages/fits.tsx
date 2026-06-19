@@ -22,10 +22,11 @@ export default function Fits() {
 
   const productFits = fits?.filter(f => f.productId === productId);
 
+  const sourceParam = params.get("source");
   const handleSelect = (fit: any) => {
     if (!fit.available) return;
     setFit(fit);
-    setLocation(`/colors?fit=${fit.id}`);
+    setLocation(`/colors?fit=${fit.id}${sourceParam ? `&source=${sourceParam}` : ""}`);
   };
 
   return (
