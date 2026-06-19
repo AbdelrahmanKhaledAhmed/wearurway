@@ -132,7 +132,12 @@ export default function LandingPage() {
     setEditMode(v => !v);
   };
 
-  const navigateToProducts = () => navigate("/products");
+  const navigateToProducts = () => {
+    const params = new URLSearchParams(window.location.search);
+    const utm = params.get("utm_source")?.toLowerCase() ?? "";
+    const isMeta = params.has("fbclid") || utm === "meta" || utm === "facebook";
+    navigate(isMeta ? "/products?source=meta" : "/products");
+  };
 
   const rDesktop = realsDesktop[current];
   const rMobile = realsMobile[current];
