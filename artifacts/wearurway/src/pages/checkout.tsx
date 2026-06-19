@@ -48,7 +48,18 @@ export default function Checkout() {
   const [, setLocation] = useLocation();
   const { selectedProduct, selectedFit, selectedColor, selectedSize, reset } = useCustomizer();
 
-  const source = localStorage.getItem("ww_order_source") ?? undefined;
+  const source = (() => {
+    const stored = localStorage.getItem("ww_order_source");
+    if (stored) return stored;
+    const params = new URLSearchParams(window.location.search);
+    const utm = params.get("utm_source")?.toLowerCase() ?? "";
+    const hasFbclid = params.has("fbclid");
+    const referrerIsMeta = /facebook\.com|instagram\.com|fb\.com/i.test(document.referrer);
+    if (hasFbclid || utm === "meta" || utm === "facebook" || referrerIsMeta) {
+      return "META";
+    }
+    return undefined;
+  })();
 
   const frontPreview = sessionStorage.getItem("ww_checkout_front") || "";
   const backPreview  = sessionStorage.getItem("ww_checkout_back")  || "";
