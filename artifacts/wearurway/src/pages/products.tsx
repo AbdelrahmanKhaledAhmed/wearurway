@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { motion } from "framer-motion";
 import { useGetProducts } from "@workspace/api-client-react";
 import { useCustomizer } from "@/hooks/use-customizer";
@@ -14,10 +14,12 @@ export default function Products() {
     reset();
   }, [reset]);
 
+  const search = useSearch();
+  const sourceParam = new URLSearchParams(search).get("source");
   const handleSelect = (product: any) => {
     if (!product.available) return;
     setProduct(product);
-    setLocation(`/fits?product=${product.id}`);
+    setLocation(`/fits?product=${product.id}${sourceParam ? `&source=${sourceParam}` : ""}`);
   };
 
   return (
