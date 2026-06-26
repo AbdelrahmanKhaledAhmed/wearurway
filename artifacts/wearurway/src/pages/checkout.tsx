@@ -382,8 +382,8 @@ export default function Checkout() {
                 <Field label="Phone Number" value={form.phone} onChange={setField("phone")} error={errors.phone} type="tel" />
               </div>
               <div className="grid grid-cols-2 gap-4 mt-4">
-                <Field label="City"        value={form.city}        onChange={setField("city")}        error={errors.city} />
                 <Field label="Governorate" value={form.governorate} onChange={setField("governorate")} error={errors.governorate} />
+                <Field label="City"        value={form.city}        onChange={setField("city")}        error={errors.city} />
               </div>
               <div className="mt-4">
                 <Field label="Address" value={form.address} onChange={setField("address")} error={errors.address} />
