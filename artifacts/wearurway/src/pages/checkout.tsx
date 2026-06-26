@@ -13,9 +13,7 @@ import {
   clearCheckoutExportFiles,
 } from "@/lib/design-export";
 
-const FREE_SHIPPING_AREAS = ["6th of October", "Sheikh Zayed"];
-
-type ShippingOption = "free" | "wasslaha";
+type ShippingOption = "wasslaha";
 type PaymentMethod = "instapay" | "cod";
 
 interface FormState {
@@ -396,14 +394,6 @@ export default function Checkout() {
             <section>
               <SectionLabel>Shipping</SectionLabel>
               <div className="space-y-3">
-                <ShippingCard
-                  selected={shipping === "free"}
-                  onSelect={() => setShipping("free")}
-                  title="Free Shipping"
-                  description={`Available inside ${FREE_SHIPPING_AREAS.join(" & ")} only`}
-                  price="0 EGP"
-                  badge="FREE"
-                />
                 <ShippingCard
                   selected={shipping === "wasslaha"}
                   onSelect={() => setShipping("wasslaha")}
