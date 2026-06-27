@@ -911,14 +911,14 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
           </div>
           <div className="flex items-center gap-0.5 md:gap-1">
             <button onClick={doUndo} disabled={!canUndo} title="Undo (Ctrl+Z)"
-              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest"
-              style={{ color: "#ffffff" }}>
-              <UndoIcon/> <span className="hidden md:inline">Undo</span>
+              className="flex items-center gap-1.5 px-3 py-2 disabled:opacity-25 transition-all font-black uppercase tracking-widest"
+              style={{ color: "#f5c842", fontSize: 13 }}>
+              <UndoIcon/> Undo
             </button>
             <button onClick={doRedo} disabled={!canRedo} title="Redo (Ctrl+Y)"
-              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest"
-              style={{ color: "#ffffff" }}>
-              <span className="hidden md:inline">Redo</span> <RedoIcon/>
+              className="flex items-center gap-1.5 px-3 py-2 disabled:opacity-25 transition-all font-black uppercase tracking-widest"
+              style={{ color: "#f5c842", fontSize: 13 }}>
+              Redo <RedoIcon/>
             </button>
           </div>
         </div>
@@ -1079,17 +1079,17 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
   </button>
 
   {/* Tap to remove instruction */}
-  <div className="flex flex-col items-center justify-center gap-4 px-5 py-8 text-center">
+  <div className="flex flex-col items-center justify-center gap-3 px-5 py-4 text-center">
     <div
       className="flex items-center justify-center rounded-full"
       style={{
-        width: 64,
-        height: 64,
+        width: 52,
+        height: 52,
         backgroundColor: "rgba(245,200,66,0.12)",
         border: "2px solid rgba(245,200,66,0.35)",
       }}
     >
-      <svg viewBox="0 0 24 24" fill="none" stroke="#f5c842" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 30, height: 30 }}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f5c842" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 26, height: 26 }}>
         <path d="M9 11V6a2 2 0 0 1 4 0v5"/>
         <path d="M13 11V8a2 2 0 0 1 4 0v3"/>
         <path d="M17 11a2 2 0 0 1 4 0v3a8 8 0 0 1-8 8H9a8 8 0 0 1-8-8V9a2 2 0 0 1 4 0v2"/>
@@ -1098,26 +1098,13 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     <p
       className="font-black uppercase leading-tight"
       style={{
-        fontSize: 22,
+        fontSize: 20,
         color: "#ffffff",
         letterSpacing: "0.04em",
         lineHeight: 1.2,
       }}
     >
       Tap on background<br />to remove
-    </p>
-    <p
-      className="font-medium"
-      style={{
-        fontSize: 12,
-        color: "rgba(255,255,255,0.4)",
-        lineHeight: 1.6,
-        letterSpacing: "0.02em",
-      }}
-    >
-      Tap multiple times to remove more areas.{" "}
-      <span style={{ color: "rgba(255,255,255,0.6)", fontWeight: 700 }}>Undo</span>{" "}
-      to go back.
     </p>
   </div>
 
