@@ -1742,7 +1742,7 @@ export default function Design() {
       <div
         className="relative w-full overflow-hidden shrink-0"
         style={{
-          height: "150vw",
+          height: "100vw",
           touchAction: "pan-y",
           display: "flex",
           alignItems: "center",
@@ -1776,7 +1776,7 @@ export default function Design() {
           <div
             className="relative"
             style={{
-              width: `${mockupSize}px`,
+              width: "100vw",
               aspectRatio: "3/4",
               transform: `translateY(${mockupOffsetY}px) scale(${viewZoom})`,
               transformOrigin: "center center",
