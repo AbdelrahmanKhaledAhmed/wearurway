@@ -150,7 +150,7 @@ export default function Design() {
   const clipAreaRef = useRef<HTMLDivElement>(null);
   const mobileClipAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
-  const pinchRef = useRef<{ dist: number; midX: number; midY: number } | null>(null);
+  const pinchRef = useRef<{ dist: number; midX: number; midY: number } | null>(null); const rotateRef = useRef<{ angle: number } | null>(null);
   const mockupSizeRef = useRef(mockupSize);
   useEffect(() => { mockupSizeRef.current = mockupSize; }, [mockupSize]);
 
@@ -545,11 +545,14 @@ export default function Design() {
   const onTouchStart = useCallback((e: TouchEvent) => {
     if (e.touches.length === 2) {
       e.preventDefault();
+      const dx = e.touches[1].clientX - e.touches[0].clientX;
+      const dy = e.touches[1].clientY - e.touches[0].clientY;
       pinchRef.current = {
         dist: getTouchDist(e),
         midX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
         midY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
       };
+      rotateRef.current = { angle: Math.atan2(dy, dx) };
     }
   }, []);
 
@@ -557,21 +560,35 @@ export default function Design() {
     if (e.touches.length === 2 && pinchRef.current) {
       e.preventDefault();
       const newDist = getTouchDist(e);
-      const ratio = newDist / pinchRef.current.dist;
+      const scaleRatio = newDist / pinchRef.current.dist;
+
+      const dx = e.touches[1].clientX - e.touches[0].clientX;
+      const dy = e.touches[1].clientY - e.touches[0].clientY;
+      const newAngle = Math.atan2(dy, dx);
+      const prevAngle = rotateRef.current?.angle ?? newAngle;
+      const angleDeltaDeg = ((newAngle - prevAngle) * 180) / Math.PI;
+      if (rotateRef.current) rotateRef.current.angle = newAngle;
+
       const newMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       const newMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      const dx = (newMidX - pinchRef.current.midX) / (viewZoomRef.current || 1);
-      const dy = (newMidY - pinchRef.current.midY) / (viewZoomRef.current || 1);
+      const panDx = (newMidX - pinchRef.current.midX) / (viewZoomRef.current || 1);
+      const panDy = (newMidY - pinchRef.current.midY) / (viewZoomRef.current || 1);
       pinchRef.current.dist = newDist;
       pinchRef.current.midX = newMidX;
       pinchRef.current.midY = newMidY;
+
       setSelectedLayerId(prev => {
         if (!prev) return prev;
         setLayers(layers =>
           layers.map(l => {
             if (l.id !== prev) return l;
-            const scaled = scaleLayerAtPoint(l, ratio);
-            return { ...scaled, x: scaled.x + dx, y: scaled.y + dy };
+            const scaled = scaleLayerAtPoint(l, scaleRatio);
+            return {
+              ...scaled,
+              x: scaled.x + panDx,
+              y: scaled.y + panDy,
+              rotation: (scaled.rotation + angleDeltaDeg + 360) % 360,
+            };
           })
         );
         return prev;
@@ -581,6 +598,7 @@ export default function Design() {
 
   const onTouchEnd = useCallback(() => {
     pinchRef.current = null;
+    rotateRef.current = null;
   }, []);
 
   useEffect(() => {
