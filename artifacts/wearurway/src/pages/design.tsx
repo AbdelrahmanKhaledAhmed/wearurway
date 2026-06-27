@@ -200,6 +200,7 @@ export default function Design() {
     }
   }, [viewZoom]);
   const [snapActive, setSnapActive] = useState(false);
+  const [rotationSnapActive, setRotationSnapActive] = useState(false);
   const holdActionRef = useRef<(() => void) | null>(null);
   const holdTimerRef = useRef<{ timeout: ReturnType<typeof setTimeout> | null; interval: ReturnType<typeof setInterval> | null }>({ timeout: null, interval: null });
 
@@ -590,9 +591,14 @@ export default function Design() {
               x: scaled.x + panDx,
               y: scaled.y + panDy,
               rotation: (() => {
-               const raw = (scaled.rotation + angleDeltaDeg + 360) % 360;
-               const snapped = ROTATION_SNAP_ANGLES.find(a => Math.abs(raw - a) < ROTATION_SNAP_THRESHOLD);
-               return snapped !== undefined ? snapped : raw;
+                 const raw = (scaled.rotation + angleDeltaDeg + 360) % 360;
+                 const snapped = ROTATION_SNAP_ANGLES.find(a => Math.abs(raw - a) < ROTATION_SNAP_THRESHOLD);
+                 if (snapped !== undefined) {
+                   setRotationSnapActive(true);
+                   return snapped;
+                 }
+                 setRotationSnapActive(false);
+                 return raw;
               })(),
             };
           })
@@ -605,6 +611,7 @@ export default function Design() {
   const onTouchEnd = useCallback(() => {
     pinchRef.current = null;
     rotateRef.current = null;
+    setRotationSnapActive(false);
   }, []);
 
   useEffect(() => {
@@ -1436,6 +1443,39 @@ export default function Design() {
                 }}
               />
             )}
+            {/* ── Rotation snap guides ── */}
+            {rotationSnapActive && (
+              <>
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: 0,
+                    right: 0,
+                    height: "1px",
+                    backgroundColor: "#f5c842",
+                    zIndex: 20,
+                    pointerEvents: "none",
+                    opacity: 0.75,
+                    transform: "translateY(-50%)",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    bottom: 0,
+                    left: "50%",
+                    width: "1px",
+                    backgroundColor: "#f5c842",
+                    zIndex: 20,
+                    pointerEvents: "none",
+                    opacity: 0.75,
+                    transform: "translateX(-50%)",
+                  }}
+                />
+              </>
+            )}
 
             {/* ── Design clip area ── */}
             {/* z-index 5 places designs above the shirt (z-index 1). */}
@@ -1775,7 +1815,39 @@ export default function Design() {
                 }}
               />
             )}
-
+            {/* Rotation snap guides */}
+            {rotationSnapActive && (
+              <>
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: 0,
+                    right: 0,
+                    height: "1px",
+                    backgroundColor: "#f5c842",
+                    zIndex: 20,
+                    pointerEvents: "none",
+                    opacity: 0.75,
+                    transform: "translateY(-50%)",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    bottom: 0,
+                    left: "50%",
+                    width: "1px",
+                    backgroundColor: "#f5c842",
+                    zIndex: 20,
+                    pointerEvents: "none",
+                    opacity: 0.75,
+                    transform: "translateX(-50%)",
+                  }}
+                />
+              </>
+            )}
             {/* Design clip area (touch-draggable layers) */}
             <div
               ref={mobileClipAreaRef}
