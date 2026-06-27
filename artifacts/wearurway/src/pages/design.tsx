@@ -49,7 +49,7 @@ const MAX_LAYER_SCALE = 200;
 const ROTATE_STEP = 1;
 const SNAP_THRESHOLD = 8;
 const ROTATION_SNAP_ANGLES = [0, 90, 180, 270];
-const ROTATION_SNAP_THRESHOLD = 5;
+const ROTATION_SNAP_THRESHOLD = 2;
 
 const SAVE_KEY = (productId: string, fitId: string, colorId: string) =>
   `ww_design_${productId}_${fitId}_${colorId}`;
