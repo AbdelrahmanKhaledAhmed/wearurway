@@ -100,7 +100,10 @@ export default function AddImageModal({ onBrowse, onFile, onCancel }: Props) {
           <h2 className="text-xl font-black uppercase tracking-wide leading-tight">
             Upload Your Artwork
           </h2>
-          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+          <p className="text-xs text-muted-foreground mt-2 leading-relaxed md:hidden">
+            Choose a file from your device.
+          </p>
+          <p className="text-xs text-muted-foreground mt-2 leading-relaxed hidden md:block">
             Choose a file from your device or drop it anywhere on this window.
           </p>
         </div>
@@ -122,28 +125,30 @@ export default function AddImageModal({ onBrowse, onFile, onCancel }: Props) {
           </span>
         </button>
 
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-px bg-border" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground">
-            Or
-          </span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
+       <div className="hidden md:block">
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground">
+              Or
+            </span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
 
-        <div
-          className={`w-full border-2 border-dashed px-4 py-10 text-center transition-colors ${
-            isDragging
-              ? "border-foreground bg-foreground/5"
-              : "border-border"
-          }`}
-        >
-          <p className="text-3xl mb-3 leading-none">⬆</p>
-          <p className="text-xs font-bold uppercase tracking-widest mb-1">
-            Drag & Drop
-          </p>
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Drop an image anywhere on this window
-          </p>
+          <div
+            className={`w-full border-2 border-dashed px-4 py-10 text-center transition-colors ${
+              isDragging
+                ? "border-foreground bg-foreground/5"
+                : "border-border"
+            }`}
+          >
+            <p className="text-3xl mb-3 leading-none">⬆</p>
+            <p className="text-xs font-bold uppercase tracking-widest mb-1">
+              Drag & Drop
+            </p>
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Drop an image anywhere on this window
+            </p>
+          </div>
         </div>
       </div>
     </div>
