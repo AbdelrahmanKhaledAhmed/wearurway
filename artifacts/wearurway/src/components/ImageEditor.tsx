@@ -911,11 +911,13 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
           </div>
           <div className="flex items-center gap-0.5 md:gap-1">
             <button onClick={doUndo} disabled={!canUndo} title="Undo (Ctrl+Z)"
-              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/10 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest">
+              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest"
+              style={{ color: "#ffffff" }}>
               <UndoIcon/> <span className="hidden md:inline">Undo</span>
             </button>
             <button onClick={doRedo} disabled={!canRedo} title="Redo (Ctrl+Y)"
-              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/10 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest">
+              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 disabled:opacity-25 transition-all text-[11px] font-bold uppercase tracking-widest"
+              style={{ color: "#ffffff" }}>
               <span className="hidden md:inline">Redo</span> <RedoIcon/>
             </button>
           </div>
@@ -1076,25 +1078,47 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
     </span>
   </button>
 
-  {/* Sensitivity slider */}
-  <div className="flex flex-col gap-3 px-5 py-5">
-    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground">
-      How much to remove
-    </span>
-    <input
-      type="range"
-      min={0}
-      max={100}
-      value={sensitivity}
-      onChange={e => setSensitivity(Number(e.target.value))}
-      className="w-full"
-      style={{ accentColor: "#f5c842" }}
-    />
-    <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-      <span>A little</span>
-      <span>Normal</span>
-      <span>A lot</span>
+  {/* Tap to remove instruction */}
+  <div className="flex flex-col items-center justify-center gap-4 px-5 py-8 text-center">
+    <div
+      className="flex items-center justify-center rounded-full"
+      style={{
+        width: 64,
+        height: 64,
+        backgroundColor: "rgba(245,200,66,0.12)",
+        border: "2px solid rgba(245,200,66,0.35)",
+      }}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f5c842" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 30, height: 30 }}>
+        <path d="M9 11V6a2 2 0 0 1 4 0v5"/>
+        <path d="M13 11V8a2 2 0 0 1 4 0v3"/>
+        <path d="M17 11a2 2 0 0 1 4 0v3a8 8 0 0 1-8 8H9a8 8 0 0 1-8-8V9a2 2 0 0 1 4 0v2"/>
+      </svg>
     </div>
+    <p
+      className="font-black uppercase leading-tight"
+      style={{
+        fontSize: 22,
+        color: "#ffffff",
+        letterSpacing: "0.04em",
+        lineHeight: 1.2,
+      }}
+    >
+      Tap on background<br />to remove
+    </p>
+    <p
+      className="font-medium"
+      style={{
+        fontSize: 12,
+        color: "rgba(255,255,255,0.4)",
+        lineHeight: 1.6,
+        letterSpacing: "0.02em",
+      }}
+    >
+      Tap multiple times to remove more areas.{" "}
+      <span style={{ color: "rgba(255,255,255,0.6)", fontWeight: 700 }}>Undo</span>{" "}
+      to go back.
+    </p>
   </div>
 
   {/* Shortcuts — desktop only */}
@@ -1130,55 +1154,7 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
 
       </div>  {/* ← closes "flex flex-1 min-h-0 flex-col md:flex-row" */}
       
-      {showBgOnboarding && (
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0,0,0,0.82)", backdropFilter: "blur(8px)" }}
-        >
-          <div
-            className="w-full max-w-sm bg-background border border-border p-7 text-center shadow-2xl"
-            style={{}}
-          >
-            <h2 className="text-[20px] font-black text-white mb-3">
-              Tap on background to remove
-            </h2>
-            <p className="text-[12px] mb-6" style={{ color: "rgba(255,255,255,0.5)" }}>
-              Tap multiple times to remove more areas. Use Undo to go back.
-            </p>
-            <label className="flex items-center justify-center gap-2.5 cursor-pointer mb-5 select-none group">
-              <div
-                onClick={() => setOnboardingChecked(c => !c)}
-                className="w-4 h-4 border flex items-center justify-center flex-shrink-0 transition-all"
-                style={{
-                  borderColor: onboardingChecked ? "#f5c842" : "rgba(255,255,255,0.25)",
-                  backgroundColor: onboardingChecked ? "#f5c842" : "transparent",
-                }}
-              >
-                {onboardingChecked && (
-                  <svg viewBox="0 0 10 8" fill="none" className="w-2.5 h-2.5">
-                    <path d="M1 4l3 3 5-6" stroke="#0d0d0d" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                )}
-              </div>
-              <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.5)" }}>
-                I understand, let's go
-              </span>
-            </label>
-            <button
-              onClick={() => { if (onboardingChecked) setShowBgOnboarding(false); }}
-              className="w-full py-4 text-[13px] font-black uppercase tracking-widest transition-all active:scale-[0.98]"
-              style={{
-                backgroundColor: onboardingChecked ? "#f5c842" : "rgba(255,255,255,0.08)",
-                color: onboardingChecked ? "#0d0d0d" : "rgba(255,255,255,0.2)",
-                cursor: onboardingChecked ? "pointer" : "not-allowed",
-              }}
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
-
+      
       {showHelpWizard && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4"
