@@ -85,7 +85,7 @@ export default function Design() {
   const [localBackBbox, setLocalBackBbox] = useState<BBox | null>(null);
   const [mockupSize, setMockupSize] = useState(() =>
     typeof window !== "undefined" && window.innerWidth < 768
-      ? window.innerWidth
+      ? Math.round(window.innerWidth * 1.15)
       : 320
   );
   const [mockupOffsetY, setMockupOffsetY] = useState(0);
@@ -218,7 +218,7 @@ export default function Design() {
     const handler = () => {
       setIsMobileLayout(window.innerWidth < 768);
       if (window.innerWidth < 768) {
-        setMockupSize(window.innerWidth);
+        setMockupSize(Math.round(window.innerWidth * 1.15));
       }
     };
     window.addEventListener("resize", handler);
@@ -268,7 +268,7 @@ export default function Design() {
       if (window.innerWidth >= 768) {
         setMockupSize(mockup.mockupSize);
       } else {
-        setMockupSize(window.innerWidth);
+        setMockupSize(Math.round(window.innerWidth * 1.15));
       }
     }
     if (mockup?.mockupOffsetY !== undefined) setMockupOffsetY(mockup.mockupOffsetY);
@@ -1757,7 +1757,7 @@ export default function Design() {
       <div
         className="relative w-full overflow-hidden shrink-0"
         style={{
-          height: "100vw",
+          height: "125vw",
           touchAction: "pan-y",
           display: "flex",
           alignItems: "center",
