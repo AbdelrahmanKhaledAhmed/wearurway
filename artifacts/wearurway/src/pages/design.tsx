@@ -1443,39 +1443,7 @@ export default function Design() {
                 }}
               />
             )}
-            {/* ── Rotation snap guides ── */}
-            {rotationSnapActive && (
-              <>
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "50%",
-                    left: 0,
-                    right: 0,
-                    height: "1px",
-                    backgroundColor: "#f5c842",
-                    zIndex: 20,
-                    pointerEvents: "none",
-                    opacity: 0.75,
-                    transform: "translateY(-50%)",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    bottom: 0,
-                    left: "50%",
-                    width: "1px",
-                    backgroundColor: "#f5c842",
-                    zIndex: 20,
-                    pointerEvents: "none",
-                    opacity: 0.75,
-                    transform: "translateX(-50%)",
-                  }}
-                />
-              </>
-            )}
+
 
             {/* ── Design clip area ── */}
             {/* z-index 5 places designs above the shirt (z-index 1). */}
@@ -1507,33 +1475,76 @@ export default function Design() {
               {layers.map((layer) =>
                 layer.visible ? (() => {
                   const { width, height } = getRatioLockedSize(layer, layer.width);
+                  const isSnapped = rotationSnapActive && layer.id === selectedLayerId;
+                  const snapAngle = layer.rotation;
+                  const isHorizontal = isSnapped && (Math.abs(snapAngle) < 2 || Math.abs(snapAngle - 180) < 2);
+                  const isVertical = isSnapped && (Math.abs(snapAngle - 90) < 2 || Math.abs(snapAngle - 270) < 2);
                   return (
-                  <img
-                    key={layer.id}
-                    src={layer.imageUrl}
-                    alt={layer.name}
-                    draggable={false}
-                    onMouseDown={e => startDrag(e, layer)}
-                    onTouchStart={e => startTouchDrag(e, layer)}
-                    style={{
-                      position: "absolute",
-                      left: layer.x,
-                      top: layer.y,
-                      width,
-                      height,
-                      minWidth: width,
-                      minHeight: height,
-                      maxWidth: "none",
-                      maxHeight: "none",
-                      transform: `rotate(${layer.rotation}deg)`,
-                      transformOrigin: "center center",
-                      cursor: dragRef.current?.layerId === layer.id ? "grabbing" : "grab",
-                      userSelect: "none",
-                      background: "none",
-                      flexShrink: 0,
-                      imageRendering: "high-quality" as React.CSSProperties["imageRendering"],
-                    }}
-                  />
+                    <div
+                      key={layer.id}
+                      style={{
+                        position: "absolute",
+                        left: layer.x,
+                        top: layer.y,
+                        width,
+                        height,
+                        transform: `rotate(${layer.rotation}deg)`,
+                        transformOrigin: "center center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <img
+                        src={layer.imageUrl}
+                        alt={layer.name}
+                        draggable={false}
+                        onMouseDown={e => startDrag(e, layer)}
+                        onTouchStart={e => startTouchDrag(e, layer)}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          minWidth: width,
+                          minHeight: height,
+                          maxWidth: "none",
+                          maxHeight: "none",
+                          cursor: dragRef.current?.layerId === layer.id ? "grabbing" : "grab",
+                          userSelect: "none",
+                          background: "none",
+                          flexShrink: 0,
+                          imageRendering: "high-quality" as React.CSSProperties["imageRendering"],
+                          display: "block",
+                        }}
+                      />
+                      {isHorizontal && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "50%",
+                            left: 0,
+                            right: 0,
+                            height: "2px",
+                            backgroundColor: "#f5c842",
+                            transform: "translateY(-50%)",
+                            pointerEvents: "none",
+                            zIndex: 30,
+                          }}
+                        />
+                      )}
+                      {isVertical && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: "50%",
+                            top: 0,
+                            bottom: 0,
+                            width: "2px",
+                            backgroundColor: "#f5c842",
+                            transform: "translateX(-50%)",
+                            pointerEvents: "none",
+                            zIndex: 30,
+                          }}
+                        />
+                      )}
+                    </div>
                   );
                 })() : null
               )}
@@ -1815,39 +1826,7 @@ export default function Design() {
                 }}
               />
             )}
-            {/* Rotation snap guides */}
-            {rotationSnapActive && (
-              <>
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "50%",
-                    left: 0,
-                    right: 0,
-                    height: "1px",
-                    backgroundColor: "#f5c842",
-                    zIndex: 20,
-                    pointerEvents: "none",
-                    opacity: 0.75,
-                    transform: "translateY(-50%)",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    bottom: 0,
-                    left: "50%",
-                    width: "1px",
-                    backgroundColor: "#f5c842",
-                    zIndex: 20,
-                    pointerEvents: "none",
-                    opacity: 0.75,
-                    transform: "translateX(-50%)",
-                  }}
-                />
-              </>
-            )}
+          
             {/* Design clip area (touch-draggable layers) */}
             <div
               ref={mobileClipAreaRef}
@@ -1874,33 +1853,76 @@ export default function Design() {
               {layers.map((layer) =>
                 layer.visible ? (() => {
                   const { width, height } = getRatioLockedSize(layer, layer.width);
+                  const isSnapped = rotationSnapActive && layer.id === selectedLayerId;
+                  const snapAngle = layer.rotation;
+                  const isHorizontal = isSnapped && (Math.abs(snapAngle) < 2 || Math.abs(snapAngle - 180) < 2);
+                  const isVertical = isSnapped && (Math.abs(snapAngle - 90) < 2 || Math.abs(snapAngle - 270) < 2);
                   return (
-                    <img
+                    <div
                       key={layer.id}
-                      src={layer.imageUrl}
-                      alt={layer.name}
-                      draggable={false}
-                      onMouseDown={e => startDrag(e, layer)}
-                      onTouchStart={e => startTouchDrag(e, layer)}
                       style={{
                         position: "absolute",
                         left: layer.x,
                         top: layer.y,
                         width,
                         height,
-                        minWidth: width,
-                        minHeight: height,
-                        maxWidth: "none",
-                        maxHeight: "none",
                         transform: `rotate(${layer.rotation}deg)`,
                         transformOrigin: "center center",
-                        cursor: touchDragRef.current?.layerId === layer.id ? "grabbing" : "grab",
-                        userSelect: "none",
-                        background: "none",
                         flexShrink: 0,
-                        imageRendering: "high-quality" as React.CSSProperties["imageRendering"],
                       }}
-                    />
+                    >
+                      <img
+                        src={layer.imageUrl}
+                        alt={layer.name}
+                        draggable={false}
+                        onMouseDown={e => startDrag(e, layer)}
+                        onTouchStart={e => startTouchDrag(e, layer)}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          minWidth: width,
+                          minHeight: height,
+                          maxWidth: "none",
+                          maxHeight: "none",
+                          cursor: touchDragRef.current?.layerId === layer.id ? "grabbing" : "grab",
+                          userSelect: "none",
+                          background: "none",
+                          flexShrink: 0,
+                          imageRendering: "high-quality" as React.CSSProperties["imageRendering"],
+                          display: "block",
+                        }}
+                      />
+                      {isHorizontal && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "50%",
+                            left: 0,
+                            right: 0,
+                            height: "2px",
+                            backgroundColor: "#f5c842",
+                            transform: "translateY(-50%)",
+                            pointerEvents: "none",
+                            zIndex: 30,
+                          }}
+                        />
+                      )}
+                      {isVertical && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: "50%",
+                            top: 0,
+                            bottom: 0,
+                            width: "2px",
+                            backgroundColor: "#f5c842",
+                            transform: "translateX(-50%)",
+                            pointerEvents: "none",
+                            zIndex: 30,
+                          }}
+                        />
+                      )}
+                    </div>
                   );
                 })() : null
               )}
