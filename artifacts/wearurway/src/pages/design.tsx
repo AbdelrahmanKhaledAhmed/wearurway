@@ -48,6 +48,8 @@ const MIN_LAYER_SIZE = 10;
 const MAX_LAYER_SCALE = 200;
 const ROTATE_STEP = 1;
 const SNAP_THRESHOLD = 8;
+const ROTATION_SNAP_ANGLES = [0, 90, 180, 270];
+const ROTATION_SNAP_THRESHOLD = 5;
 
 const SAVE_KEY = (productId: string, fitId: string, colorId: string) =>
   `ww_design_${productId}_${fitId}_${colorId}`;
@@ -587,7 +589,11 @@ export default function Design() {
               ...scaled,
               x: scaled.x + panDx,
               y: scaled.y + panDy,
-              rotation: (scaled.rotation + angleDeltaDeg + 360) % 360,
+              rotation: (() => {
+               const raw = (scaled.rotation + angleDeltaDeg + 360) % 360;
+               const snapped = ROTATION_SNAP_ANGLES.find(a => Math.abs(raw - a) < ROTATION_SNAP_THRESHOLD);
+               return snapped !== undefined ? snapped : raw;
+              })(),
             };
           })
         );
@@ -650,7 +656,11 @@ export default function Design() {
       prev.map(l => {
         if (l.id !== selectedLayerId) return l;
         const delta = direction === "cw" ? ROTATE_STEP : -ROTATE_STEP;
-        return { ...l, rotation: (l.rotation + delta + 360) % 360 };
+        return (() => {
+         const raw = (l.rotation + delta + 360) % 360;
+         const snapped = ROTATION_SNAP_ANGLES.find(a => Math.abs(raw - a) < ROTATION_SNAP_THRESHOLD);
+         return { ...l, rotation: snapped !== undefined ? snapped : raw };
+        })();
       })
     );
   }, [selectedLayerId]);
