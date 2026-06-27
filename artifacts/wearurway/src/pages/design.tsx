@@ -83,7 +83,11 @@ export default function Design() {
   const [side, setSide] = useState<"front" | "back">("front");
   const [localFrontBbox, setLocalFrontBbox] = useState<BBox | null>(null);
   const [localBackBbox, setLocalBackBbox] = useState<BBox | null>(null);
-  const [mockupSize, setMockupSize] = useState(320);
+  const [mockupSize, setMockupSize] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < 768
+      ? window.innerWidth
+      : 320
+  );
   const [mockupOffsetY, setMockupOffsetY] = useState(0);
   // Add this state near the other state declarations in design.tsx
   const [orderModalClipDims, setOrderModalClipDims] = useState<{w: number, h: number} | null>(null);
@@ -211,7 +215,12 @@ export default function Design() {
   }, [selectedProduct, selectedFit, selectedColor, setLocation, isAdminPreview]);
 
   useEffect(() => {
-    const handler = () => setIsMobileLayout(window.innerWidth < 768);
+    const handler = () => {
+      setIsMobileLayout(window.innerWidth < 768);
+      if (window.innerWidth < 768) {
+        setMockupSize(window.innerWidth);
+      }
+    };
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, []);
@@ -255,7 +264,13 @@ export default function Design() {
   useEffect(() => {
     if (mockup?.front?.boundingBox) setLocalFrontBbox(mockup.front.boundingBox as BBox);
     if (mockup?.back?.boundingBox) setLocalBackBbox(mockup.back.boundingBox as BBox);
-    if (mockup?.mockupSize) setMockupSize(mockup.mockupSize);
+    if (mockup?.mockupSize) {
+      if (window.innerWidth >= 768) {
+        setMockupSize(mockup.mockupSize);
+      } else {
+        setMockupSize(window.innerWidth);
+      }
+    }
     if (mockup?.mockupOffsetY !== undefined) setMockupOffsetY(mockup.mockupOffsetY);
   }, [mockup]);
 
@@ -1776,7 +1791,7 @@ export default function Design() {
           <div
             className="relative"
             style={{
-              width: "100vw",
+              width: `${mockupSize}px`,
               aspectRatio: "3/4",
               transform: `translateY(${mockupOffsetY}px) scale(${viewZoom})`,
               transformOrigin: "center center",
