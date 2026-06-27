@@ -911,14 +911,14 @@ export default function ImageEditor({ file, onConfirm, onCancel, qualityScale=1,
           </div>
           <div className="flex items-center gap-0.5 md:gap-1">
             <button onClick={doUndo} disabled={!canUndo} title="Undo (Ctrl+Z)"
-              className="flex items-center gap-1.5 px-3 py-2 disabled:opacity-25 transition-all font-black uppercase tracking-widest"
-              style={{ backgroundColor: "#f5c842", color: "#0d0d0d", fontSize: 13 }}>
-              <UndoIcon/> Undo
+              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 disabled:opacity-25 transition-all text-[13px] font-bold uppercase tracking-widest"
+              style={{ color: "#ffffff" }}>
+              <UndoIcon/> <span>Undo</span>
             </button>
             <button onClick={doRedo} disabled={!canRedo} title="Redo (Ctrl+Y)"
-              className="flex items-center gap-1.5 px-3 py-2 disabled:opacity-25 transition-all font-black uppercase tracking-widest"
-              style={{ backgroundColor: "#f5c842", color: "#0d0d0d", fontSize: 13 }}>
-              Redo <RedoIcon/>
+              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 disabled:opacity-25 transition-all text-[13px] font-bold uppercase tracking-widest"
+              style={{ color: "#ffffff" }}>
+              <span>Redo</span> <RedoIcon/>
             </button>
           </div>
         </div>
