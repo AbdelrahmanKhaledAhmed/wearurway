@@ -2038,7 +2038,7 @@ export default function Design() {
       {/* ── Layers button — inside navbar bar ── */}
       <button
         onClick={() => setShowLayersSheet(true)}
-        className="fixed top-0 right-0 z-50 flex items-center gap-1.5 px-4 h-16 border-l border-border bg-background text-xs font-bold uppercase tracking-widest hover:border-foreground transition-colors"
+        className="fixed top-0 right-0 z-50 flex items-center gap-1.5 px-4 h-16 bg-background text-xs font-bold uppercase tracking-widest transition-colors"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
           <rect x="2" y="3" width="20" height="4" rx="1" />
