@@ -2113,7 +2113,7 @@ export default function Design() {
                               e.stopPropagation();
                               setLayers(prev => prev.map(l => l.id === layer.id ? { ...l, visible: !l.visible } : l));
                             }}
-                            className={`text-xs px-2 py-1 border transition-colors ${layer.visible ? "border-border" : "border-border/30 text-muted-foreground/30"}`}
+                            className={`text-xs px-2 py-1.5 border transition-colors flex items-center justify-center ${layer.visible ? "border-border" : "border-border/30 text-muted-foreground/30"}`}
                           >
                             {layer.visible ? (
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
