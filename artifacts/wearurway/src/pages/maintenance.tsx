@@ -6,19 +6,44 @@ export default function Maintenance() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#111",
+        background: "#000000",
         color: "#fff",
-        fontFamily: "Arial, sans-serif",
         textAlign: "center",
         padding: "20px",
       }}
     >
-      <div style={{ maxWidth: 500 }}>
-        <h1 style={{ fontSize: 28, marginBottom: 10 }}>
-          We're making some improvements
+      <style>{`
+        @font-face {
+          font-family: 'Moderniz';
+          src: url('/fonts/Moderniz.woff2') format('woff2');
+          font-weight: normal;
+          font-style: normal;
+        }
+      `}</style>
+      <div style={{ maxWidth: 600 }}>
+        <h1
+          style={{
+            fontFamily: "'Moderniz', sans-serif",
+            fontWeight: "bold",
+            textTransform: "uppercase",
+            fontSize: 36,
+            marginBottom: 14,
+            letterSpacing: "1px",
+          }}
+        >
+          We're Making Some Improvements
         </h1>
-        <p style={{ color: "#aaa", fontSize: 16 }}>
-          Wearurway is temporarily down for maintenance. We'll be back online shortly. Thanks for your patience!
+        <p
+          style={{
+            fontFamily: "'Moderniz', sans-serif",
+            fontWeight: "bold",
+            textTransform: "uppercase",
+            color: "#fff",
+            fontSize: 16,
+            letterSpacing: "0.5px",
+          }}
+        >
+          Wearurway Is Temporarily Down For Maintenance. We'll Be Back Online Shortly. Thanks For Your Patience!
         </p>
       </div>
     </div>
