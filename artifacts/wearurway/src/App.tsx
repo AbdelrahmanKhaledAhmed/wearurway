@@ -18,6 +18,9 @@ import Checkout from "@/pages/checkout";
 import { Navbar } from "@/components/layout/navbar";
 import { CustomizerProvider } from "@/hooks/use-customizer";
 import { getAdminToken } from "@/lib/admin-token";
+import Maintenance from "@/pages/maintenance";
+
+const MAINTENANCE_MODE = true; // change to false to bring site back online
 
 const queryClient = new QueryClient();
 
@@ -47,6 +50,10 @@ function Router() {
 
 
 function App() {
+  if (MAINTENANCE_MODE) {
+    return <Maintenance />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <CustomizerProvider>
