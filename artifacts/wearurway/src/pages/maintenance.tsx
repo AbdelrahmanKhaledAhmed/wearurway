@@ -2,7 +2,8 @@ export default function Maintenance() {
   return (
     <div
       style={{
-        height: "100vh",
+        minHeight: "100vh",
+        width: "100%",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -13,6 +14,12 @@ export default function Maintenance() {
       }}
     >
       <style>{`
+        html, body, #root {
+          margin: 0;
+          padding: 0;
+          height: 100%;
+          background: #000000 !important;
+        }
         @font-face {
           font-family: 'Moderniz';
           src: url('/fonts/Moderniz.woff2') format('woff2');
