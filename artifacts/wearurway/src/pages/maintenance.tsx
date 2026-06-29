@@ -11,6 +11,7 @@ export default function Maintenance() {
         color: "#fff",
         textAlign: "center",
         padding: "20px",
+        boxSizing: "border-box",
       }}
     >
       <style>{`
@@ -27,15 +28,17 @@ export default function Maintenance() {
           font-style: normal;
         }
       `}</style>
-      <div style={{ maxWidth: 600 }}>
+      <div style={{ maxWidth: 600, width: "100%" }}>
         <h1
           style={{
             fontFamily: "'Moderniz', sans-serif",
             fontWeight: "bold",
             textTransform: "uppercase",
-            fontSize: 36,
+            fontSize: "clamp(22px, 6vw, 36px)",
             marginBottom: 14,
             letterSpacing: "1px",
+            lineHeight: 1.2,
+            wordBreak: "break-word",
           }}
         >
           We're Making Some Improvements
@@ -46,8 +49,10 @@ export default function Maintenance() {
             fontWeight: "bold",
             textTransform: "uppercase",
             color: "#fff",
-            fontSize: 16,
+            fontSize: "clamp(13px, 3.5vw, 16px)",
             letterSpacing: "0.5px",
+            lineHeight: 1.4,
+            wordBreak: "break-word",
           }}
         >
           Wearurway Is Temporarily Down For Maintenance. We'll Be Back Online Shortly. Thanks For Your Patience!
