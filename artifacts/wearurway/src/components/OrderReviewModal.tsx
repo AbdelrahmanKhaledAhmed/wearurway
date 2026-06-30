@@ -211,11 +211,7 @@ export default function OrderReviewModal({
     clipH: Math.round(mockupSize * 4 / 3),
   });
 
-  const hasFront = frontLayers.some(l => l.visible);
-  const hasBack  = backLayers.some(l => l.visible);
-  const price    = hasFront && hasBack
-    ? (orderSettings?.frontBackPrice ?? 700)
-    : (orderSettings?.frontOnlyPrice ?? 550);
+  const price = orderSettings?.price ?? 600;
 
   const previewParamsRef = useRef({
     mockup, localFrontBbox, localBackBbox, frontLayers, backLayers, mockupSize, clipW, clipH,
