@@ -1576,8 +1576,7 @@ function OrderSettingsManager() {
     shippingCompanyName: "Wasslaha Standard",
     shippingDescription: "Delivered in 2–3 working days",
     shippingPrice: 85,
-    frontOnlyPrice: 550,
-    frontBackPrice: 700,
+    price: 600,
     instaPayPhone: "01069383482",
     contactPhone: "01069383482",
     telegramChatId: "",
@@ -1590,8 +1589,7 @@ function OrderSettingsManager() {
       shippingCompanyName: settings.shippingCompanyName,
       shippingDescription: settings.shippingDescription,
       shippingPrice: settings.shippingPrice,
-      frontOnlyPrice: settings.frontOnlyPrice,
-      frontBackPrice: settings.frontBackPrice,
+      price: settings.price,
       instaPayPhone: settings.instaPayPhone,
       contactPhone: settings.contactPhone ?? settings.instaPayPhone ?? "",
       telegramChatId: settings.telegramChatId ?? "",
@@ -1639,12 +1637,8 @@ function OrderSettingsManager() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-xs uppercase tracking-widest">Price for Front Only</Label>
-              <Input type="number" value={form.frontOnlyPrice} onChange={setNumber("frontOnlyPrice")} className="rounded-none" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs uppercase tracking-widest">Price for Front + Back</Label>
-              <Input type="number" value={form.frontBackPrice} onChange={setNumber("frontBackPrice")} className="rounded-none" />
+              <Label className="text-xs uppercase tracking-widest">T-Shirt Price</Label>
+              <Input type="number" value={form.price} onChange={setNumber("price")} className="rounded-none" />
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
