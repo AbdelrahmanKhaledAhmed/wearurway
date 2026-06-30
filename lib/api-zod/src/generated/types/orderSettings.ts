@@ -10,8 +10,7 @@ export interface OrderSettings {
   shippingCompanyName: string;
   shippingDescription: string;
   shippingPrice: number;
-  frontOnlyPrice: number;
-  frontBackPrice: number;
+  price: number;
   instaPayPhone: string;
   contactPhone?: string;
   telegramChatId?: string;
