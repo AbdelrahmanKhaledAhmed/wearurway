@@ -97,8 +97,7 @@ export interface OrderSettings {
   shippingCompanyName: string;
   shippingDescription: string;
   shippingPrice: number;
-  frontOnlyPrice: number;
-  frontBackPrice: number;
+  price: number;
   instaPayPhone: string;
   contactPhone?: string;
   telegramChatId?: string;
@@ -227,8 +226,7 @@ const DEFAULT_STORE: Store = {
     shippingCompanyName: "Wasslaha Standard",
     shippingDescription: "Delivered in 2–3 working days",
     shippingPrice: 85,
-    frontOnlyPrice: 550,
-    frontBackPrice: 700,
+    price: 600,
     instaPayPhone: "01069383482",
     contactPhone: "01069383482",
   },
