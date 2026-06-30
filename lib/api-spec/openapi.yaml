@@ -757,9 +757,7 @@ components:
           type: string
         shippingPrice:
           type: number
-        frontOnlyPrice:
-          type: number
-        frontBackPrice:
+        price:
           type: number
         instaPayPhone:
           type: string
@@ -767,7 +765,7 @@ components:
           type: string
         showExportButton:
           type: boolean
-      required: [shippingCompanyName, shippingDescription, shippingPrice, frontOnlyPrice, frontBackPrice, instaPayPhone]
+      required: [shippingCompanyName, shippingDescription, shippingPrice, price, instaPayPhone]
 
     OrderSettings:
       type: object
@@ -778,9 +776,7 @@ components:
           type: string
         shippingPrice:
           type: number
-        frontOnlyPrice:
-          type: number
-        frontBackPrice:
+        price:
           type: number
         instaPayPhone:
           type: string
@@ -792,7 +788,7 @@ components:
           type: string
         showExportButton:
           type: boolean
-      required: [shippingCompanyName, shippingDescription, shippingPrice, frontOnlyPrice, frontBackPrice, instaPayPhone]
+      required: [shippingCompanyName, shippingDescription, shippingPrice, price, instaPayPhone]
 
     CreateOrderSize:
       type: object
