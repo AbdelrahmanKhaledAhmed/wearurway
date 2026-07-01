@@ -20,7 +20,7 @@ import { CustomizerProvider } from "@/hooks/use-customizer";
 import { getAdminToken } from "@/lib/admin-token";
 import Maintenance from "@/pages/maintenance";
 
-const MAINTENANCE_MODE = true; // change to false to bring site back online
+const MAINTENANCE_MODE = false; // change to false to bring site back online
 
 const queryClient = new QueryClient();
 
